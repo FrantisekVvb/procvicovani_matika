@@ -43,6 +43,20 @@ Pro generování analýzy s vlastní URL aplikace:
 APP_BASE_URL=http://localhost:3000 node generate-fraction-all-operations-analysis.mjs
 ```
 
+## GitHub Pages
+
+Repozitář obsahuje GitHub Actions workflow pro nasazení na Pages.
+
+1. V repozitáři: **Settings → Pages → Build and deployment → GitHub Actions**.
+2. Volitelně nastav secrets **Settings → Secrets and variables → Actions**:
+   - `SUPABASE_URL` – URL Supabase projektu
+   - `SUPABASE_ANON_KEY` – anon klíč (pro sdílení analýz na Pages)
+3. Po pushi na `main` se spustí workflow **Deploy GitHub Pages**.
+
+Bez secrets se nasadí aplikace s ukázkovou konfigurací – cvičení funguje, ukládání analýz ne.
+
+Workflow **CI** při každém pushi kontroluje syntaxi `main.js` a skriptů `.mjs`.
+
 ## Struktura
 
 - `index.html`, `main.js`, `styles.css` – aplikace
