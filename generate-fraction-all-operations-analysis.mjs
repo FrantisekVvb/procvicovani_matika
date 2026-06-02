@@ -118,7 +118,7 @@ function getSelectedFractionOperations() {
 }
 
 function getFractionCombinedMaxLevel() {
-  return FRACTION_COMBINED_EXTRA_MAX_LEVEL;
+  return FRACTION_COMBINED_EXTRA_MAX_LEVEL + 1;
 }
 `;
 

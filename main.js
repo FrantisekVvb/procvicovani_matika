@@ -50,6 +50,8 @@ const POWER_TEN_BASE_INDEX = 5;
 const POWER_TEN_MULTIPLIERS = [10, 100, 1000];
 const MULTI_OP_MIXED_START_LEVEL = 4;
 const MULTI_OP_EXTRA_MIXED_START_LEVEL = 5;
+const MULTI_OPERAND_DISPLAY_LEVEL = 7;
+const MULTI_OPERAND_COUNT = 4;
 
 const CORRECT_STREAK_TO_LEVEL_UP = 2;
 const PROBLEMS_BEFORE_RETRY = 3;
@@ -59,6 +61,7 @@ const PARENTHESES_RATE = 0.5;
 const APP_TITLE = 'Procvičování matematiky';
 const DECIMAL_APP_TITLE = 'Početní operace s desetinnými čísly';
 const FRACTION_APP_TITLE = 'Početní operace se zlomky';
+const DECIMAL_FRACTION_COMBINED_APP_TITLE = 'Početní operace s desetinnými čísly a se zlomky';
 const BASIC_FORM_PRIMES = [2, 3, 5, 7];
 const FRACTION_BASIC_FORM_MAX_LEVEL = 2;
 const BASIC_FORM_MAX_BY_LEVEL = {
@@ -81,6 +84,8 @@ const FRACTION_DIVIDE_MAX_LEVEL = 3;
 const FRACTION_DIVIDE_LEVEL3_MAX_DEN = 18;
 const FRACTION_DIVIDE_LEVEL3_WHOLE_MAX = 24;
 const FRACTION_DIVIDE_LEVEL4_MAX_DEN = 24;
+const FRACTION_COMPOUND_MAX_LEVEL = 4;
+const COMPOUND_FRACTION_OPS = ['add', 'subtract', 'multiply', 'divide'];
 
 let activeExerciseMode = 'decimal';
 let difficultyLevel = 0;
@@ -227,12 +232,10 @@ function randomDivideDivisor(useDecimal = Math.random() < 0.5) {
 }
 
 function divideDivisorsAreValid(operands, operators) {
-  if (operators[0] === 'divide' && !isValidDivideDivisor(operands[1])) {
-    return false;
-  }
-
-  if (operators[1] === 'divide' && !isValidDivideDivisor(operands[2])) {
-    return false;
+  for (let i = 0; i < operators.length; i += 1) {
+    if (operators[i] === 'divide' && !isValidDivideDivisor(operands[i + 1])) {
+      return false;
+    }
   }
 
   return true;
@@ -265,7 +268,9 @@ function getFractionAnswerMaxValue() {
     || currentProblem?.type === 'fraction-subtract'
     || currentProblem?.type === 'fraction-mixed'
     || currentProblem?.type === 'fraction-multiply'
-    || currentProblem?.type === 'fraction-divide') {
+    || currentProblem?.type === 'fraction-divide'
+    || currentProblem?.type === 'fraction-compound'
+    || currentProblem?.type === 'decimal-fraction-mixed') {
     return FRACTION_ADD_ANSWER_MAX;
   }
 
@@ -278,7 +283,9 @@ function isFractionAnswerProblem(problem) {
     || problem?.type === 'fraction-subtract'
     || problem?.type === 'fraction-mixed'
     || problem?.type === 'fraction-multiply'
-    || problem?.type === 'fraction-divide';
+    || problem?.type === 'fraction-divide'
+    || problem?.type === 'fraction-compound'
+    || problem?.type === 'decimal-fraction-mixed';
 }
 
 function getSelectedFractionOperations(selected = getSelectedFractionModes()) {
@@ -303,19 +310,97 @@ function getSelectedFractionOperations(selected = getSelectedFractionModes()) {
   return operations;
 }
 
+function getFractionOperationModes(selected = getSelectedFractionModes()) {
+  return selected.filter((mode) => mode !== 'basic-form' && mode !== 'fraction-compound');
+}
+
+function isCompoundFractionOnlySelection(selected = getSelectedFractionModes()) {
+  return selected.includes('fraction-compound') && getFractionOperationModes(selected).length === 0;
+}
+
 function hasMultipleFractionOperations(selected = getSelectedFractionModes()) {
   return getSelectedFractionOperations(selected).length >= 2;
 }
 
 function getFractionCombinedMaxLevel(selectedOps = getSelectedFractionOperations()) {
   if (selectedOps.length >= 3) {
-    return FRACTION_COMBINED_EXTRA_MAX_LEVEL;
+    return FRACTION_COMBINED_EXTRA_MAX_LEVEL + 1;
   }
 
   return FRACTION_COMBINED_MAX_LEVEL;
 }
 
+function shouldUseMultiOperandCount(displayLevel, selectedOpsCount) {
+  return displayLevel >= MULTI_OPERAND_DISPLAY_LEVEL && selectedOpsCount >= 3;
+}
+
+function getMixedOperandCount(displayLevel, selectedOpsCount) {
+  return shouldUseMultiOperandCount(displayLevel, selectedOpsCount)
+    ? MULTI_OPERAND_COUNT
+    : 3;
+}
+
+function hasCrossTypeSelection() {
+  return getSelectedOperations().length > 0 && getSelectedFractionOperations().length > 0;
+}
+
+function getCrossTypeOperators() {
+  return [...new Set([
+    ...getRegularOperations(),
+    ...getSelectedFractionOperations(),
+  ])];
+}
+
+function getDecimalMaxLevelForSelection(selected = getSelectedOperations()) {
+  if (selected.length === 0) {
+    return 0;
+  }
+
+  const regularOps = getRegularOperations(selected);
+
+  if (selected.length === 1) {
+    if (regularOps.length === 0) {
+      return POWER_TEN_MULTIPLIERS.length - 1;
+    }
+
+    if (regularOps[0] === 'multiply') {
+      return MAX_REGULAR_MULTIPLY_LEVEL;
+    }
+
+    if (regularOps[0] === 'divide') {
+      return MAX_REGULAR_DIVIDE_LEVEL;
+    }
+
+    return MAX_NON_MULTIPLY_LEVEL;
+  }
+
+  if (regularOps.length >= 3) {
+    return MULTI_OP_EXTRA_MIXED_START_LEVEL + 1;
+  }
+
+  return MULTI_OP_MIXED_START_LEVEL;
+}
+
+function getCrossTypePoolMaxLevel() {
+  return Math.max(
+    getDecimalMaxLevelForSelection(),
+    getFractionCombinedMaxLevel(),
+  );
+}
+
+function getCrossTypeCombinedMaxLevel() {
+  return getCrossTypePoolMaxLevel();
+}
+
+function shouldUseCrossTypeMixedProblem(difficultyLevel) {
+  return difficultyLevel >= getCrossTypePoolMaxLevel();
+}
+
 function resolveActiveExerciseMode() {
+  if (hasCrossTypeSelection()) {
+    return 'decimal-fraction-combined';
+  }
+
   if (getSelectedOperations().length > 0) {
     return 'decimal';
   }
@@ -323,6 +408,10 @@ function resolveActiveExerciseMode() {
   const modes = getSelectedFractionModes();
   if (modes.includes('basic-form')) {
     return 'basic-form';
+  }
+
+  if (isCompoundFractionOnlySelection(modes)) {
+    return 'fraction-compound';
   }
 
   if (hasMultipleFractionOperations(modes)) {
@@ -343,6 +432,10 @@ function resolveActiveExerciseMode() {
 
   if (modes.includes('fraction-divide')) {
     return 'fraction-divide';
+  }
+
+  if (modes.includes('fraction-compound')) {
+    return 'fraction-compound';
   }
 
   return 'decimal';
@@ -950,15 +1043,29 @@ function applyFractionBinaryOperation(left, right, operator) {
 }
 
 function evaluateFractionExpression(terms, operators, parenthesesGroup = null) {
-  const evaluationGroup = resolveEvaluationGroup(operators, parenthesesGroup);
+  if (terms.length === 3 && operators.length === 2) {
+    const evaluationGroup = resolveEvaluationGroup(operators, parenthesesGroup);
 
-  if (evaluationGroup === 1) {
-    const inner = applyFractionBinaryOperation(terms[1], terms[2], operators[1]);
+    if (evaluationGroup === 1) {
+      const inner = applyFractionBinaryOperation(terms[1], terms[2], operators[1]);
+      if (!inner || inner.num <= 0) {
+        return null;
+      }
+
+      const result = applyFractionBinaryOperation(terms[0], inner, operators[0]);
+      if (!result || result.num <= 0) {
+        return null;
+      }
+
+      return reduceFraction(result.num, result.den);
+    }
+
+    const inner = applyFractionBinaryOperation(terms[0], terms[1], operators[0]);
     if (!inner || inner.num <= 0) {
       return null;
     }
 
-    const result = applyFractionBinaryOperation(terms[0], inner, operators[0]);
+    const result = applyFractionBinaryOperation(inner, terms[2], operators[1]);
     if (!result || result.num <= 0) {
       return null;
     }
@@ -966,17 +1073,17 @@ function evaluateFractionExpression(terms, operators, parenthesesGroup = null) {
     return reduceFraction(result.num, result.den);
   }
 
-  const inner = applyFractionBinaryOperation(terms[0], terms[1], operators[0]);
-  if (!inner || inner.num <= 0) {
-    return null;
+  let current = { num: terms[0].num, den: terms[0].den };
+
+  for (let i = 0; i < operators.length; i += 1) {
+    const result = applyFractionBinaryOperation(current, terms[i + 1], operators[i]);
+    if (!result || result.num <= 0) {
+      return null;
+    }
+    current = result;
   }
 
-  const result = applyFractionBinaryOperation(inner, terms[2], operators[1]);
-  if (!result || result.num <= 0) {
-    return null;
-  }
-
-  return reduceFraction(result.num, result.den);
+  return reduceFraction(current.num, current.den);
 }
 
 function evaluateMixedFractionTerms(terms, operators) {
@@ -1025,7 +1132,293 @@ function generateFractionParenthesisPair(innerOperator, maxDen) {
   return null;
 }
 
-function pickFractionCombinedOperators(difficultyLevel, selectedOps) {
+function cloneMixedTerm(term) {
+  return { ...term };
+}
+
+function mixedTermToRational(term) {
+  if (term.kind === 'decimal') {
+    let num = toScaled(term.value, term.decimals);
+    let den = 10 ** term.decimals;
+
+    if (term.wholeFactor != null) {
+      num *= term.wholeFactor;
+    }
+
+    return { num, den };
+  }
+
+  if (term.kind === 'fraction') {
+    return { num: term.num, den: term.den };
+  }
+
+  if (term.kind === 'whole') {
+    return { num: term.value, den: 1 };
+  }
+
+  if (term.kind === 'compound') {
+    return evaluateCompoundPart({
+      type: 'compound',
+      numerator: term.numerator,
+      denominator: term.denominator,
+    });
+  }
+
+  return { num: term.value, den: 1 };
+}
+
+function rationalToMixedTerm(num, den, maxDen = 12) {
+  if (num <= 0) {
+    return null;
+  }
+
+  const common = gcd(num, den);
+  num /= common;
+  den /= common;
+
+  if (num < den && den <= maxDen * 2) {
+    return { kind: 'fraction', num, den };
+  }
+
+  for (let decimals = 1; decimals <= 2; decimals += 1) {
+    const scaled = num * 10 ** decimals;
+    if (scaled % den !== 0) {
+      continue;
+    }
+
+    const value = fromScaled(scaled / den, decimals);
+    if (value >= 0.1 && value <= 9.99) {
+      return { kind: 'decimal', value, decimals };
+    }
+  }
+
+  return null;
+}
+
+function randomMixedDecimalTerm(decimals = null) {
+  const useOneDecimal = decimals === 1 || (decimals === null && Math.random() < 0.5);
+  const actualDecimals = useOneDecimal ? 1 : 2;
+  const min = actualDecimals === 1 ? 0.1 : 0.01;
+  const max = actualDecimals === 1 ? 9.9 : 9.99;
+
+  return {
+    kind: 'decimal',
+    value: randomDecimal(min, max, actualDecimals),
+    decimals: actualDecimals,
+  };
+}
+
+function randomMixedTerm(maxDen, preferDecimal = null) {
+  const useDecimal = preferDecimal ?? Math.random() < 0.5;
+
+  if (useDecimal) {
+    return randomMixedDecimalTerm();
+  }
+
+  const fraction = randomProperFraction(maxDen);
+  return { kind: 'fraction', num: fraction.num, den: fraction.den };
+}
+
+function mixedTermsIncludeBothTypes(terms) {
+  return terms.some((term) => term.kind === 'decimal')
+    && terms.some((term) => term.kind === 'fraction');
+}
+
+function maybeApplyMixedWholeFactor(terms, operators) {
+  for (let i = operators.length - 1; i >= 0; i -= 1) {
+    if (operators[i] !== 'multiply' || terms[i + 1].kind !== 'decimal' || terms[i + 1].wholeFactor != null) {
+      continue;
+    }
+
+    if (Math.random() < 0.45) {
+      terms[i + 1].wholeFactor = randomWhole(2, 9);
+      return;
+    }
+  }
+}
+
+function evaluateMixedDecimalFractionExpression(terms, operators, parenthesesGroup = null) {
+  const rationals = terms.map((term) => mixedTermToRational(term));
+  return evaluateFractionExpression(rationals, operators, parenthesesGroup);
+}
+
+function generateCrossTypeParenthesisPair(innerOperator, maxDen) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    if (innerOperator === 'subtract') {
+      const second = randomMixedTerm(maxDen);
+      const secondRat = mixedTermToRational(second);
+      const inner = randomProperFraction(maxDen);
+
+      if (isUnitFraction(inner)) {
+        continue;
+      }
+
+      const minuendNum = inner.num * secondRat.den + secondRat.num * inner.den;
+      const minuendDen = inner.den * secondRat.den;
+      const minuend = rationalToMixedTerm(minuendNum, minuendDen, maxDen);
+
+      if (!minuend) {
+        continue;
+      }
+
+      if (minuend.kind === second.kind) {
+        continue;
+      }
+
+      return [minuend, cloneMixedTerm(second)];
+    }
+
+    const inner = randomProperFraction(maxDen);
+    if (isUnitFraction(inner)) {
+      continue;
+    }
+
+    const first = randomMixedTerm(maxDen);
+    const firstRat = mixedTermToRational(first);
+    const [secondNum, secondDen] = combineFractions(
+      inner.num,
+      inner.den,
+      firstRat.num,
+      firstRat.den,
+      'subtract',
+    );
+
+    if (secondNum <= 0) {
+      continue;
+    }
+
+    const second = rationalToMixedTerm(secondNum, secondDen, maxDen);
+    if (!second || second.kind === first.kind) {
+      continue;
+    }
+
+    return [cloneMixedTerm(first), second];
+  }
+
+  return null;
+}
+
+function pickCrossTypeOperators(difficultyLevel, selectedOps, operandCount = 3) {
+  return pickFractionCombinedOperators(difficultyLevel, selectedOps, operandCount);
+}
+
+function createCrossTypePoolProblem(difficultyLevel) {
+  if (Math.random() < 0.5) {
+    const level = Math.min(difficultyLevel, getDecimalMaxLevelForSelection());
+    const selected = getSelectedOperations();
+
+    if (selected.length === 1) {
+      return createSingleOperationProblem(selected[0], level);
+    }
+
+    return createMultiOperationProblem(selected, level);
+  }
+
+  const level = Math.min(difficultyLevel, getFractionCombinedMaxLevel());
+  return createFractionCombinedProblem(level);
+}
+
+function createDecimalFractionMixedProblem(difficultyLevel) {
+  const displayLevel = difficultyLevel + 1;
+  const maxDen = 12;
+  const selectedOps = getCrossTypeOperators();
+  const operandCount = getMixedOperandCount(displayLevel, selectedOps.length);
+
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const operators = pickCrossTypeOperators(difficultyLevel, selectedOps, operandCount);
+    const useParentheses = operandCount === 3;
+    const isMixed = useParentheses && operators[0] !== operators[1];
+    const pickedParentheses = isMixed ? pickParenthesesGroup(operators) : null;
+    const grouping = isMixed ? resolveParenthesesGroup(operators, pickedParentheses) : null;
+    let terms;
+
+    if (operandCount === 3 && grouping === 0) {
+      const pair = generateCrossTypeParenthesisPair(operators[0], maxDen);
+      if (!pair) {
+        continue;
+      }
+      terms = [pair[0], pair[1], randomMixedTerm(maxDen, pair[0].kind !== 'decimal')];
+    } else if (operandCount === 3 && grouping === 1) {
+      const pair = generateCrossTypeParenthesisPair(operators[1], maxDen);
+      if (!pair) {
+        continue;
+      }
+      terms = [randomMixedTerm(maxDen, pair[0].kind !== 'decimal'), pair[0], pair[1]];
+    } else if (operandCount === 3) {
+      terms = [
+        randomMixedTerm(maxDen, true),
+        randomMixedTerm(maxDen, false),
+        randomMixedTerm(maxDen),
+      ];
+    } else {
+      terms = [
+        randomMixedTerm(maxDen, true),
+        randomMixedTerm(maxDen, false),
+        randomMixedTerm(maxDen, true),
+        randomMixedTerm(maxDen, false),
+      ];
+    }
+
+    if (!mixedTermsIncludeBothTypes(terms)) {
+      continue;
+    }
+
+    maybeApplyMixedWholeFactor(terms, operators);
+
+    const answer = evaluateMixedDecimalFractionExpression(terms, operators, grouping);
+    if (!answer || answer.num <= 0) {
+      continue;
+    }
+
+    if (answer.num > FRACTION_ADD_ANSWER_MAX || answer.den > FRACTION_ADD_ANSWER_MAX) {
+      continue;
+    }
+
+    if (gcd(answer.num, answer.den) !== 1) {
+      continue;
+    }
+
+    return {
+      type: 'decimal-fraction-mixed',
+      terms: terms.map(cloneMixedTerm),
+      operators,
+      parenthesesGroup: grouping,
+      answerNum: answer.num,
+      answerDen: answer.den,
+      level: displayLevel,
+      isRetry: false,
+    };
+  }
+
+  return {
+    type: 'decimal-fraction-mixed',
+    terms: [
+      { kind: 'decimal', value: 0.2, decimals: 1 },
+      { kind: 'fraction', num: 3, den: 4 },
+      { kind: 'decimal', value: 1.2, decimals: 1, wholeFactor: 3 },
+    ],
+    operators: ['divide', 'add'],
+    parenthesesGroup: null,
+    answerNum: 58,
+    answerDen: 15,
+    level: displayLevel,
+    isRetry: false,
+  };
+}
+
+function createDecimalFractionCombinedProblem(difficultyLevel) {
+  if (shouldUseCrossTypeMixedProblem(difficultyLevel)) {
+    return createDecimalFractionMixedProblem(difficultyLevel);
+  }
+
+  return createCrossTypePoolProblem(difficultyLevel);
+}
+
+function pickFractionCombinedOperators(difficultyLevel, selectedOps, operandCount = 3) {
+  if (operandCount > 3) {
+    return pickOperatorsForMultiOperandProblem(difficultyLevel, selectedOps, operandCount);
+  }
+
   const displayLevel = difficultyLevel + 1;
   const mixedPairs = buildMixedOperatorPairs(selectedOps);
 
@@ -1075,32 +1468,30 @@ function shouldUseFractionCombinedMixedProblem(difficultyLevel, selectedOps) {
 function createFractionCombinedMixedProblem(selectedOps, difficultyLevel) {
   const displayLevel = difficultyLevel + 1;
   const maxDen = displayLevel >= FRACTION_MIXED_DISPLAY_LEVEL ? 18 : 12;
+  const operandCount = getMixedOperandCount(displayLevel, selectedOps.length);
 
   for (let attempt = 0; attempt < 200; attempt += 1) {
-    const operators = pickFractionCombinedOperators(difficultyLevel, selectedOps);
-    const isMixed = operators[0] !== operators[1];
+    const operators = pickFractionCombinedOperators(difficultyLevel, selectedOps, operandCount);
+    const useParentheses = operandCount === 3;
+    const isMixed = useParentheses && operators[0] !== operators[1];
     const pickedParentheses = isMixed ? pickParenthesesGroup(operators) : null;
     const grouping = isMixed ? resolveParenthesesGroup(operators, pickedParentheses) : null;
     let terms;
 
-    if (grouping === 0) {
+    if (operandCount === 3 && grouping === 0) {
       const pair = generateFractionParenthesisPair(operators[0], maxDen);
       if (!pair) {
         continue;
       }
       terms = [pair[0], pair[1], randomProperFraction(maxDen)];
-    } else if (grouping === 1) {
+    } else if (operandCount === 3 && grouping === 1) {
       const pair = generateFractionParenthesisPair(operators[1], maxDen);
       if (!pair) {
         continue;
       }
       terms = [randomProperFraction(maxDen), pair[0], pair[1]];
     } else {
-      terms = [
-        randomProperFraction(maxDen),
-        randomProperFraction(maxDen),
-        randomProperFraction(maxDen),
-      ];
+      terms = Array.from({ length: operandCount }, () => randomProperFraction(maxDen));
     }
 
     const answer = evaluateFractionExpression(terms, operators, grouping);
@@ -1501,6 +1892,455 @@ function createFractionDivideProblem(difficultyLevel) {
   );
 }
 
+function cloneCompoundPart(part) {
+  if (part.type === 'fraction') {
+    return { type: 'fraction', num: part.num, den: part.den };
+  }
+
+  if (part.type === 'whole') {
+    return { type: 'whole', value: part.value };
+  }
+
+  if (part.type === 'fraction-expr') {
+    return {
+      type: 'fraction-expr',
+      terms: part.terms.map((term) => ({ ...term })),
+      operators: [...part.operators],
+      parenthesesGroup: part.parenthesesGroup ?? null,
+    };
+  }
+
+  if (part.type === 'mixed-expr') {
+    return {
+      type: 'mixed-expr',
+      terms: part.terms.map(cloneCompoundMixedTerm),
+      operators: [...part.operators],
+      parenthesesGroup: part.parenthesesGroup ?? null,
+    };
+  }
+
+  if (part.type === 'compound') {
+    return {
+      type: 'compound',
+      numerator: cloneCompoundPart(part.numerator),
+      denominator: cloneCompoundPart(part.denominator),
+    };
+  }
+
+  return part;
+}
+
+function cloneCompoundMixedTerm(term) {
+  if (term.kind === 'compound') {
+    return {
+      kind: 'compound',
+      numerator: cloneCompoundPart(term.numerator),
+      denominator: cloneCompoundPart(term.denominator),
+    };
+  }
+
+  return cloneMixedTerm(term);
+}
+
+function evaluateCompoundPart(part) {
+  if (part.type === 'fraction') {
+    return reduceFraction(part.num, part.den);
+  }
+
+  if (part.type === 'whole') {
+    return { num: part.value, den: 1 };
+  }
+
+  if (part.type === 'fraction-expr') {
+    return evaluateFractionExpression(part.terms, part.operators, part.parenthesesGroup ?? null);
+  }
+
+  if (part.type === 'mixed-expr') {
+    const rationals = part.terms.map((term) => mixedTermToRational(term));
+    return evaluateFractionExpression(rationals, part.operators, part.parenthesesGroup ?? null);
+  }
+
+  if (part.type === 'compound') {
+    const numerator = evaluateCompoundPart(part.numerator);
+    const denominator = evaluateCompoundPart(part.denominator);
+
+    if (!numerator || !denominator || denominator.num <= 0) {
+      return null;
+    }
+
+    const raw = divideFractionByFraction(numerator, denominator);
+    return reduceFraction(raw.num, raw.den);
+  }
+
+  return null;
+}
+
+function tryBuildCompoundFractionProblem(numerator, denominator, displayLevel) {
+  const numRat = evaluateCompoundPart(numerator);
+  const denRat = evaluateCompoundPart(denominator);
+
+  if (!numRat || !denRat || numRat.num <= 0 || denRat.num <= 0) {
+    return null;
+  }
+
+  const raw = divideFractionByFraction(numRat, denRat);
+  const answer = reduceFraction(raw.num, raw.den);
+
+  if (answer.num <= 0
+    || answer.num > FRACTION_ADD_ANSWER_MAX
+    || answer.den > FRACTION_ADD_ANSWER_MAX
+    || gcd(answer.num, answer.den) !== 1) {
+    return null;
+  }
+
+  return {
+    type: 'fraction-compound',
+    numerator: cloneCompoundPart(numerator),
+    denominator: cloneCompoundPart(denominator),
+    answerNum: answer.num,
+    answerDen: answer.den,
+    level: displayLevel,
+    isRetry: false,
+  };
+}
+
+function generateCompoundFractionExpr(maxDen) {
+  const operator = pickRandomItem(COMPOUND_FRACTION_OPS);
+
+  for (let attempt = 0; attempt < 150; attempt += 1) {
+    const first = randomProperFraction(maxDen);
+    const second = randomProperFraction(maxDen);
+    const result = applyFractionBinaryOperation(first, second, operator);
+
+    if (!result || result.num <= 0) {
+      continue;
+    }
+
+    return {
+      type: 'fraction-expr',
+      terms: [{ num: first.num, den: first.den }, { num: second.num, den: second.den }],
+      operators: [operator],
+    };
+  }
+
+  return null;
+}
+
+function generateSimpleCompoundPair() {
+  const variant = Math.floor(Math.random() * 3);
+
+  if (variant === 0) {
+    const fraction = randomProperFraction(10);
+    return {
+      numerator: { type: 'fraction', num: fraction.num, den: fraction.den },
+      denominator: { type: 'whole', value: randomWhole(2, 9) },
+    };
+  }
+
+  if (variant === 1) {
+    const fraction = randomProperFraction(10);
+    return {
+      numerator: { type: 'whole', value: randomWhole(2, 9) },
+      denominator: { type: 'fraction', num: fraction.num, den: fraction.den },
+    };
+  }
+
+  const dividend = randomProperFraction(10);
+  const divisor = randomProperFraction(10);
+
+  return {
+    numerator: { type: 'fraction', num: dividend.num, den: dividend.den },
+    denominator: { type: 'fraction', num: divisor.num, den: divisor.den },
+  };
+}
+
+function compoundMixedSideHasDecimalAndFraction(terms) {
+  let hasDecimal = false;
+  let hasFraction = false;
+
+  terms.forEach((term) => {
+    if (term.kind === 'decimal') {
+      hasDecimal = true;
+    }
+
+    if (term.kind === 'fraction') {
+      hasFraction = true;
+    }
+
+    if (term.kind === 'compound') {
+      hasFraction = true;
+    }
+  });
+
+  return hasDecimal && hasFraction;
+}
+
+function generateCompoundMixedSideExpr(maxDen, operator, useNestedCompound) {
+  for (let attempt = 0; attempt < 150; attempt += 1) {
+    let terms;
+
+    if (useNestedCompound) {
+      const nested = generateSimpleCompoundPair();
+      terms = [
+        {
+          kind: 'compound',
+          numerator: nested.numerator,
+          denominator: nested.denominator,
+        },
+        randomMixedTerm(maxDen, Math.random() < 0.5),
+      ];
+    } else {
+      terms = [
+        randomMixedTerm(maxDen, true),
+        randomMixedTerm(maxDen, false),
+      ];
+    }
+
+    if (Math.random() < 0.35) {
+      terms[1] = { kind: 'whole', value: randomWhole(1, 9) };
+    }
+
+    if (!compoundMixedSideHasDecimalAndFraction(terms)) {
+      continue;
+    }
+
+    const rationals = terms.map((term) => mixedTermToRational(term));
+    const result = evaluateFractionExpression(rationals, [operator]);
+
+    if (!result || result.num <= 0) {
+      continue;
+    }
+
+    return {
+      type: 'mixed-expr',
+      terms: terms.map(cloneCompoundMixedTerm),
+      operators: [operator],
+    };
+  }
+
+  return null;
+}
+
+function createCompoundFractionLevel1FractionOverWhole(displayLevel) {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const wholeDivisor = randomWhole(2, 9);
+    const fraction = randomProperFraction(12);
+    const problem = tryBuildCompoundFractionProblem(
+      { type: 'fraction', num: fraction.num, den: fraction.den },
+      { type: 'whole', value: wholeDivisor },
+      displayLevel,
+    );
+
+    if (problem) {
+      return problem;
+    }
+  }
+
+  return tryBuildCompoundFractionProblem(
+    { type: 'fraction', num: 2, den: 3 },
+    { type: 'whole', value: 5 },
+    displayLevel,
+  );
+}
+
+function createCompoundFractionLevel1WholeOverFraction(displayLevel) {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const divisor = randomProperFraction(12);
+    const wholeDividend = randomWhole(2, 12);
+    const raw = divideWholeByFraction(wholeDividend, divisor);
+
+    if (gcd(raw.num, raw.den) !== 1) {
+      continue;
+    }
+
+    const problem = tryBuildCompoundFractionProblem(
+      { type: 'whole', value: wholeDividend },
+      { type: 'fraction', num: divisor.num, den: divisor.den },
+      displayLevel,
+    );
+
+    if (problem) {
+      return problem;
+    }
+  }
+
+  return tryBuildCompoundFractionProblem(
+    { type: 'whole', value: 6 },
+    { type: 'fraction', num: 2, den: 3 },
+    displayLevel,
+  );
+}
+
+function createCompoundFractionLevel1Problem(displayLevel) {
+  if (Math.random() < 0.5) {
+    return createCompoundFractionLevel1WholeOverFraction(displayLevel);
+  }
+
+  return createCompoundFractionLevel1FractionOverWhole(displayLevel);
+}
+
+function createCompoundFractionLevel2Problem(displayLevel) {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const dividend = randomProperFraction(14);
+    const divisor = randomProperFraction(14);
+    const problem = tryBuildCompoundFractionProblem(
+      { type: 'fraction', num: dividend.num, den: dividend.den },
+      { type: 'fraction', num: divisor.num, den: divisor.den },
+      displayLevel,
+    );
+
+    if (problem) {
+      return problem;
+    }
+  }
+
+  return tryBuildCompoundFractionProblem(
+    { type: 'fraction', num: 2, den: 3 },
+    { type: 'fraction', num: 4, den: 5 },
+    displayLevel,
+  );
+}
+
+function createCompoundFractionLevel3Problem(displayLevel) {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const expr = generateCompoundFractionExpr(14);
+
+    if (!expr) {
+      continue;
+    }
+
+    const simple = randomProperFraction(14);
+    const exprOnTop = Math.random() < 0.5;
+    const numerator = exprOnTop
+      ? expr
+      : { type: 'fraction', num: simple.num, den: simple.den };
+    const denominator = exprOnTop
+      ? { type: 'fraction', num: simple.num, den: simple.den }
+      : expr;
+    const problem = tryBuildCompoundFractionProblem(numerator, denominator, displayLevel);
+
+    if (problem) {
+      return problem;
+    }
+  }
+
+  return tryBuildCompoundFractionProblem(
+    {
+      type: 'fraction-expr',
+      terms: [{ num: 1, den: 2 }, { num: 1, den: 3 }],
+      operators: ['add'],
+    },
+    { type: 'fraction', num: 2, den: 5 },
+    displayLevel,
+  );
+}
+
+function createCompoundFractionLevel4Problem(displayLevel) {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const numeratorExpr = generateCompoundFractionExpr(16);
+    const denominatorExpr = generateCompoundFractionExpr(16);
+
+    if (!numeratorExpr || !denominatorExpr) {
+      continue;
+    }
+
+    const problem = tryBuildCompoundFractionProblem(numeratorExpr, denominatorExpr, displayLevel);
+
+    if (problem) {
+      return problem;
+    }
+  }
+
+  return tryBuildCompoundFractionProblem(
+    {
+      type: 'fraction-expr',
+      terms: [{ num: 1, den: 2 }, { num: 1, den: 3 }],
+      operators: ['add'],
+    },
+    {
+      type: 'fraction-expr',
+      terms: [{ num: 2, den: 5 }, { num: 1, den: 4 }],
+      operators: ['multiply'],
+    },
+    displayLevel,
+  );
+}
+
+function createCompoundFractionLevel5Problem(displayLevel) {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const numeratorOperator = pickRandomItem(COMPOUND_FRACTION_OPS);
+    let denominatorOperator = pickRandomItem(COMPOUND_FRACTION_OPS);
+
+    for (let pickAttempt = 0; pickAttempt < 20 && denominatorOperator === numeratorOperator; pickAttempt += 1) {
+      denominatorOperator = pickRandomItem(COMPOUND_FRACTION_OPS);
+    }
+
+    const includeNested = Math.random() < 0.45;
+    const numeratorExpr = generateCompoundMixedSideExpr(12, numeratorOperator, includeNested);
+    const denominatorExpr = generateCompoundMixedSideExpr(
+      12,
+      denominatorOperator,
+      includeNested && Math.random() < 0.5,
+    );
+
+    if (!numeratorExpr || !denominatorExpr) {
+      continue;
+    }
+
+    const problem = tryBuildCompoundFractionProblem(numeratorExpr, denominatorExpr, displayLevel);
+
+    if (problem) {
+      return problem;
+    }
+  }
+
+  return tryBuildCompoundFractionProblem(
+    {
+      type: 'mixed-expr',
+      terms: [
+        {
+          kind: 'compound',
+          numerator: { type: 'fraction', num: 2, den: 3 },
+          denominator: { type: 'whole', value: 5 },
+        },
+        { kind: 'whole', value: 1 },
+      ],
+      operators: ['add'],
+    },
+    {
+      type: 'mixed-expr',
+      terms: [
+        { kind: 'fraction', num: 4, den: 15 },
+        { kind: 'fraction', num: 30, den: 80 },
+      ],
+      operators: ['multiply'],
+    },
+    displayLevel,
+  );
+}
+
+function createCompoundFractionProblem(difficultyLevel) {
+  const displayLevel = difficultyLevel + 1;
+
+  if (displayLevel === 1) {
+    return createCompoundFractionLevel1Problem(displayLevel);
+  }
+
+  if (displayLevel === 2) {
+    return createCompoundFractionLevel2Problem(displayLevel);
+  }
+
+  if (displayLevel === 3) {
+    return createCompoundFractionLevel3Problem(displayLevel);
+  }
+
+  if (displayLevel === 4) {
+    return createCompoundFractionLevel4Problem(displayLevel);
+  }
+
+  return createCompoundFractionLevel5Problem(displayLevel);
+}
+
 function applyRationalStep(num, den, operand, op) {
   const operandScaled = toScaled(operand.value, operand.decimals);
   const operandDen = 10 ** operand.decimals;
@@ -1592,6 +2432,23 @@ function computeExactAnswerRational(operands, operators, answerDecimals, parenth
   }
 
   if (operands.length !== 3) {
+    if (operands.length >= 4) {
+      let num = toScaled(operands[0].value, operands[0].decimals);
+      let den = 10 ** operands[0].decimals;
+
+      for (let i = 0; i < resolvedOperators.length; i += 1) {
+        const nextNum = toScaled(operands[i + 1].value, operands[i + 1].decimals);
+        const nextDen = 10 ** operands[i + 1].decimals;
+        [num, den] = combineFractions(num, den, nextNum, nextDen, resolvedOperators[i]);
+
+        if (num <= 0) {
+          return null;
+        }
+      }
+
+      return finalizeRationalAnswer(num, den, answerDecimals);
+    }
+
     return null;
   }
 
@@ -1670,6 +2527,14 @@ function computeAnswer(operands, operators, answerDecimals, parenthesesGroup = n
     return Math.round(result * factor) / factor;
   }
 
+  if (operands.length >= 4) {
+    result = operands[0].value;
+    for (let i = 0; i < resolvedOperators.length; i += 1) {
+      result = applyOperator(result, operands[i + 1].value, resolvedOperators[i]);
+    }
+    return Math.round(result * factor) / factor;
+  }
+
   if (evaluationGroup === 1) {
     const inner = applyOperator(
       operands[1].value,
@@ -1730,6 +2595,10 @@ function getMaxDifficultyLevel() {
     return FRACTION_BASIC_FORM_MAX_LEVEL;
   }
 
+  if (activeExerciseMode === 'decimal-fraction-combined') {
+    return getCrossTypeCombinedMaxLevel();
+  }
+
   if (activeExerciseMode === 'fraction-add') {
     return FRACTION_ADD_MAX_LEVEL;
   }
@@ -1748,6 +2617,10 @@ function getMaxDifficultyLevel() {
 
   if (activeExerciseMode === 'fraction-divide') {
     return FRACTION_DIVIDE_MAX_LEVEL;
+  }
+
+  if (activeExerciseMode === 'fraction-compound') {
+    return FRACTION_COMPOUND_MAX_LEVEL;
   }
 
   const selected = getSelectedOperations();
@@ -1839,6 +2712,26 @@ function pickOperatorsForLevel(level, regularOps) {
   }
 
   return pickRandomItem(purePairs);
+}
+
+function pickOperatorsForMultiOperandProblem(level, regularOps, operandCount) {
+  const operatorCount = operandCount - 1;
+
+  if (operatorCount === 2) {
+    return pickOperatorsForLevel(level, regularOps);
+  }
+
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const operators = Array.from({ length: operatorCount }, () => pickRandomItem(regularOps));
+
+    if (level >= MULTI_OP_EXTRA_MIXED_START_LEVEL && new Set(operators).size === 1) {
+      continue;
+    }
+
+    return operators;
+  }
+
+  return Array.from({ length: operatorCount }, (_, index) => regularOps[index % regularOps.length]);
 }
 
 function operationFromOperators(operators) {
@@ -2135,14 +3028,11 @@ function createTwoOperandProblem(level, config, operation) {
 function getRestrictedOperandIndices(operators) {
   const indices = new Set();
 
-  if (operators[0] === 'multiply' || operators[0] === 'divide') {
-    indices.add(0);
-    indices.add(1);
-  }
-
-  if (operators[1] === 'multiply' || operators[1] === 'divide') {
-    indices.add(1);
-    indices.add(2);
+  for (let i = 0; i < operators.length; i += 1) {
+    if (operators[i] === 'multiply' || operators[i] === 'divide') {
+      indices.add(i);
+      indices.add(i + 1);
+    }
   }
 
   return indices;
@@ -2168,23 +3058,26 @@ function combinedFriendlyPairIsValid(operands, firstIndex, operator) {
 }
 
 function combinedFriendlyPairsAreValid(operands, operators) {
-  return combinedFriendlyPairIsValid(operands, 0, operators[0])
-    && combinedFriendlyPairIsValid(operands, 1, operators[1]);
-}
-
-function divisorsAreNonZero(operands, operators) {
-  if (operators[0] === 'divide' && operands[1].value === 0) {
-    return false;
-  }
-
-  if (operators[1] === 'divide' && operands[2].value === 0) {
-    return false;
+  for (let i = 0; i < operators.length; i += 1) {
+    if (!combinedFriendlyPairIsValid(operands, i, operators[i])) {
+      return false;
+    }
   }
 
   return true;
 }
 
-function isThreeOperandProblemValid(
+function divisorsAreNonZero(operands, operators) {
+  for (let i = 0; i < operators.length; i += 1) {
+    if (operators[i] === 'divide' && operands[i + 1].value === 0) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function isMultiOperandProblemValid(
   operands,
   operators,
   answer,
@@ -2214,6 +3107,24 @@ function isThreeOperandProblemValid(
   }
 
   return true;
+}
+
+function isThreeOperandProblemValid(
+  operands,
+  operators,
+  answer,
+  combinedMode,
+  answerDecimals,
+  parenthesesGroup = null,
+) {
+  return isMultiOperandProblemValid(
+    operands,
+    operators,
+    answer,
+    combinedMode,
+    answerDecimals,
+    parenthesesGroup,
+  );
 }
 
 function randomCombinedFriendlyOperand() {
@@ -2270,10 +3181,12 @@ function applyCombinedFriendlyRules(operands, operators, config) {
     fillCombinedDividePair(operands, 0, config);
   }
 
-  if (operators[1] === 'multiply' && operators[0] !== 'multiply') {
-    fillCombinedFriendlyPair(operands, 1, config);
-  } else if (operators[1] === 'divide' && operators[0] !== 'divide') {
-    fillCombinedDividePair(operands, 1, config);
+  for (let i = 1; i < operators.length; i += 1) {
+    if (operators[i] === 'multiply' && operators[i - 1] !== 'multiply') {
+      fillCombinedFriendlyPair(operands, i, config);
+    } else if (operators[i] === 'divide' && operators[i - 1] !== 'divide') {
+      fillCombinedDividePair(operands, i, config);
+    }
   }
 }
 
@@ -2296,7 +3209,13 @@ function createThreeOneDecimalProblem(level, config, operators, combinedMode = f
   return buildProblem(operands, operators, 1, level + 1, false, null, parenthesesGroup);
 }
 
-function createThreeMixedDecimalProblem(level, config, operators, combinedMode = false) {
+function createMultiOperandMixedDecimalProblem(
+  level,
+  config,
+  operators,
+  combinedMode = false,
+  operandCount = 3,
+) {
   let operands;
   let answer;
   let parenthesesGroup;
@@ -2305,14 +3224,15 @@ function createThreeMixedDecimalProblem(level, config, operators, combinedMode =
     : new Set();
 
   do {
-    const eligibleForTwoDecimals = [0, 1, 2].filter((index) => !restrictedIndices.has(index));
+    const eligibleForTwoDecimals = Array.from({ length: operandCount }, (_, index) => index)
+      .filter((index) => !restrictedIndices.has(index));
     const twoDecimalCount = eligibleForTwoDecimals.length === 0
       ? 0
       : Math.min(Math.random() < 0.5 ? 1 : 2, eligibleForTwoDecimals.length);
     const shuffledIndices = [...eligibleForTwoDecimals].sort(() => Math.random() - 0.5);
     const twoDecimalIndices = new Set(shuffledIndices.slice(0, twoDecimalCount));
 
-    operands = [0, 1, 2].map((index) => {
+    operands = Array.from({ length: operandCount }, (__, index) => {
       if (twoDecimalIndices.has(index)) {
         return {
           value: randomDecimal(0.01, 9.99, 2),
@@ -2323,16 +3243,20 @@ function createThreeMixedDecimalProblem(level, config, operators, combinedMode =
       return randomOneDecimalOperand(config);
     });
 
-    parenthesesGroup = pickParenthesesGroup(operators);
+    parenthesesGroup = operandCount === 3 ? pickParenthesesGroup(operators) : null;
 
     if (combinedMode) {
       applyCombinedFriendlyRules(operands, operators, config);
     }
 
     answer = computeAnswer(operands, operators, 2, parenthesesGroup);
-  } while (!isThreeOperandProblemValid(operands, operators, answer, combinedMode, 2, parenthesesGroup));
+  } while (!isMultiOperandProblemValid(operands, operators, answer, combinedMode, 2, parenthesesGroup));
 
   return buildProblem(operands, operators, 2, level + 1, false, null, parenthesesGroup);
+}
+
+function createThreeMixedDecimalProblem(level, config, operators, combinedMode = false) {
+  return createMultiOperandMixedDecimalProblem(level, config, operators, combinedMode, 3);
 }
 
 function createSingleOperationProblem(operation, level) {
@@ -2422,6 +3346,18 @@ function createMultiOperationProblem(selected, level) {
   }
 
   const operators = pickOperatorsForLevel(level, regularOps);
+  const operandCount = getMixedOperandCount(level + 1, regularOps.length);
+
+  if (operandCount === MULTI_OPERAND_COUNT) {
+    const multiOperators = pickOperatorsForMultiOperandProblem(level, regularOps, operandCount);
+    return createMultiOperandMixedDecimalProblem(
+      level,
+      DIFFICULTY_LEVELS[4],
+      multiOperators,
+      true,
+      operandCount,
+    );
+  }
 
   if (level >= MULTI_OP_EXTRA_MIXED_START_LEVEL) {
     return createThreeMixedDecimalProblem(level, DIFFICULTY_LEVELS[4], operators, true);
@@ -2433,6 +3369,10 @@ function createMultiOperationProblem(selected, level) {
 function createRandomProblem(level) {
   if (activeExerciseMode === 'basic-form') {
     return createBasicFormProblem(level);
+  }
+
+  if (activeExerciseMode === 'decimal-fraction-combined') {
+    return createDecimalFractionCombinedProblem(level);
   }
 
   if (activeExerciseMode === 'fraction-add') {
@@ -2453,6 +3393,10 @@ function createRandomProblem(level) {
 
   if (activeExerciseMode === 'fraction-divide') {
     return createFractionDivideProblem(level);
+  }
+
+  if (activeExerciseMode === 'fraction-compound') {
+    return createCompoundFractionProblem(level);
   }
 
   const selected = getSelectedOperations();
@@ -2499,22 +3443,27 @@ function formatProblemLevel(problem) {
   return `Úroveň ${getDisplayLevel(problem)}`;
 }
 
+function formatMultiOperandExpression(problem) {
+  const parts = problem.operands.map((operand) => formatDecimal(operand.value, operand.decimals));
+
+  if (problem.operands.length === 3 && problem.parenthesesGroup === 0) {
+    return `(${parts[0]}${formatOperatorSymbol(problem.operators[0])}${parts[1]})${formatOperatorSymbol(problem.operators[1])}${parts[2]}`;
+  }
+
+  if (problem.operands.length === 3 && problem.parenthesesGroup === 1) {
+    return `${parts[0]}${formatOperatorSymbol(problem.operators[0])}(${parts[1]}${formatOperatorSymbol(problem.operators[1])}${parts[2]})`;
+  }
+
+  let expression = parts[0];
+  for (let i = 0; i < problem.operators.length; i += 1) {
+    expression += `${formatOperatorSymbol(problem.operators[i])}${parts[i + 1]}`;
+  }
+
+  return expression;
+}
+
 function formatThreeOperandExpression(problem) {
-  const a = formatDecimal(problem.operands[0].value, problem.operands[0].decimals);
-  const b = formatDecimal(problem.operands[1].value, problem.operands[1].decimals);
-  const c = formatDecimal(problem.operands[2].value, problem.operands[2].decimals);
-  const op1 = formatOperatorSymbol(problem.operators[0]);
-  const op2 = formatOperatorSymbol(problem.operators[1]);
-
-  if (problem.parenthesesGroup === 0) {
-    return `(${a}${op1}${b})${op2}${c}`;
-  }
-
-  if (problem.parenthesesGroup === 1) {
-    return `${a}${op1}(${b}${op2}${c})`;
-  }
-
-  return `${a}${op1}${b}${op2}${c}`;
+  return formatMultiOperandExpression(problem);
 }
 
 function formatSingleFractionHtml(num, den) {
@@ -2590,41 +3539,161 @@ function formatFractionOperatorSymbol(operator, forText = false) {
 }
 
 function formatFractionMixedDisplayHtml(problem) {
-  const f0 = formatSingleFractionHtml(problem.terms[0].num, problem.terms[0].den);
-  const f1 = formatSingleFractionHtml(problem.terms[1].num, problem.terms[1].den);
-  const f2 = formatSingleFractionHtml(problem.terms[2].num, problem.terms[2].den);
-  const op0 = `<span class="problem-expression__operator">${formatFractionOperatorSymbol(problem.operators[0])}</span>`;
-  const op1 = `<span class="problem-expression__operator">${formatFractionOperatorSymbol(problem.operators[1])}</span>`;
+  if (problem.terms.length === 3 && problem.parenthesesGroup != null) {
+    const f0 = formatSingleFractionHtml(problem.terms[0].num, problem.terms[0].den);
+    const f1 = formatSingleFractionHtml(problem.terms[1].num, problem.terms[1].den);
+    const f2 = formatSingleFractionHtml(problem.terms[2].num, problem.terms[2].den);
+    const op0 = `<span class="problem-expression__operator">${formatFractionOperatorSymbol(problem.operators[0])}</span>`;
+    const op1 = `<span class="problem-expression__operator">${formatFractionOperatorSymbol(problem.operators[1])}</span>`;
 
-  let html;
+    let html;
 
-  if (problem.parenthesesGroup === 0) {
-    html = `(${f0}${op0}${f1})${op1}${f2}`;
-  } else if (problem.parenthesesGroup === 1) {
-    html = `${f0}${op0}(${f1}${op1}${f2})`;
-  } else {
-    html = `${f0}${op0}${f1}${op1}${f2}`;
+    if (problem.parenthesesGroup === 0) {
+      html = `(${f0}${op0}${f1})${op1}${f2}`;
+    } else {
+      html = `${f0}${op0}(${f1}${op1}${f2})`;
+    }
+
+    return `<span class="problem-expression">${html}<span class="problem-expression__equals">=</span></span>`;
   }
+
+  let html = formatSingleFractionHtml(problem.terms[0].num, problem.terms[0].den);
+  problem.operators.forEach((operator, index) => {
+    const term = problem.terms[index + 1];
+    html += `<span class="problem-expression__operator">${formatFractionOperatorSymbol(operator)}</span>${formatSingleFractionHtml(term.num, term.den)}`;
+  });
 
   return `<span class="problem-expression">${html}<span class="problem-expression__equals">=</span></span>`;
 }
 
 function formatFractionMixedProblemText(problem) {
-  const a = `${problem.terms[0].num}/${problem.terms[0].den}`;
-  const b = `${problem.terms[1].num}/${problem.terms[1].den}`;
-  const c = `${problem.terms[2].num}/${problem.terms[2].den}`;
-  const op1 = formatFractionOperatorSymbol(problem.operators[0], true);
-  const op2 = formatFractionOperatorSymbol(problem.operators[1], true);
+  if (problem.terms.length === 3 && problem.parenthesesGroup != null) {
+    const a = `${problem.terms[0].num}/${problem.terms[0].den}`;
+    const b = `${problem.terms[1].num}/${problem.terms[1].den}`;
+    const c = `${problem.terms[2].num}/${problem.terms[2].den}`;
+    const op1 = formatFractionOperatorSymbol(problem.operators[0], true);
+    const op2 = formatFractionOperatorSymbol(problem.operators[1], true);
 
-  if (problem.parenthesesGroup === 0) {
-    return `(${a}${op1}${b})${op2}${c} =`;
+    if (problem.parenthesesGroup === 0) {
+      return `(${a}${op1}${b})${op2}${c} =`;
+    }
+
+    if (problem.parenthesesGroup === 1) {
+      return `${a}${op1}(${b}${op2}${c}) =`;
+    }
   }
 
-  if (problem.parenthesesGroup === 1) {
-    return `${a}${op1}(${b}${op2}${c}) =`;
+  let text = `${problem.terms[0].num}/${problem.terms[0].den}`;
+  problem.operators.forEach((operator, index) => {
+    const term = problem.terms[index + 1];
+    text += `${formatFractionOperatorSymbol(operator, true)}${term.num}/${term.den}`;
+  });
+
+  return `${text} =`;
+}
+
+function formatMixedTermHtml(term) {
+  if (term.kind === 'decimal') {
+    let html = `<span class="problem-expression__term">${escapeHtml(formatDecimal(term.value, term.decimals))}</span>`;
+
+    if (term.wholeFactor != null) {
+      html += `<span class="problem-expression__operator">·</span><span class="problem-expression__term">${escapeHtml(term.wholeFactor)}</span>`;
+    }
+
+    return html;
   }
 
-  return `${a}${op1}${b}${op2}${c} =`;
+  if (term.kind === 'fraction') {
+    return formatSingleFractionHtml(term.num, term.den);
+  }
+
+  if (term.kind === 'whole') {
+    return `<span class="problem-expression__term">${escapeHtml(term.value)}</span>`;
+  }
+
+  if (term.kind === 'compound') {
+    return formatNestedCompoundPartHtml(term.numerator, term.denominator);
+  }
+
+  return `<span class="problem-expression__term">${escapeHtml(term.value)}</span>`;
+}
+
+function formatMixedTermText(term) {
+  if (term.kind === 'decimal') {
+    let text = formatDecimal(term.value, term.decimals);
+
+    if (term.wholeFactor != null) {
+      text += ` · ${term.wholeFactor}`;
+    }
+
+    return text;
+  }
+
+  if (term.kind === 'fraction') {
+    return `${term.num}/${term.den}`;
+  }
+
+  if (term.kind === 'whole') {
+    return String(term.value);
+  }
+
+  if (term.kind === 'compound') {
+    return formatNestedCompoundPartText(term.numerator, term.denominator);
+  }
+
+  return String(term.value);
+}
+
+function formatDecimalFractionMixedDisplayHtml(problem) {
+  if (problem.terms.length === 3 && problem.parenthesesGroup != null) {
+    const t0 = formatMixedTermHtml(problem.terms[0]);
+    const t1 = formatMixedTermHtml(problem.terms[1]);
+    const t2 = formatMixedTermHtml(problem.terms[2]);
+    const op0 = `<span class="problem-expression__operator">${formatFractionOperatorSymbol(problem.operators[0])}</span>`;
+    const op1 = `<span class="problem-expression__operator">${formatFractionOperatorSymbol(problem.operators[1])}</span>`;
+
+    let html;
+
+    if (problem.parenthesesGroup === 0) {
+      html = `(${t0}${op0}${t1})${op1}${t2}`;
+    } else {
+      html = `${t0}${op0}(${t1}${op1}${t2})`;
+    }
+
+    return `<span class="problem-expression">${html}<span class="problem-expression__equals">=</span></span>`;
+  }
+
+  let html = formatMixedTermHtml(problem.terms[0]);
+  problem.operators.forEach((operator, index) => {
+    html += `<span class="problem-expression__operator">${formatFractionOperatorSymbol(operator)}</span>${formatMixedTermHtml(problem.terms[index + 1])}`;
+  });
+
+  return `<span class="problem-expression">${html}<span class="problem-expression__equals">=</span></span>`;
+}
+
+function formatDecimalFractionMixedProblemText(problem) {
+  if (problem.terms.length === 3 && problem.parenthesesGroup != null) {
+    const a = formatMixedTermText(problem.terms[0]);
+    const b = formatMixedTermText(problem.terms[1]);
+    const c = formatMixedTermText(problem.terms[2]);
+    const op1 = formatFractionOperatorSymbol(problem.operators[0], true);
+    const op2 = formatFractionOperatorSymbol(problem.operators[1], true);
+
+    if (problem.parenthesesGroup === 0) {
+      return `(${a}${op1}${b})${op2}${c} =`;
+    }
+
+    if (problem.parenthesesGroup === 1) {
+      return `${a}${op1}(${b}${op2}${c}) =`;
+    }
+  }
+
+  let text = formatMixedTermText(problem.terms[0]);
+  problem.operators.forEach((operator, index) => {
+    text += `${formatFractionOperatorSymbol(operator, true)}${formatMixedTermText(problem.terms[index + 1])}`;
+  });
+
+  return `${text} =`;
 }
 
 function formatFractionMultiplyDisplayHtml(problem) {
@@ -2676,6 +3745,99 @@ function formatFractionDivideProblemText(problem) {
   return `${problem.dividendTerm.num}/${problem.dividendTerm.den} : ${problem.divisorTerm.num}/${problem.divisorTerm.den} =`;
 }
 
+function formatCompoundExprPartHtml(part) {
+  if (part.type === 'fraction-expr') {
+    let html = formatSingleFractionHtml(part.terms[0].num, part.terms[0].den);
+    part.operators.forEach((operator, index) => {
+      const term = part.terms[index + 1];
+      html += `<span class="problem-expression__operator">${formatFractionOperatorSymbol(operator)}</span>${formatSingleFractionHtml(term.num, term.den)}`;
+    });
+    return `<span class="problem-expression__inline-expr">${html}</span>`;
+  }
+
+  if (part.type === 'mixed-expr') {
+    let html = formatMixedTermHtml(part.terms[0]);
+    part.operators.forEach((operator, index) => {
+      html += `<span class="problem-expression__operator">${formatFractionOperatorSymbol(operator)}</span>${formatMixedTermHtml(part.terms[index + 1])}`;
+    });
+    return `<span class="problem-expression__inline-expr">${html}</span>`;
+  }
+
+  return formatCompoundPartHtml(part);
+}
+
+function formatCompoundExprPartText(part) {
+  if (part.type === 'fraction-expr') {
+    let text = `${part.terms[0].num}/${part.terms[0].den}`;
+    part.operators.forEach((operator, index) => {
+      const term = part.terms[index + 1];
+      text += `${formatFractionOperatorSymbol(operator, true)}${term.num}/${term.den}`;
+    });
+    return `(${text})`;
+  }
+
+  if (part.type === 'mixed-expr') {
+    let text = formatMixedTermText(part.terms[0]);
+    part.operators.forEach((operator, index) => {
+      text += `${formatFractionOperatorSymbol(operator, true)}${formatMixedTermText(part.terms[index + 1])}`;
+    });
+    return `(${text})`;
+  }
+
+  return formatCompoundPartText(part);
+}
+
+function formatNestedCompoundPartHtml(numerator, denominator) {
+  return `<span class="fraction compound-fraction compound-fraction--nested"><span class="fraction__num">${formatCompoundPartHtml(numerator)}</span><span class="fraction__bar" aria-hidden="true"></span><span class="fraction__den">${formatCompoundPartHtml(denominator)}</span></span>`;
+}
+
+function formatNestedCompoundPartText(numerator, denominator) {
+  return `(${formatCompoundPartText(numerator)})/(${formatCompoundPartText(denominator)})`;
+}
+
+function formatCompoundPartHtml(part) {
+  if (part.type === 'fraction') {
+    return formatSingleFractionHtml(part.num, part.den);
+  }
+
+  if (part.type === 'whole') {
+    return `<span class="problem-expression__term">${escapeHtml(part.value)}</span>`;
+  }
+
+  if (part.type === 'compound') {
+    return formatNestedCompoundPartHtml(part.numerator, part.denominator);
+  }
+
+  return formatCompoundExprPartHtml(part);
+}
+
+function formatCompoundPartText(part) {
+  if (part.type === 'fraction') {
+    return `(${part.num}/${part.den})`;
+  }
+
+  if (part.type === 'whole') {
+    return String(part.value);
+  }
+
+  if (part.type === 'compound') {
+    return formatNestedCompoundPartText(part.numerator, part.denominator);
+  }
+
+  return formatCompoundExprPartText(part);
+}
+
+function formatCompoundFractionDisplayHtml(problem) {
+  const numeratorHtml = formatCompoundPartHtml(problem.numerator);
+  const denominatorHtml = formatCompoundPartHtml(problem.denominator);
+
+  return `<span class="problem-expression problem-expression--compound"><span class="fraction compound-fraction"><span class="fraction__num">${numeratorHtml}</span><span class="fraction__bar compound-fraction__main-bar" aria-hidden="true"></span><span class="fraction__den">${denominatorHtml}</span></span><span class="problem-expression__equals">=</span></span>`;
+}
+
+function formatCompoundFractionProblemText(problem) {
+  return `${formatCompoundPartText(problem.numerator)}/${formatCompoundPartText(problem.denominator)} =`;
+}
+
 function formatProblemText(problem) {
   if (problem.type === 'basic-form') {
     return `${problem.givenNum}/${problem.givenDen} =`;
@@ -2701,12 +3863,20 @@ function formatProblemText(problem) {
     return formatFractionDivideProblemText(problem);
   }
 
+  if (problem.type === 'fraction-compound') {
+    return formatCompoundFractionProblemText(problem);
+  }
+
+  if (problem.type === 'decimal-fraction-mixed') {
+    return formatDecimalFractionMixedProblemText(problem);
+  }
+
   if (getSelectedOperations().length === 0) {
     return 'Vyber alespoň jednu operaci.';
   }
 
   if (problem.operators) {
-    return `${formatThreeOperandExpression(problem)} =`;
+    return `${formatMultiOperandExpression(problem)} =`;
   }
 
   const operator = formatOperatorSymbol(problem.operation);
@@ -3263,7 +4433,9 @@ function setAnswerInputMode(mode) {
     && mode !== 'fraction-subtract'
     && mode !== 'fraction-combined'
     && mode !== 'fraction-multiply'
-    && mode !== 'fraction-divide') {
+    && mode !== 'fraction-divide'
+    && mode !== 'fraction-compound'
+    && mode !== 'decimal-fraction-combined') {
     fractionAnswerInputShape = 'fraction';
   }
 
@@ -3380,6 +4552,16 @@ function showProblem(problem) {
     answerNumeratorEl.maxLength = maxInputLength;
     answerDenominatorEl.maxLength = maxInputLength;
     problemEl.innerHTML = formatFractionDivideDisplayHtml(problem);
+  } else if (problem.type === 'fraction-compound') {
+    const maxInputLength = String(FRACTION_ADD_ANSWER_MAX).length;
+    answerNumeratorEl.maxLength = maxInputLength;
+    answerDenominatorEl.maxLength = maxInputLength;
+    problemEl.innerHTML = formatCompoundFractionDisplayHtml(problem);
+  } else if (problem.type === 'decimal-fraction-mixed') {
+    const maxInputLength = String(FRACTION_ADD_ANSWER_MAX).length;
+    answerNumeratorEl.maxLength = maxInputLength;
+    answerDenominatorEl.maxLength = maxInputLength;
+    problemEl.innerHTML = formatDecimalFractionMixedDisplayHtml(problem);
   } else {
   problemEl.textContent = formatProblemText(problem);
   }
@@ -3442,6 +4624,19 @@ function queueRetry(problem) {
     item.wholeDividend = problem.wholeDividend ?? null;
     item.divisorTerm = problem.divisorTerm ? { ...problem.divisorTerm } : null;
     item.wholeDivisor = problem.wholeDivisor ?? null;
+    item.answerNum = problem.answerNum;
+    item.answerDen = problem.answerDen;
+  } else if (problem.type === 'fraction-compound') {
+    item.type = 'fraction-compound';
+    item.numerator = cloneCompoundPart(problem.numerator);
+    item.denominator = cloneCompoundPart(problem.denominator);
+    item.answerNum = problem.answerNum;
+    item.answerDen = problem.answerDen;
+  } else if (problem.type === 'decimal-fraction-mixed') {
+    item.type = 'decimal-fraction-mixed';
+    item.terms = problem.terms.map(cloneMixedTerm);
+    item.operators = [...problem.operators];
+    item.parenthesesGroup = problem.parenthesesGroup ?? null;
     item.answerNum = problem.answerNum;
     item.answerDen = problem.answerDen;
   } else {
@@ -3544,6 +4739,31 @@ function pickNextProblem() {
       };
     }
 
+    if (dueRetry.type === 'fraction-compound') {
+      return {
+        type: 'fraction-compound',
+        numerator: cloneCompoundPart(dueRetry.numerator),
+        denominator: cloneCompoundPart(dueRetry.denominator),
+        answerNum: dueRetry.answerNum,
+        answerDen: dueRetry.answerDen,
+        level: dueRetry.level,
+        isRetry: true,
+      };
+    }
+
+    if (dueRetry.type === 'decimal-fraction-mixed') {
+      return {
+        type: 'decimal-fraction-mixed',
+        terms: dueRetry.terms.map(cloneMixedTerm),
+        operators: [...dueRetry.operators],
+        parenthesesGroup: dueRetry.parenthesesGroup ?? null,
+        answerNum: dueRetry.answerNum,
+        answerDen: dueRetry.answerDen,
+        level: dueRetry.level,
+        isRetry: true,
+      };
+    }
+
     return {
       operands: dueRetry.operands.map((operand) => ({ ...operand })),
       operation: dueRetry.operation,
@@ -3561,7 +4781,9 @@ function pickNextProblem() {
 
 function updateTitle() {
   if (exerciseScreenEl.hidden && analysisScreenEl.hidden) {
-    appTitleEl.textContent = APP_TITLE;
+    appTitleEl.textContent = hasCrossTypeSelection()
+      ? DECIMAL_FRACTION_COMBINED_APP_TITLE
+      : APP_TITLE;
     return;
   }
 
@@ -3570,8 +4792,14 @@ function updateTitle() {
     || activeExerciseMode === 'fraction-subtract'
     || activeExerciseMode === 'fraction-combined'
     || activeExerciseMode === 'fraction-multiply'
-    || activeExerciseMode === 'fraction-divide') {
+    || activeExerciseMode === 'fraction-divide'
+    || activeExerciseMode === 'fraction-compound') {
     appTitleEl.textContent = FRACTION_APP_TITLE;
+    return;
+  }
+
+  if (activeExerciseMode === 'decimal-fraction-combined') {
+    appTitleEl.textContent = DECIMAL_FRACTION_COMBINED_APP_TITLE;
     return;
   }
 
@@ -3674,6 +4902,7 @@ function handleOperationSelectionChange() {
 function handleFractionModeSelectionChange() {
   showSetupFeedback('');
   updateStartButton();
+  updateTitle();
 }
 
 formEl.addEventListener('submit', (event) => {

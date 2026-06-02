@@ -144,6 +144,101 @@ body {
   text-align: center;
 }
 
+.compound-fraction {
+  vertical-align: middle;
+}
+
+.problem-expression--compound {
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto auto;
+  column-gap: 0.35em;
+  row-gap: 0;
+  vertical-align: middle;
+  align-items: center;
+}
+
+.problem-expression--compound > .compound-fraction {
+  display: contents;
+}
+
+.problem-expression--compound > .compound-fraction > .fraction__num {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  justify-content: center;
+  justify-self: stretch;
+  line-height: 1;
+}
+
+.problem-expression--compound > .compound-fraction > .compound-fraction__main-bar {
+  grid-column: 1;
+  grid-row: 2;
+  width: 100%;
+  justify-self: stretch;
+  align-self: center;
+  border-top: 0.14em solid currentColor;
+  height: 0;
+  min-width: 1.8em;
+  margin: 0.05em 0;
+  padding: 0;
+}
+
+.problem-expression--compound > .compound-fraction > .fraction__den {
+  grid-column: 1;
+  grid-row: 3;
+  display: flex;
+  justify-content: center;
+  justify-self: stretch;
+  line-height: 1;
+}
+
+.problem-expression--compound > .problem-expression__equals {
+  grid-column: 2;
+  grid-row: 2;
+  align-self: center;
+  line-height: 1;
+}
+
+.compound-fraction > .compound-fraction__main-bar {
+  width: 100%;
+  justify-self: stretch;
+  border-top: 0.14em solid currentColor;
+  height: 0;
+  min-width: 1.8em;
+  margin: 0.05em 0;
+  padding: 0;
+}
+
+.compound-fraction:not(.compound-fraction--nested) .fraction .fraction__bar,
+.compound-fraction--nested > .fraction__bar {
+  width: 72%;
+  min-width: 1em;
+  border-top-width: 0.06em;
+  margin: 0.04em 0;
+  justify-self: center;
+}
+
+.compound-fraction > .fraction__num,
+.compound-fraction > .fraction__den {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  line-height: 1;
+}
+
+.compound-fraction--nested {
+  font-size: 0.85em;
+}
+
+.problem-expression__inline-expr {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.15em;
+}
+
 .fraction {
   display: inline-grid;
   grid-template-rows: auto auto auto;
