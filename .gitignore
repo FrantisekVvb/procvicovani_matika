@@ -1,0 +1,12 @@
+supabase-config.js
+.env
+.env.local
+.DS_Store
+node_modules/
+
+# Vygenerované simulace a exporty
+simulation-output*.json
+simulace-*.html
+simulace-*.csv
+ulohy-prehled.html
+ulohy-prehled.csv
