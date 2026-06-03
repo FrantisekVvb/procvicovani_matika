@@ -17,7 +17,7 @@ Aplikaci otevři v prohlížeči na adrese, kterou vypíše server (např. `http
 
 1. Vytvoř projekt na [supabase.com](https://supabase.com).
 2. Spusť schéma z `supabase/schema.sql` (tabulka `analyses` pro sdílení analýz).
-3. Zkopíruj `supabase-config.example.js` → `supabase-config.js` a doplň URL a anon klíč.
+3. Zkopíruj `supabase-config.example.js` → `supabase-config.js` a doplň URL a anon klíč (soubor je v repozitáři pro nasazení na GitHub Pages; anon klíč je určený pro použití v prohlížeči).
 
 Automatické nastavení (vyžaduje Supabase access token):
 
@@ -48,12 +48,12 @@ APP_BASE_URL=http://localhost:3000 node generate-fraction-all-operations-analysi
 Repozitář obsahuje GitHub Actions workflow pro nasazení na Pages.
 
 1. V repozitáři: **Settings → Pages → Build and deployment → GitHub Actions**.
-2. Volitelně nastav secrets **Settings → Secrets and variables → Actions**:
+2. Volitelně nastav secrets **Settings → Secrets and variables → Actions** (mají přednost před souborem v repozitáři):
    - `SUPABASE_URL` – URL Supabase projektu
-   - `SUPABASE_ANON_KEY` – anon klíč (pro sdílení analýz na Pages)
+   - `SUPABASE_ANON_KEY` – anon klíč
 3. Po pushi na `main` se spustí workflow **Deploy GitHub Pages**.
 
-Bez secrets se nasadí aplikace s ukázkovou konfigurací – cvičení funguje, ukládání analýz ne.
+Deploy použije `supabase-config.js` z repozitáře, pokud secrets nejsou nastavené. Bez platné konfigurace cvičení funguje, ukládání analýz ne.
 
 Workflow **CI** při každém pushi kontroluje syntaxi `main.js` a skriptů `.mjs`.
 

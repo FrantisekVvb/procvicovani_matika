@@ -34,15 +34,21 @@ jobs:
           const fs = require('node:fs');
           const url = process.env.SUPABASE_URL ?? '';
           const anonKey = process.env.SUPABASE_ANON_KEY ?? '';
+          const target = '_site/supabase-config.js';
 
           if (url && anonKey) {
-            fs.writeFileSync('_site/supabase-config.js', `window.SUPABASE_CONFIG = {
-            url: '${url}',
-            anonKey: '${anonKey}',
-          };
-          `);
+            fs.writeFileSync(target, `window.SUPABASE_CONFIG = {
+  url: '${url}',
+  anonKey: '${anonKey}',
+};
+`);
+          } else if (
+            fs.existsSync('supabase-config.js')
+            && !fs.readFileSync('supabase-config.js', 'utf8').includes('YOUR_PROJECT')
+          ) {
+            fs.copyFileSync('supabase-config.js', target);
           } else {
-            fs.copyFileSync('supabase-config.example.js', '_site/supabase-config.js');
+            fs.copyFileSync('supabase-config.example.js', target);
           }
           NODE
 
