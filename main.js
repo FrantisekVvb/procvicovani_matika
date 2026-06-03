@@ -2556,7 +2556,7 @@ function computeAnswer(operands, operators, answerDecimals, parenthesesGroup = n
 
 function answersMatch(userAnswer, correctAnswer, decimals) {
   const epsilon = 10 ** (-decimals) / 2;
-  return Math.abs(userAnswer - correctAnswer) < epsilon;
+  return Math.abs(userAnswer - correctAnswer) <= epsilon;
 }
 
 function getFractionalPart(value, decimals) {
@@ -4566,6 +4566,11 @@ function showProblem(problem) {
   problemEl.textContent = formatProblemText(problem);
   }
 
+  if (activeExerciseMode === 'decimal-fraction-combined' && !isFractionAnswerProblem(problem)) {
+    fractionAnswerInputShape = 'number';
+    updateFractionAnswerShapeUi();
+  }
+
   const canAnswer = isFractionExerciseMode() || getSelectedOperations().length > 0;
   setFormEnabled(canAnswer);
 
@@ -4913,7 +4918,7 @@ formEl.addEventListener('submit', (event) => {
     return;
   }
 
-  if (isFractionExerciseMode()) {
+  if (isFractionAnswerProblem(currentProblem)) {
     const correctFraction = {
       num: currentProblem.answerNum,
       den: currentProblem.answerDen,
