@@ -37,11 +37,16 @@ jobs:
           const target = '_site/supabase-config.js';
 
           if (url && anonKey) {
-            fs.writeFileSync(target, `window.SUPABASE_CONFIG = {
-  url: '${url}',
-  anonKey: '${anonKey}',
-};
-`);
+            fs.writeFileSync(
+              target,
+              [
+                'window.SUPABASE_CONFIG = {',
+                "  url: '" + url + "',",
+                "  anonKey: '" + anonKey + "',",
+                '};',
+                '',
+              ].join('\n'),
+            );
           } else if (
             fs.existsSync('supabase-config.js')
             && !fs.readFileSync('supabase-config.js', 'utf8').includes('YOUR_PROJECT')
