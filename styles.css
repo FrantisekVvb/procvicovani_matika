@@ -32,15 +32,64 @@ body {
   margin-bottom: 24px;
 }
 
+.app.app--exercise .app__title {
+  display: none;
+}
+
+.app:has(#setup-screen:not([hidden])) {
+  max-width: 720px;
+}
+
 .setup-panels {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 16px;
   margin-bottom: 24px;
+  text-align: left;
+}
+
+@media (max-width: 640px) {
+  .setup-panels {
+    grid-template-columns: 1fr;
+  }
+
+  .app:has(#setup-screen:not([hidden])) {
+    max-width: 420px;
+  }
 }
 
 .setup-panels .operation-picker {
   margin-bottom: 0;
+}
+
+.setup-option {
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  background: #f5f5f5;
+  padding: 12px 14px;
+  margin-bottom: 24px;
+  text-align: left;
+}
+
+.setup-option__label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.875rem;
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.setup-option__label input {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.setup-option__hint {
+  margin: 8px 0 0 1.5rem;
+  font-size: 0.75rem;
+  color: #666;
+  line-height: 1.35;
 }
 
 .setup-feedback {
@@ -142,6 +191,12 @@ body {
 .problem-expression__term {
   min-width: 1.1em;
   text-align: center;
+}
+
+.problem-expression__power sup {
+  font-size: 0.72em;
+  line-height: 0;
+  vertical-align: super;
 }
 
 .compound-fraction {
@@ -338,6 +393,10 @@ body {
   gap: 12px;
 }
 
+#primary-action-btn {
+  margin-top: 12px;
+}
+
 .answer-form__label {
   font-size: 0.875rem;
   color: #666;
@@ -356,6 +415,32 @@ body {
 .answer-form__input:focus {
   outline: none;
   border-color: #333;
+}
+
+.answer-form__input--correct,
+.answer-form__fraction-input--correct {
+  background: #dafbe1;
+  border-color: #1a7f37;
+}
+
+.answer-form__input--wrong,
+.answer-form__fraction-input--wrong {
+  background: #ffebe9;
+  border-color: #cf222e;
+}
+
+.answer-form__input--correct:disabled,
+.answer-form__fraction-input--correct:disabled {
+  opacity: 1;
+  background: #dafbe1;
+  border-color: #1a7f37;
+}
+
+.answer-form__input--wrong:disabled,
+.answer-form__fraction-input--wrong:disabled {
+  opacity: 1;
+  background: #ffebe9;
+  border-color: #cf222e;
 }
 
 .answer-form__decimal-wrap,
@@ -399,7 +484,7 @@ body {
   border-color: #333;
 }
 
-.answer-form__fraction-input:disabled {
+.answer-form__fraction-input:disabled:not(.answer-form__fraction-input--correct):not(.answer-form__fraction-input--wrong) {
   opacity: 0.6;
   background: #f5f5f5;
 }
@@ -532,6 +617,12 @@ body {
   font-weight: 600;
 }
 
+.feedback:empty {
+  display: none;
+  min-height: 0;
+  margin-top: 0;
+}
+
 .feedback--correct {
   color: #1a7f37;
 }
@@ -541,11 +632,20 @@ body {
 }
 
 .exercise-actions {
+  position: fixed;
+  top: 24px;
+  left: 24px;
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: 12px;
-  margin-top: 16px;
+  justify-content: flex-start;
+  gap: 8px;
+  margin: 0;
+  z-index: 10;
+}
+
+.exercise-actions .btn {
+  padding: 8px 14px;
+  font-size: 0.875rem;
 }
 
 .exercise-actions .btn--back {
@@ -608,6 +708,20 @@ body {
 .analysis__levels p {
   margin-bottom: 6px;
   font-size: 0.9375rem;
+}
+
+.analysis__modes-block {
+  margin-bottom: 12px;
+}
+
+.analysis__modes {
+  margin: 4px 0 0;
+  padding-left: 1.25rem;
+  font-size: 0.9375rem;
+}
+
+.analysis__modes li {
+  margin-bottom: 4px;
 }
 
 .analysis__levels h3 {

@@ -31,12 +31,15 @@ const answerFractionEl = document.getElementById('answer-fraction');
 const answerFractionSignEl = document.getElementById('answer-fraction-sign');
 const answerShapeToggleBtn = document.getElementById('answer-shape-toggle-btn');
 const feedbackEl = document.getElementById('feedback');
-const nextBtn = document.getElementById('next-btn');
+const primaryActionBtn = document.getElementById('primary-action-btn');
+let awaitingNextProblem = false;
 const mathKeypadEl = document.getElementById('math-keypad');
 const mathKeypadKeys = document.querySelectorAll('.math-keypad__key');
 const operationCheckboxes = document.querySelectorAll('#decimal-operation-picker input[type="checkbox"]');
 const integerModeCheckboxes = document.querySelectorAll('#integer-operation-picker input[type="checkbox"]');
+const powersModeCheckboxes = document.querySelectorAll('#powers-operation-picker input[type="checkbox"]');
 const fractionModeCheckboxes = document.querySelectorAll('#fraction-operation-picker input[type="checkbox"]');
+const requireBasicFormCheckbox = document.getElementById('require-basic-form-checkbox');
 
 const DIFFICULTY_LEVELS = [
   { type: 'two', min: 0.1, max: 9.9, decimals: 1, decimalPartsSumBelowOne: true },
@@ -66,6 +69,12 @@ const DECIMAL_APP_TITLE = 'Početní operace s desetinnými čísly';
 const FRACTION_APP_TITLE = 'Početní operace se zlomky';
 const INTEGER_APP_TITLE = 'Početní operace se zápornými čísly';
 const DECIMAL_FRACTION_COMBINED_APP_TITLE = 'Početní operace s desetinnými čísly a se zlomky';
+const POWERS_APP_TITLE = 'Počítání s mocninami a druhou odmocninou';
+const POWER_MAX_LEVEL = 4;
+const POWER_SQUARE_BASE_MAX = 15;
+const POWER_HIGH_EXP_BASE_MAX = 5;
+const POWER_ANSWER_MIN = -1000;
+const POWER_ANSWER_MAX = 1000;
 const INTEGER_ADD_SUBTRACT_MAX_LEVEL = 4;
 const INTEGER_MULTIPLY_DIVIDE_MAX_LEVEL = 2;
 const INTEGER_COMBINED_MAX_LEVEL = 4;
@@ -76,6 +85,7 @@ const INTEGER_OPERAND_MAX = 20;
 const INTEGER_ANSWER_MIN = -100;
 const INTEGER_ANSWER_MAX = 100;
 const NON_INTEGER_ADD_SUBTRACT_MAX_LEVEL = 4;
+const NON_INTEGER_MULTIPLY_DIVIDE_MAX_LEVEL = 2;
 const NON_INTEGER_DECIMAL_MIN = 0.1;
 const NON_INTEGER_DECIMAL_MAX = 9.9;
 const NON_INTEGER_FRACTION_DEN_MAX = 12;
@@ -112,6 +122,9 @@ let correctStreak = 0;
 let retryQueue = [];
 let currentProblem = null;
 let sessionResults = [];
+let sessionSelectedModes = [];
+let activeExerciseModePool = [];
+let currentAnswerInputMode = null;
 let viewingSharedAnalysis = false;
 let activeFractionInputEl = null;
 let fractionAnswerInputShape = 'fraction';
@@ -128,12 +141,30 @@ function getSelectedIntegerModes() {
     .map((checkbox) => checkbox.value);
 }
 
+function getSelectedPowersModes() {
+  return [...powersModeCheckboxes]
+    .filter((checkbox) => checkbox.checked)
+    .map((checkbox) => checkbox.value);
+}
+
+function hasPowersMode(selected = getSelectedPowersModes()) {
+  return selected.includes('powers');
+}
+
 function hasIntegerAddSubtractMode(selected = getSelectedIntegerModes()) {
   return selected.includes('integer-add-subtract');
 }
 
 function hasIntegerMultiplyDivideMode(selected = getSelectedIntegerModes()) {
   return selected.includes('integer-multiply-divide');
+}
+
+function hasNonIntegerAddSubtractMode(selected = getSelectedIntegerModes()) {
+  return selected.includes('non-integer-add-subtract');
+}
+
+function hasNonIntegerMultiplyDivideMode(selected = getSelectedIntegerModes()) {
+  return selected.includes('non-integer-multiply-divide');
 }
 
 function hasIntegerArithmeticCombinedModes(selected = getSelectedIntegerModes()) {
@@ -157,17 +188,26 @@ function getSelectedIntegerArithmeticOperations(selected = getSelectedIntegerMod
 function hasIntegerOnlySelection() {
   return getSelectedIntegerModes().length > 0
     && getSelectedOperations().length === 0
-    && getSelectedFractionModes().length === 0;
+    && getSelectedFractionModes().length === 0
+    && getSelectedPowersModes().length === 0;
+}
+
+function hasPowersOnlySelection() {
+  return getSelectedPowersModes().length > 0
+    && getSelectedOperations().length === 0
+    && getSelectedFractionModes().length === 0
+    && getSelectedIntegerModes().length === 0;
 }
 
 function hasSetupSelection() {
   return getSelectedOperations().length > 0
     || getSelectedFractionModes().length > 0
-    || getSelectedIntegerModes().length > 0;
+    || getSelectedIntegerModes().length > 0
+    || getSelectedPowersModes().length > 0;
 }
 
 function updateStartButton() {
-  startBtn.disabled = !hasSetupSelection();
+  startBtn.disabled = getSetupStartBlockReason() !== '';
 }
 
 function getSelectedOperations() {
@@ -495,36 +535,39 @@ function shouldUseCrossTypeMixedProblem(difficultyLevel) {
   return difficultyLevel >= getCrossTypePoolMaxLevel();
 }
 
-function resolveActiveExerciseMode() {
-  if (hasCrossTypeSelection()) {
-    return 'decimal-fraction-combined';
+function resolveIntegerExerciseModeFromSelection(integerModes = getSelectedIntegerModes()) {
+  if (integerModes.length === 0) {
+    return null;
   }
 
-  if (hasIntegerOnlySelection()) {
-    const integerModes = getSelectedIntegerModes();
-
-    if (integerModes.includes('non-integer-add-subtract')) {
-      return 'non-integer-add-subtract';
-    }
-
-    if (hasIntegerArithmeticCombinedModes(integerModes)) {
-      return 'integer-combined';
-    }
-
-    if (hasIntegerMultiplyDivideMode(integerModes)) {
-      return 'integer-multiply-divide';
-    }
-
-    if (hasIntegerAddSubtractMode(integerModes)) {
-      return 'integer-add-subtract';
-    }
+  if (hasNonIntegerMultiplyDivideMode(integerModes) && !hasNonIntegerAddSubtractMode(integerModes)) {
+    return 'non-integer-multiply-divide';
   }
 
-  if (getSelectedOperations().length > 0) {
-    return 'decimal';
+  if (hasNonIntegerAddSubtractMode(integerModes)) {
+    return 'non-integer-add-subtract';
   }
 
-  const modes = getSelectedFractionModes();
+  if (hasIntegerArithmeticCombinedModes(integerModes)) {
+    return 'integer-combined';
+  }
+
+  if (hasIntegerMultiplyDivideMode(integerModes)) {
+    return 'integer-multiply-divide';
+  }
+
+  if (hasIntegerAddSubtractMode(integerModes)) {
+    return 'integer-add-subtract';
+  }
+
+  return null;
+}
+
+function resolveFractionExerciseModeFromSelection(modes = getSelectedFractionModes()) {
+  if (modes.length === 0) {
+    return null;
+  }
+
   if (modes.includes('basic-form')) {
     return 'basic-form';
   }
@@ -557,7 +600,60 @@ function resolveActiveExerciseMode() {
     return 'fraction-compound';
   }
 
-  return 'decimal';
+  return null;
+}
+
+function buildExerciseModePool() {
+  if (hasCrossTypeSelection()) {
+    return ['decimal-fraction-combined'];
+  }
+
+  const pool = [];
+
+  if (hasPowersMode()) {
+    pool.push('powers');
+  }
+
+  const integerMode = resolveIntegerExerciseModeFromSelection();
+  if (integerMode) {
+    pool.push(integerMode);
+  }
+
+  if (getSelectedOperations().length > 0) {
+    pool.push('decimal');
+  }
+
+  const fractionMode = resolveFractionExerciseModeFromSelection();
+  if (fractionMode) {
+    pool.push(fractionMode);
+  }
+
+  return pool;
+}
+
+function resolveActiveExerciseMode() {
+  const pool = buildExerciseModePool();
+  if (pool.length === 0) {
+    return null;
+  }
+
+  if (pool.length === 1) {
+    return pool[0];
+  }
+
+  return 'multi-mode';
+}
+
+function getSetupStartBlockReason() {
+  if (!hasSetupSelection()) {
+    return 'Vyber alespoň jeden režim procvičování.';
+  }
+
+  if (resolveActiveExerciseMode() === null) {
+    return 'Vyber alespoň jeden režim procvičování.';
+  }
+
+  return '';
 }
 
 function parseFractionAnswerFromFields(numeratorText, denominatorText) {
@@ -587,9 +683,124 @@ function isBasicFormFraction(num, den) {
 }
 
 function isFractionExerciseMode() {
+  if (isMultiModeExercise()) {
+    return false;
+  }
+
   return activeExerciseMode !== 'decimal'
     && !isIntegerExerciseMode()
-    && activeExerciseMode !== 'non-integer-add-subtract';
+    && activeExerciseMode !== 'non-integer-add-subtract'
+    && activeExerciseMode !== 'non-integer-multiply-divide'
+    && activeExerciseMode !== 'powers';
+}
+
+function isNonIntegerAnswerInputMode() {
+  const mode = getActiveAnswerInputMode();
+  return mode === 'non-integer-add-subtract' || mode === 'non-integer-multiply-divide';
+}
+
+function isNonIntegerMultiplyDivideAnswerInputMode() {
+  return getActiveAnswerInputMode() === 'non-integer-multiply-divide';
+}
+
+function isFractionAnswerInputMode() {
+  const mode = getActiveAnswerInputMode();
+  return mode === 'basic-form'
+    || mode === 'fraction-add'
+    || mode === 'fraction-subtract'
+    || mode === 'fraction-combined'
+    || mode === 'fraction-multiply'
+    || mode === 'fraction-divide'
+    || mode === 'fraction-compound'
+    || mode === 'decimal-fraction-combined';
+}
+
+function isPowersExerciseMode() {
+  return activeExerciseMode === 'powers';
+}
+
+function isMultiModeExercise() {
+  return activeExerciseMode === 'multi-mode';
+}
+
+function getExerciseModeForProblem(problem) {
+  if (problem?.type === 'powers') {
+    return 'powers';
+  }
+
+  if (problem?.type === 'integer-add-subtract') {
+    return 'integer-add-subtract';
+  }
+
+  if (problem?.type === 'integer-multiply-divide') {
+    return 'integer-multiply-divide';
+  }
+
+  if (problem?.type === 'integer-mixed') {
+    return 'integer-combined';
+  }
+
+  if (problem?.type === 'non-integer-add-subtract') {
+    return 'non-integer-add-subtract';
+  }
+
+  if (problem?.type === 'non-integer-multiply-divide') {
+    return 'non-integer-multiply-divide';
+  }
+
+  if (problem?.type === 'decimal-fraction-mixed') {
+    return 'decimal-fraction-combined';
+  }
+
+  if (problem?.type === 'basic-form') {
+    return 'basic-form';
+  }
+
+  if (problem?.type?.startsWith('fraction-')) {
+    return problem.type;
+  }
+
+  if (problem?.operands) {
+    return 'decimal';
+  }
+
+  return 'decimal';
+}
+
+function setAnswerInputModeForProblem(problem) {
+  setAnswerInputMode(getExerciseModeForProblem(problem));
+}
+
+function getActiveAnswerInputMode() {
+  return currentAnswerInputMode ?? activeExerciseMode;
+}
+
+function isIntegerAnswerInputMode() {
+  const mode = getActiveAnswerInputMode();
+  return mode === 'integer-add-subtract'
+    || mode === 'integer-multiply-divide'
+    || mode === 'integer-combined';
+}
+
+function isPowersAnswerInputMode() {
+  return getActiveAnswerInputMode() === 'powers';
+}
+
+function usesIntegerAnswerInput() {
+  return isIntegerAnswerInputMode() || isPowersAnswerInputMode();
+}
+
+function canAnswerProblem(problem) {
+  return isFractionAnswerProblem(problem)
+    || isIntegerArithmeticProblem(problem)
+    || isPowersProblem(problem)
+    || problem?.type === 'non-integer-add-subtract'
+    || problem?.type === 'non-integer-multiply-divide'
+    || Boolean(problem?.operands);
+}
+
+function isPowersProblem(problem) {
+  return problem?.type === 'powers';
 }
 
 function isIntegerArithmeticProblem(problem) {
@@ -605,7 +816,12 @@ function isIntegerExerciseMode() {
 }
 
 function isNonIntegerExerciseMode() {
-  return activeExerciseMode === 'non-integer-add-subtract';
+  return activeExerciseMode === 'non-integer-add-subtract'
+    || activeExerciseMode === 'non-integer-multiply-divide';
+}
+
+function isNonIntegerMultiplyDivideExerciseMode() {
+  return activeExerciseMode === 'non-integer-multiply-divide';
 }
 
 function getNonIntegerAnswerKind(problem) {
@@ -621,7 +837,8 @@ function isNonIntegerDecimalAnswerProblem(problem) {
 }
 
 function isNonIntegerFractionAnswerProblem(problem) {
-  return getNonIntegerAnswerKind(problem) === 'fraction';
+  return problem?.type === 'non-integer-multiply-divide'
+    || getNonIntegerAnswerKind(problem) === 'fraction';
 }
 
 function fractionAnswersMatch(userFraction, correctFraction) {
@@ -633,20 +850,70 @@ function fractionAnswersMatch(userFraction, correctFraction) {
     && user.den === correct.den;
 }
 
+function fractionAnswersEquivalent(userFraction, correctFraction) {
+  const user = normalizeSignedFraction(userFraction);
+  const correct = normalizeSignedFraction(correctFraction);
+
+  if (user.negative !== correct.negative || user.den === 0 || correct.den === 0) {
+    return false;
+  }
+
+  return user.num * correct.den === correct.num * user.den;
+}
+
+function shouldRequireBasicFormAnswer() {
+  if (currentProblem?.type === 'basic-form') {
+    return true;
+  }
+
+  return requireBasicFormCheckbox?.checked ?? false;
+}
+
+function evaluateFractionAnswer(userFraction, correctFraction) {
+  if (shouldRequireBasicFormAnswer()
+    && !isBasicFormFraction(userFraction.num, userFraction.den)) {
+    return {
+      isCorrect: false,
+      feedbackMessage: BASIC_FORM_REQUIRED_MESSAGE,
+    };
+  }
+
+  if (fractionAnswersMatch(userFraction, correctFraction)
+    || (!shouldRequireBasicFormAnswer() && fractionAnswersEquivalent(userFraction, correctFraction))) {
+    return {
+      isCorrect: true,
+      feedbackMessage: 'Správně!',
+    };
+  }
+
+  return {
+    isCorrect: false,
+    feedbackMessage: 'Špatně.',
+  };
+}
+
 function isFractionAnswerInputShape() {
-  return isFractionExerciseMode() && fractionAnswerInputShape === 'fraction';
+  return isFractionAnswerInputMode() && fractionAnswerInputShape === 'fraction';
 }
 
 function isNonIntegerFractionAnswerInputShape() {
-  return isNonIntegerFractionAnswerProblem(currentProblem);
+  return currentProblem?.type === 'non-integer-add-subtract'
+    && getNonIntegerAnswerKind(currentProblem) === 'fraction';
+}
+
+function isNonIntegerMultiplyDivideFractionAnswerInputShape() {
+  return isNonIntegerMultiplyDivideAnswerInputMode()
+    || isNonIntegerMultiplyDivideExerciseMode();
 }
 
 function usesFractionAnswerFields() {
-  return isFractionAnswerInputShape() || isNonIntegerFractionAnswerInputShape();
+  return isFractionAnswerInputShape()
+    || isNonIntegerFractionAnswerInputShape()
+    || isNonIntegerMultiplyDivideFractionAnswerInputShape();
 }
 
 function isNumberAnswerInputShape() {
-  return isFractionExerciseMode() && fractionAnswerInputShape === 'number';
+  return isFractionAnswerInputMode() && fractionAnswerInputShape === 'number';
 }
 
 function getFractionAnswerDecimals(num, den, maxDecimals = 6) {
@@ -2806,53 +3073,65 @@ function matchesTwoOperandConstraints(a, b, config, operation) {
   return true;
 }
 
-function getMaxDifficultyLevel() {
-  if (activeExerciseMode === 'basic-form') {
+function getMaxDifficultyLevelForMode(mode) {
+  if (mode === 'basic-form') {
     return FRACTION_BASIC_FORM_MAX_LEVEL;
   }
 
-  if (activeExerciseMode === 'integer-add-subtract') {
+  if (mode === 'integer-add-subtract') {
     return INTEGER_ADD_SUBTRACT_MAX_LEVEL;
   }
 
-  if (activeExerciseMode === 'integer-multiply-divide') {
+  if (mode === 'integer-multiply-divide') {
     return INTEGER_MULTIPLY_DIVIDE_MAX_LEVEL;
   }
 
-  if (activeExerciseMode === 'integer-combined') {
+  if (mode === 'integer-combined') {
     return INTEGER_COMBINED_MAX_LEVEL;
   }
 
-  if (activeExerciseMode === 'non-integer-add-subtract') {
+  if (mode === 'non-integer-add-subtract') {
     return NON_INTEGER_ADD_SUBTRACT_MAX_LEVEL;
   }
 
-  if (activeExerciseMode === 'decimal-fraction-combined') {
+  if (mode === 'non-integer-multiply-divide') {
+    return NON_INTEGER_MULTIPLY_DIVIDE_MAX_LEVEL;
+  }
+
+  if (mode === 'powers') {
+    return POWER_MAX_LEVEL;
+  }
+
+  if (mode === 'decimal-fraction-combined') {
     return getCrossTypeCombinedMaxLevel();
   }
 
-  if (activeExerciseMode === 'fraction-add') {
+  if (mode === 'fraction-add') {
     return FRACTION_ADD_MAX_LEVEL;
   }
 
-  if (activeExerciseMode === 'fraction-subtract') {
+  if (mode === 'fraction-subtract') {
     return FRACTION_SUBTRACT_MAX_LEVEL;
   }
 
-  if (activeExerciseMode === 'fraction-combined') {
+  if (mode === 'fraction-combined') {
     return getFractionCombinedMaxLevel();
   }
 
-  if (activeExerciseMode === 'fraction-multiply') {
+  if (mode === 'fraction-multiply') {
     return FRACTION_MULTIPLY_MAX_LEVEL;
   }
 
-  if (activeExerciseMode === 'fraction-divide') {
+  if (mode === 'fraction-divide') {
     return FRACTION_DIVIDE_MAX_LEVEL;
   }
 
-  if (activeExerciseMode === 'fraction-compound') {
+  if (mode === 'fraction-compound') {
     return FRACTION_COMPOUND_MAX_LEVEL;
+  }
+
+  if (mode !== 'decimal') {
+    return 0;
   }
 
   const selected = getSelectedOperations();
@@ -2883,6 +3162,14 @@ function getMaxDifficultyLevel() {
   }
 
   return MULTI_OP_MIXED_START_LEVEL;
+}
+
+function getMaxDifficultyLevel() {
+  if (activeExerciseMode === 'multi-mode') {
+    return Math.min(...activeExerciseModePool.map(getMaxDifficultyLevelForMode));
+  }
+
+  return getMaxDifficultyLevelForMode(activeExerciseMode);
 }
 
 function pickRandomItem(items) {
@@ -3225,6 +3512,69 @@ function formatNonIntegerAddSubtractProblemText(problem) {
   return `${text} =`;
 }
 
+function formatNonIntegerMultiplyDivideFractionTermText(term) {
+  const numText = term.sign < 0 ? `-${term.num}` : String(term.num);
+
+  return `${numText}/${term.den}`;
+}
+
+function formatNonIntegerMultiplyDivideFractionTermHtml(term) {
+  const numText = term.sign < 0 ? `-${term.num}` : String(term.num);
+
+  return `<span class="fraction" aria-label="${escapeHtml(numText)}/${escapeHtml(term.den)}"><span class="fraction__num">${escapeHtml(numText)}</span><span class="fraction__bar" aria-hidden="true"></span><span class="fraction__den">${escapeHtml(term.den)}</span></span>`;
+}
+
+function formatNonIntegerMultiplyDivideDisplayHtml(problem) {
+  let html = `<span class="problem-expression__term">${formatNonIntegerMultiplyDivideFractionTermHtml(problem.terms[0])}</span>`;
+
+  problem.operators.forEach((operator, index) => {
+    html += `<span class="problem-expression__operator">${formatIntegerArithmeticOperatorSymbol(operator)}</span><span class="problem-expression__term">${formatNonIntegerMultiplyDivideFractionTermHtml(problem.terms[index + 1])}</span>`;
+  });
+
+  return `<span class="problem-expression">${html}<span class="problem-expression__equals">=</span></span>`;
+}
+
+function formatNonIntegerMultiplyDivideProblemText(problem) {
+  let text = formatNonIntegerMultiplyDivideFractionTermText(problem.terms[0]);
+
+  problem.operators.forEach((operator, index) => {
+    text += `${formatIntegerArithmeticOperatorSymbol(operator, true)}${formatNonIntegerMultiplyDivideFractionTermText(problem.terms[index + 1])}`;
+  });
+
+  return `${text} =`;
+}
+
+function parseFractionAnswerWithSignedNumerator(numeratorText, denominatorText) {
+  const numText = numeratorText.trim();
+  const denText = denominatorText.trim();
+  const maxValue = getFractionAnswerMaxValue();
+
+  if (!/^-?\d+$/.test(numText) || !/^\d+$/.test(denText)) {
+    return null;
+  }
+
+  const parsedNum = Number(numText);
+  const den = Number(denText);
+
+  if (den === 0 || Math.abs(parsedNum) > maxValue || den > maxValue) {
+    return null;
+  }
+
+  if (parsedNum < 0) {
+    return {
+      num: Math.abs(parsedNum),
+      den,
+      negative: true,
+    };
+  }
+
+  return {
+    num: parsedNum,
+    den,
+    negative: false,
+  };
+}
+
 function parseSignedFractionAnswerFromFields(numeratorText, denominatorText) {
   const parsed = parseFractionAnswerFromFields(numeratorText, denominatorText);
 
@@ -3239,6 +3589,10 @@ function parseSignedFractionAnswerFromFields(numeratorText, denominatorText) {
 }
 
 function getNonIntegerFractionAnswerFromInputs() {
+  if (isNonIntegerMultiplyDivideFractionAnswerInputShape()) {
+    return parseFractionAnswerWithSignedNumerator(answerNumeratorEl.value, answerDenominatorEl.value);
+  }
+
   return parseSignedFractionAnswerFromFields(answerNumeratorEl.value, answerDenominatorEl.value);
 }
 
@@ -4765,6 +5119,163 @@ function generateNonIntegerTerms(displayLevel, operandCount, operandKind) {
   return null;
 }
 
+function createNonIntegerMultiplyDivideFractionTerm(sign) {
+  const den = randomWhole(2, NON_INTEGER_FRACTION_DEN_MAX);
+  const num = randomWhole(1, den - 1);
+
+  return {
+    kind: 'fraction',
+    num,
+    den,
+    sign,
+    wrapped: false,
+  };
+}
+
+function applyFractionMultiplyDivideBinary(left, right, operator) {
+  if (operator === 'multiply') {
+    return reduceFraction(left.num * right.num, left.den * right.den);
+  }
+
+  if (operator === 'divide') {
+    if (right.num === 0) {
+      return null;
+    }
+
+    return reduceFraction(left.num * right.den, left.den * right.num);
+  }
+
+  return null;
+}
+
+function evaluateNonIntegerFractionMultiplyDivideExpression(terms, operators) {
+  const values = terms.map((term) => ({
+    num: term.sign * term.num,
+    den: term.den,
+  }));
+  const result = evaluateExpressionWithOperatorPrecedence(
+    values,
+    operators,
+    applyFractionMultiplyDivideBinary,
+  );
+
+  if (!result) {
+    return null;
+  }
+
+  return normalizeSignedFraction(result);
+}
+
+function isValidNonIntegerMultiplyDivideProblem(terms, operators) {
+  if (!terms.every((term) => term.kind === 'fraction') || terms.some((term) => term.num === 0)) {
+    return false;
+  }
+
+  const answer = evaluateNonIntegerFractionMultiplyDivideExpression(terms, operators);
+  if (!answer) {
+    return false;
+  }
+
+  const answerValue = answer.negative
+    ? -answer.num / answer.den
+    : answer.num / answer.den;
+
+  if (!Number.isFinite(answerValue)
+    || answerValue < NON_INTEGER_ANSWER_MIN
+    || answerValue > NON_INTEGER_ANSWER_MAX) {
+    return false;
+  }
+
+  if (answer.num > FRACTION_ADD_ANSWER_MAX || answer.den > FRACTION_ADD_ANSWER_MAX) {
+    return false;
+  }
+
+  if (!nonIntegerExpressionHasNegativeValue(terms) && answerValue >= 0) {
+    return false;
+  }
+
+  return true;
+}
+
+function pickNonIntegerMultiplyDivideOperandCount(displayLevel) {
+  return displayLevel === 1 ? 2 : 3;
+}
+
+function pickNonIntegerMultiplyDivideOperators(displayLevel, allowedOps) {
+  if (displayLevel === 1) {
+    return [pickRandomItem(allowedOps)];
+  }
+
+  if (allowedOps.includes('multiply')) {
+    return ['multiply', 'multiply'];
+  }
+
+  return Array.from({ length: 2 }, () => pickRandomItem(allowedOps));
+}
+
+function generateNonIntegerMultiplyDivideTerms(displayLevel, allowedOps) {
+  const operandCount = pickNonIntegerMultiplyDivideOperandCount(displayLevel);
+  const operators = pickNonIntegerMultiplyDivideOperators(displayLevel, allowedOps);
+
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const terms = Array.from({ length: operandCount }, () => createNonIntegerMultiplyDivideFractionTerm(
+      Math.random() < 0.5 ? -1 : 1,
+    ));
+
+    if (isValidNonIntegerMultiplyDivideProblem(terms, operators)) {
+      return { terms, operators };
+    }
+  }
+
+  return null;
+}
+
+function buildNonIntegerMultiplyDivideProblem(terms, operators, displayLevel) {
+  const answer = evaluateNonIntegerFractionMultiplyDivideExpression(terms, operators);
+
+  return {
+    type: 'non-integer-multiply-divide',
+    terms,
+    operators,
+    answerNum: answer.num,
+    answerDen: answer.den,
+    answerNegative: answer.negative,
+    level: displayLevel,
+    isRetry: false,
+  };
+}
+
+function createNonIntegerMultiplyDivideProblem(difficultyLevel, allowedOps = ['multiply', 'divide']) {
+  const displayLevel = difficultyLevel + 1;
+  const generated = generateNonIntegerMultiplyDivideTerms(displayLevel, allowedOps);
+
+  if (generated) {
+    return buildNonIntegerMultiplyDivideProblem(generated.terms, generated.operators, displayLevel);
+  }
+
+  const fallbacks = {
+    1: buildNonIntegerMultiplyDivideProblem(
+      [
+        createNonIntegerMultiplyDivideFractionTerm(-1),
+        createNonIntegerMultiplyDivideFractionTerm(1),
+      ],
+      ['divide'],
+      1,
+    ),
+    2: buildNonIntegerMultiplyDivideProblem(
+      [
+        createNonIntegerMultiplyDivideFractionTerm(-1),
+        createNonIntegerMultiplyDivideFractionTerm(1),
+        createNonIntegerMultiplyDivideFractionTerm(-1),
+      ],
+      ['multiply', 'multiply'],
+      2,
+    ),
+  };
+
+  return fallbacks[displayLevel];
+}
+
 function createNonIntegerAddSubtractProblem(difficultyLevel) {
   const displayLevel = difficultyLevel + 1;
   const operandKind = pickNonIntegerProblemStyle(displayLevel);
@@ -4899,53 +5410,505 @@ function createNonIntegerAddSubtractProblem(difficultyLevel) {
   return fallbacks[displayLevel][operandKind];
 }
 
-function createRandomProblem(level) {
-  if (activeExerciseMode === 'basic-form') {
+function integerPow(base, exponent) {
+  return base ** exponent;
+}
+
+function createPowerTerm(base, exponent, {
+  baseSign = 1,
+  wrapped = false,
+  leadingNegative = false,
+} = {}) {
+  return {
+    kind: 'power',
+    base,
+    exponent,
+    baseSign,
+    wrapped,
+    leadingNegative,
+  };
+}
+
+function createPlainPowerTerm(value) {
+  return {
+    kind: 'plain',
+    value,
+  };
+}
+
+function evaluatePowerTerm(term) {
+  const magnitudePower = integerPow(term.base, term.exponent);
+
+  if (term.wrapped) {
+    return integerPow(term.baseSign * term.base, term.exponent);
+  }
+
+  if (term.leadingNegative) {
+    return -magnitudePower;
+  }
+
+  if (term.baseSign < 0) {
+    return -magnitudePower;
+  }
+
+  return magnitudePower;
+}
+
+function getPowerTermValue(term) {
+  if (term.kind === 'plain') {
+    return term.value;
+  }
+
+  return evaluatePowerTerm(term);
+}
+
+function evaluatePowerExpression(terms, operators) {
+  if (terms.length === 0) {
+    return null;
+  }
+
+  if (operators.length === 0) {
+    return getPowerTermValue(terms[0]);
+  }
+
+  const values = terms.map(getPowerTermValue);
+  const result = evaluateExpressionWithOperatorPrecedence(
+    values,
+    operators,
+    applyIntegerBinaryOperation,
+  );
+
+  if (result === null || !Number.isFinite(result)) {
+    return null;
+  }
+
+  return result;
+}
+
+function formatPowerExponentText(exponent) {
+  return `^${exponent}`;
+}
+
+function formatPowerExponentHtml(exponent) {
+  return `<sup>${exponent}</sup>`;
+}
+
+function powerTermNeedsParensAfterOperator(term, precedingOperator) {
+  if (!precedingOperator) {
+    return false;
+  }
+
+  if (term.kind === 'plain') {
+    return term.value < 0;
+  }
+
+  return term.leadingNegative || term.baseSign < 0;
+}
+
+function formatPowerTermInnerText(term) {
+  let text = '';
+
+  if (term.leadingNegative) {
+    text += '-';
+  }
+
+  if (term.wrapped) {
+    text += '(';
+
+    if (!term.leadingNegative && term.baseSign < 0) {
+      text += '-';
+    }
+
+    text += `${term.base})${formatPowerExponentText(term.exponent)}`;
+    return text;
+  }
+
+  if (!term.leadingNegative && term.baseSign < 0) {
+    text += '-';
+  }
+
+  text += `${term.base}${formatPowerExponentText(term.exponent)}`;
+
+  return text;
+}
+
+function formatPowerTermInnerHtml(term) {
+  let html = '';
+
+  if (term.leadingNegative) {
+    html += '−';
+  }
+
+  if (term.wrapped) {
+    html += '(';
+
+    if (!term.leadingNegative && term.baseSign < 0) {
+      html += '−';
+    }
+
+    html += `${term.base})${formatPowerExponentHtml(term.exponent)}`;
+    return html;
+  }
+
+  if (!term.leadingNegative && term.baseSign < 0) {
+    html += '−';
+  }
+
+  html += `${term.base}${formatPowerExponentHtml(term.exponent)}`;
+
+  return html;
+}
+
+function formatPowerTermText(term, precedingOperator = null) {
+  if (term.kind === 'plain') {
+    const value = term.value;
+
+    if (powerTermNeedsParensAfterOperator(term, precedingOperator)) {
+      return `(${value})`;
+    }
+
+    return String(value);
+  }
+
+  const inner = formatPowerTermInnerText(term);
+
+  if (powerTermNeedsParensAfterOperator(term, precedingOperator)) {
+    return `(${inner})`;
+  }
+
+  return inner;
+}
+
+function formatPowerTermHtml(term, precedingOperator = null) {
+  if (term.kind === 'plain') {
+    return `<span class="problem-expression__term">${escapeHtml(formatPowerTermText(term, precedingOperator))}</span>`;
+  }
+
+  const inner = formatPowerTermInnerHtml(term);
+  const content = powerTermNeedsParensAfterOperator(term, precedingOperator)
+    ? `(${inner})`
+    : inner;
+
+  return `<span class="problem-expression__term problem-expression__power">${content}</span>`;
+}
+
+function formatPowersProblemText(problem) {
+  let text = formatPowerTermText(problem.terms[0]);
+
+  problem.operators.forEach((operator, index) => {
+    text += `${formatIntegerArithmeticOperatorSymbol(operator, true)}${formatPowerTermText(problem.terms[index + 1], operator)}`;
+  });
+
+  return `${text} =`;
+}
+
+function formatPowersDisplayHtml(problem) {
+  let html = formatPowerTermHtml(problem.terms[0]);
+
+  problem.operators.forEach((operator, index) => {
+    html += `<span class="problem-expression__operator">${formatIntegerArithmeticOperatorSymbol(operator)}</span>${formatPowerTermHtml(problem.terms[index + 1], operator)}`;
+  });
+
+  return `<span class="problem-expression">${html}<span class="problem-expression__equals">=</span></span>`;
+}
+
+function buildPowersProblem(terms, operators, displayLevel) {
+  return {
+    type: 'powers',
+    terms,
+    operators,
+    answer: evaluatePowerExpression(terms, operators),
+    level: displayLevel,
+    isRetry: false,
+  };
+}
+
+function isValidPowersProblem(problem) {
+  if (!Number.isInteger(problem.answer)) {
+    return false;
+  }
+
+  if (problem.answer < POWER_ANSWER_MIN || problem.answer > POWER_ANSWER_MAX) {
+    return false;
+  }
+
+  return true;
+}
+
+function createWrappedNegativeSquareTerm(base) {
+  return createPowerTerm(base, 2, { baseSign: -1, wrapped: true });
+}
+
+function createUnaryMinusSquareTerm(base) {
+  return createPowerTerm(base, 2, { baseSign: -1, wrapped: false, leadingNegative: false });
+}
+
+function createPositiveSquareTerm(base) {
+  return createPowerTerm(base, 2, { baseSign: 1, wrapped: false });
+}
+
+function createHighExponentTerm(base, exponent, allowNegative = false) {
+  if (!allowNegative || Math.random() < 0.5) {
+    return createPowerTerm(base, exponent, { baseSign: 1, wrapped: false });
+  }
+
+  if (Math.random() < 0.5) {
+    return createPowerTerm(base, exponent, { baseSign: -1, wrapped: true });
+  }
+
+  return createPowerTerm(base, exponent, { baseSign: -1, wrapped: false });
+}
+
+function createRandomPowerTermForLevel4() {
+  const exponent = Math.random() < 0.5 ? 2 : 3;
+  const base = randomWhole(1, POWER_HIGH_EXP_BASE_MAX);
+  const allowNegative = Math.random() < 0.4;
+
+  if (exponent === 2 && allowNegative) {
+    return Math.random() < 0.5
+      ? createWrappedNegativeSquareTerm(base)
+      : createUnaryMinusSquareTerm(base);
+  }
+
+  return createHighExponentTerm(base, exponent, allowNegative);
+}
+
+function createRandomPlainTermForPowers(displayLevel) {
+  const maxValue = displayLevel >= 5 ? 20 : 15;
+  const magnitude = randomWhole(1, maxValue);
+  const sign = Math.random() < 0.5 ? -1 : 1;
+
+  return createPlainPowerTerm(sign * magnitude);
+}
+
+function pickPowerBinaryOperator() {
+  const operators = ['add', 'subtract', 'multiply', 'divide'];
+
+  return pickRandomItem(operators);
+}
+
+function pickPowerOperatorsForLevel5(operandCount) {
+  const operators = Array.from({ length: operandCount - 1 }, () => pickRandomItem([
+    'add',
+    'subtract',
+    'multiply',
+    'divide',
+  ]));
+
+  if (!operators.some((operator) => isMultiplyOrDivide(operator))) {
+    operators[0] = Math.random() < 0.5 ? 'multiply' : 'divide';
+  }
+
+  if (!operators.some((operator) => isAddOrSubtract(operator))) {
+    operators[operators.length - 1] = Math.random() < 0.5 ? 'add' : 'subtract';
+  }
+
+  return operators;
+}
+
+function pickPowerOperandCount(displayLevel) {
+  if (displayLevel <= 4) {
+    return 2;
+  }
+
+  return Math.random() < 0.5 ? 3 : 4;
+}
+
+function generatePowersTerms(displayLevel, operandCount, requirePower = false) {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const terms = [];
+    let hasPower = false;
+
+    for (let i = 0; i < operandCount; i += 1) {
+      const usePower = requirePower
+        ? (i === 0 || !hasPower || Math.random() < 0.65)
+        : Math.random() < 0.55;
+
+      if (usePower) {
+        if (displayLevel <= 2) {
+          terms.push(createPositiveSquareTerm(randomWhole(1, POWER_SQUARE_BASE_MAX)));
+        } else if (displayLevel === 3) {
+          const exponent = Math.random() < 0.5 ? 3 : 4;
+          const base = randomWhole(1, POWER_HIGH_EXP_BASE_MAX);
+          terms.push(createHighExponentTerm(base, exponent, true));
+        } else {
+          terms.push(createRandomPowerTermForLevel4());
+        }
+        hasPower = true;
+      } else {
+        terms.push(createRandomPlainTermForPowers(displayLevel));
+      }
+    }
+
+    if (requirePower && !hasPower) {
+      terms[0] = displayLevel <= 2
+        ? createPositiveSquareTerm(randomWhole(1, POWER_SQUARE_BASE_MAX))
+        : createRandomPowerTermForLevel4();
+    }
+
+    return terms;
+  }
+
+  return [
+    createRandomPowerTermForLevel4(),
+    createPlainPowerTerm(2),
+  ];
+}
+
+function createPowersLevel1Problem(displayLevel) {
+  const base = randomWhole(1, POWER_SQUARE_BASE_MAX);
+
+  return buildPowersProblem([createPositiveSquareTerm(base)], [], displayLevel);
+}
+
+function createPowersLevel2Problem(displayLevel) {
+  const base = randomWhole(1, POWER_SQUARE_BASE_MAX);
+  const term = Math.random() < 0.5
+    ? createWrappedNegativeSquareTerm(base)
+    : createUnaryMinusSquareTerm(base);
+
+  return buildPowersProblem([term], [], displayLevel);
+}
+
+function createPowersLevel3Problem(displayLevel) {
+  const exponent = Math.random() < 0.5 ? 3 : 4;
+  const base = randomWhole(1, POWER_HIGH_EXP_BASE_MAX);
+  const term = createHighExponentTerm(base, exponent, true);
+
+  return buildPowersProblem([term], [], displayLevel);
+}
+
+function createPowersLevel4Problem(displayLevel) {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const terms = [
+      Math.random() < 0.5 ? createRandomPowerTermForLevel4() : createRandomPlainTermForPowers(displayLevel),
+      Math.random() < 0.5 ? createRandomPowerTermForLevel4() : createRandomPlainTermForPowers(displayLevel),
+    ];
+
+    if (!terms.some((term) => term.kind === 'power')) {
+      terms[0] = createRandomPowerTermForLevel4();
+    }
+
+    const operators = [pickPowerBinaryOperator()];
+    const problem = buildPowersProblem(terms, operators, displayLevel);
+
+    if (isValidPowersProblem(problem)) {
+      return problem;
+    }
+  }
+
+  return buildPowersProblem(
+    [createPositiveSquareTerm(3), createPlainPowerTerm(4)],
+    ['add'],
+    displayLevel,
+  );
+}
+
+function createPowersLevel5Problem(displayLevel) {
+  const operandCount = pickPowerOperandCount(displayLevel);
+  const operators = pickPowerOperatorsForLevel5(operandCount);
+
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const terms = generatePowersTerms(displayLevel, operandCount, true);
+    const problem = buildPowersProblem(terms, operators, displayLevel);
+
+    if (isValidPowersProblem(problem)) {
+      return problem;
+    }
+  }
+
+  return buildPowersProblem(
+    [
+      createWrappedNegativeSquareTerm(2),
+      createPlainPowerTerm(-3),
+      createPowerTerm(2, 3, { baseSign: 1 }),
+    ],
+    ['multiply', 'add'],
+    displayLevel,
+  );
+}
+
+function createPowersProblem(difficultyLevel) {
+  const displayLevel = difficultyLevel + 1;
+
+  if (displayLevel === 1) {
+    return createPowersLevel1Problem(displayLevel);
+  }
+
+  if (displayLevel === 2) {
+    return createPowersLevel2Problem(displayLevel);
+  }
+
+  if (displayLevel === 3) {
+    return createPowersLevel3Problem(displayLevel);
+  }
+
+  if (displayLevel === 4) {
+    return createPowersLevel4Problem(displayLevel);
+  }
+
+  return createPowersLevel5Problem(displayLevel);
+}
+
+function createProblemForExerciseMode(mode, level) {
+  if (mode === 'basic-form') {
     return createBasicFormProblem(level);
   }
 
-  if (activeExerciseMode === 'integer-add-subtract') {
+  if (mode === 'integer-add-subtract') {
     return createIntegerAddSubtractProblem(level);
   }
 
-  if (activeExerciseMode === 'integer-multiply-divide') {
+  if (mode === 'integer-multiply-divide') {
     return createIntegerMultiplyDivideProblem(level);
   }
 
-  if (activeExerciseMode === 'integer-combined') {
+  if (mode === 'integer-combined') {
     return createIntegerCombinedProblem(level);
   }
 
-  if (activeExerciseMode === 'non-integer-add-subtract') {
+  if (mode === 'non-integer-add-subtract') {
     return createNonIntegerAddSubtractProblem(level);
   }
 
-  if (activeExerciseMode === 'decimal-fraction-combined') {
+  if (mode === 'non-integer-multiply-divide') {
+    return createNonIntegerMultiplyDivideProblem(level);
+  }
+
+  if (mode === 'powers') {
+    return createPowersProblem(level);
+  }
+
+  if (mode === 'decimal-fraction-combined') {
     return createDecimalFractionCombinedProblem(level);
   }
 
-  if (activeExerciseMode === 'fraction-add') {
+  if (mode === 'fraction-add') {
     return createFractionAddProblem(level);
   }
 
-  if (activeExerciseMode === 'fraction-subtract') {
+  if (mode === 'fraction-subtract') {
     return createFractionSubtractProblem(level);
   }
 
-  if (activeExerciseMode === 'fraction-combined') {
+  if (mode === 'fraction-combined') {
     return createFractionCombinedProblem(level);
   }
 
-  if (activeExerciseMode === 'fraction-multiply') {
+  if (mode === 'fraction-multiply') {
     return createFractionMultiplyProblem(level);
   }
 
-  if (activeExerciseMode === 'fraction-divide') {
+  if (mode === 'fraction-divide') {
     return createFractionDivideProblem(level);
   }
 
-  if (activeExerciseMode === 'fraction-compound') {
+  if (mode === 'fraction-compound') {
     return createCompoundFractionProblem(level);
+  }
+
+  if (mode !== 'decimal') {
+    return null;
   }
 
   const selected = getSelectedOperations();
@@ -4966,6 +5929,18 @@ function createRandomProblem(level) {
   }
 
   return createMultiOperationProblem(selected, level);
+}
+
+function pickExerciseModeForNextProblem() {
+  if (activeExerciseMode === 'multi-mode') {
+    return pickRandomItem(activeExerciseModePool);
+  }
+
+  return activeExerciseMode;
+}
+
+function createRandomProblem(level) {
+  return createProblemForExerciseMode(pickExerciseModeForNextProblem(), level);
 }
 
 function isPowerTenProblem(problem) {
@@ -5408,6 +6383,14 @@ function formatProblemText(problem) {
     return formatNonIntegerAddSubtractProblemText(problem);
   }
 
+  if (problem.type === 'non-integer-multiply-divide') {
+    return formatNonIntegerMultiplyDivideProblemText(problem);
+  }
+
+  if (problem.type === 'powers') {
+    return formatPowersProblemText(problem);
+  }
+
   if (problem.type === 'fraction-add') {
     return formatFractionAddProblemText(problem);
   }
@@ -5436,8 +6419,8 @@ function formatProblemText(problem) {
     return formatDecimalFractionMixedProblemText(problem);
   }
 
-  if (getSelectedOperations().length === 0) {
-    return 'Vyber alespoň jednu operaci.';
+  if (activeExerciseMode === 'decimal' && getSelectedOperations().length === 0) {
+    return 'Vyber alespoň jednu operaci s desetinnými čísly.';
   }
 
   if (problem.operators) {
@@ -5480,7 +6463,7 @@ function recordSessionAnswer(userAnswer, isCorrect) {
     return;
   }
 
-  if (isIntegerArithmeticProblem(currentProblem)) {
+  if (isIntegerArithmeticProblem(currentProblem) || isPowersProblem(currentProblem)) {
     sessionResults.push({
       uloha: formatProblemText(currentProblem),
       uroven: getDisplayLevel(currentProblem),
@@ -5518,6 +6501,21 @@ function recordSessionAnswer(userAnswer, isCorrect) {
     return;
   }
 
+  if (currentProblem?.type === 'non-integer-multiply-divide') {
+    sessionResults.push({
+      uloha: formatProblemText(currentProblem),
+      uroven: getDisplayLevel(currentProblem),
+      odpoved: formatSignedFractionText(userAnswer),
+      spravne: formatSignedFractionText({
+        num: currentProblem.answerNum,
+        den: currentProblem.answerDen,
+        negative: currentProblem.answerNegative,
+      }),
+      vysledek: isCorrect ? 'správně' : 'špatně',
+    });
+    return;
+  }
+
   sessionResults.push({
     uloha: formatProblemText(currentProblem),
     uroven: getDisplayLevel(currentProblem),
@@ -5525,6 +6523,51 @@ function recordSessionAnswer(userAnswer, isCorrect) {
     spravne: formatDecimal(currentProblem.answer, currentProblem.answerDecimals),
     vysledek: isCorrect ? 'správně' : 'špatně',
   });
+}
+
+function getCheckboxLabel(checkbox) {
+  const label = checkbox.closest('label');
+  if (!label) {
+    return checkbox.value;
+  }
+
+  const clone = label.cloneNode(true);
+  const input = clone.querySelector('input');
+  if (input) {
+    input.remove();
+  }
+
+  return clone.textContent.trim().replace(/\s+/g, ' ');
+}
+
+function captureSessionModeSelection() {
+  const modes = [];
+
+  operationCheckboxes.forEach((checkbox) => {
+    if (checkbox.checked) {
+      modes.push(getCheckboxLabel(checkbox));
+    }
+  });
+
+  integerModeCheckboxes.forEach((checkbox) => {
+    if (checkbox.checked) {
+      modes.push(getCheckboxLabel(checkbox));
+    }
+  });
+
+  powersModeCheckboxes.forEach((checkbox) => {
+    if (checkbox.checked) {
+      modes.push(getCheckboxLabel(checkbox));
+    }
+  });
+
+  fractionModeCheckboxes.forEach((checkbox) => {
+    if (checkbox.checked) {
+      modes.push(getCheckboxLabel(checkbox));
+    }
+  });
+
+  return modes;
 }
 
 function buildAnalysisStats() {
@@ -5559,6 +6602,7 @@ function formatSuccessRate(correct, total) {
 function buildAnalysisSharePayload() {
   return {
     n: getAnalysisName(),
+    m: sessionSelectedModes,
     r: sessionResults.map((row) => [
       row.uloha,
       row.uroven,
@@ -5577,6 +6621,7 @@ function parseAnalysisSharePayload(data) {
 
   return {
     name: typeof parsed.n === 'string' ? parsed.n : '',
+    modes: Array.isArray(parsed.m) ? parsed.m.map((mode) => String(mode)) : [],
     results: parsed.r.map((row) => {
       if (!Array.isArray(row) || row.length < 5) {
         throw new Error('Neplatná analýza.');
@@ -5750,8 +6795,9 @@ async function loadAnalysisFromUrl() {
   }
 
   try {
-    const { name, results } = await loadAnalysisFromSupabase(id);
+    const { name, modes, results } = await loadAnalysisFromSupabase(id);
     sessionResults = results;
+    sessionSelectedModes = modes;
     analysisNameInputEl.value = name;
     viewingSharedAnalysis = true;
     return true;
@@ -5820,6 +6866,8 @@ function buildAnalysisDocument() {
     title: 'Analýza',
     nameLabel: 'Jméno',
     name: getAnalysisName(),
+    modesLabel: 'Zvolené režimy:',
+    modes: [...sessionSelectedModes],
     overallLabel: 'Celková úspěšnost:',
     overall: formatSuccessRate(stats.correct, stats.total),
     levelsHeading: 'Úspěšnost podle úrovně',
@@ -5839,8 +6887,13 @@ function buildAnalysisSummaryText(doc) {
   const lines = [
     doc.title,
     `${doc.nameLabel}: ${doc.name || '—'}`,
-    `${doc.overallLabel} ${doc.overall}`,
   ];
+
+  if (doc.modes.length > 0) {
+    lines.push(`${doc.modesLabel} ${doc.modes.join('; ')}`);
+  }
+
+  lines.push(`${doc.overallLabel} ${doc.overall}`);
 
   if (doc.levels.length > 0) {
     lines.push(`${doc.levelsHeading}:`);
@@ -5907,7 +6960,16 @@ function renderAnalysis() {
 
   const doc = buildAnalysisDocument();
 
-  analysisSummaryEl.innerHTML = `<p><strong>${escapeHtml(doc.overallLabel)}</strong> ${escapeHtml(doc.overall)}</p>`;
+  const modesHtml = doc.modes.length > 0
+    ? `<div class="analysis__modes-block">
+        <p><strong>${escapeHtml(doc.modesLabel)}</strong></p>
+        <ul class="analysis__modes">
+          ${doc.modes.map((mode) => `<li>${escapeHtml(mode)}</li>`).join('')}
+        </ul>
+      </div>`
+    : '';
+
+  analysisSummaryEl.innerHTML = `${modesHtml}<p><strong>${escapeHtml(doc.overallLabel)}</strong> ${escapeHtml(doc.overall)}</p>`;
 
   const levelLines = doc.levels
     .map((level) => `<p>${escapeHtml(level.displayLabel)}</p>`)
@@ -5940,12 +7002,34 @@ function hideAllScreens() {
   analysisScreenEl.hidden = true;
 }
 
+function showVerifyAction() {
+  awaitingNextProblem = false;
+  primaryActionBtn.textContent = 'Ověřit';
+}
+
+function showNextExampleAction() {
+  awaitingNextProblem = true;
+  primaryActionBtn.textContent = 'Další';
+  primaryActionBtn.disabled = false;
+}
+
+function finishAnswerReview(isCorrect) {
+  setFormEnabled(false);
+  setAnswerFieldHighlight(isCorrect ? 'correct' : 'wrong');
+  feedbackEl.textContent = '';
+  feedbackEl.className = 'feedback';
+  showNextExampleAction();
+  primaryActionBtn.focus();
+}
+
 function setFormEnabled(enabled) {
   inputEl.disabled = !enabled;
   answerNumeratorEl.disabled = !enabled;
   answerDenominatorEl.disabled = !enabled;
   answerShapeToggleBtn.disabled = !enabled;
-  formEl.querySelector('button[type="submit"]').disabled = !enabled;
+  if (!awaitingNextProblem) {
+    primaryActionBtn.disabled = !enabled;
+  }
   mathKeypadKeys.forEach((key) => {
     key.disabled = !enabled;
   });
@@ -5963,11 +7047,51 @@ function getActiveAnswerInputEl() {
   return inputEl;
 }
 
+function clearAnswerFieldHighlight() {
+  inputEl.classList.remove('answer-form__input--correct', 'answer-form__input--wrong');
+  answerNumeratorEl.classList.remove('answer-form__fraction-input--correct', 'answer-form__fraction-input--wrong');
+  answerDenominatorEl.classList.remove('answer-form__fraction-input--correct', 'answer-form__fraction-input--wrong');
+}
+
+function isFractionAnswerFieldsVisible() {
+  return fractionAnswerWrapEl.classList.contains('is-visible');
+}
+
+function setAnswerFieldHighlight(result) {
+  clearAnswerFieldHighlight();
+
+  if (!result) {
+    return;
+  }
+
+  const className = result === 'correct'
+    ? 'answer-form__input--correct'
+    : 'answer-form__input--wrong';
+  const fractionClassName = result === 'correct'
+    ? 'answer-form__fraction-input--correct'
+    : 'answer-form__fraction-input--wrong';
+
+  if (isFractionAnswerFieldsVisible()) {
+    answerNumeratorEl.classList.add(fractionClassName);
+    answerDenominatorEl.classList.add(fractionClassName);
+    return;
+  }
+
+  inputEl.classList.add(className);
+}
+
+function showAnswerValidationFeedback() {
+  setAnswerFieldHighlight('wrong');
+  feedbackEl.textContent = '';
+  feedbackEl.className = 'feedback';
+}
+
 function clearAnswerInputs() {
   inputEl.value = '';
   answerNumeratorEl.value = '';
   answerDenominatorEl.value = '';
   setAnswerFractionNegative(false);
+  clearAnswerFieldHighlight();
 }
 
 function focusAnswerInput() {
@@ -5996,11 +7120,14 @@ function updateMathKeypadKeys() {
   const usesFractionFields = usesFractionAnswerFields() && !isNumberAnswerInputShape();
 
   if (commaKey) {
-    commaKey.hidden = usesFractionFields || isIntegerExerciseMode();
+    commaKey.hidden = usesFractionFields || isIntegerAnswerInputMode() || isPowersAnswerInputMode();
   }
 
   if (minusKey) {
-    minusKey.hidden = usesFractionFields && !isNonIntegerFractionAnswerInputShape();
+    minusKey.hidden = usesFractionFields
+      && !isNumberAnswerInputShape()
+      && !isNonIntegerMultiplyDivideFractionAnswerInputShape()
+      && !isNonIntegerFractionAnswerInputShape();
   }
 }
 
@@ -6019,19 +7146,27 @@ function toggleNegativeSignInInput(target) {
 }
 
 function updateFractionAnswerShapeUi() {
-  if (isIntegerExerciseMode()) {
+  if (isIntegerAnswerInputMode() || isPowersAnswerInputMode()) {
     answerShapeToggleBtn.hidden = true;
     setAnswerWrapVisible(decimalAnswerWrapEl, true);
     setAnswerWrapVisible(fractionAnswerWrapEl, false);
     inputEl.required = true;
-    inputEl.placeholder = '0';
+    inputEl.placeholder = '';
     inputEl.inputMode = 'numeric';
     updateMathKeypadKeys();
     return;
   }
 
-  if (isNonIntegerExerciseMode()) {
+  if (isNonIntegerAnswerInputMode()) {
     answerShapeToggleBtn.hidden = true;
+
+    if (isNonIntegerMultiplyDivideAnswerInputMode()) {
+      setAnswerWrapVisible(decimalAnswerWrapEl, false);
+      setAnswerWrapVisible(fractionAnswerWrapEl, true);
+      inputEl.required = false;
+      updateMathKeypadKeys();
+      return;
+    }
 
     if (isNonIntegerFractionAnswerProblem(currentProblem)) {
       setAnswerWrapVisible(decimalAnswerWrapEl, false);
@@ -6044,18 +7179,18 @@ function updateFractionAnswerShapeUi() {
     setAnswerWrapVisible(decimalAnswerWrapEl, true);
     setAnswerWrapVisible(fractionAnswerWrapEl, false);
     inputEl.required = true;
-    inputEl.placeholder = '0,0';
+    inputEl.placeholder = '';
     inputEl.inputMode = 'decimal';
     updateMathKeypadKeys();
     return;
   }
 
-  if (!isFractionExerciseMode()) {
+  if (!isFractionAnswerInputMode()) {
     answerShapeToggleBtn.hidden = true;
     setAnswerWrapVisible(decimalAnswerWrapEl, true);
     setAnswerWrapVisible(fractionAnswerWrapEl, false);
     inputEl.required = true;
-    inputEl.placeholder = '0,0';
+    inputEl.placeholder = '';
     inputEl.inputMode = 'decimal';
     updateMathKeypadKeys();
     return;
@@ -6079,13 +7214,13 @@ function updateFractionAnswerShapeUi() {
     return;
   }
 
-  inputEl.placeholder = '0,0';
+  inputEl.placeholder = '';
   inputEl.inputMode = 'decimal';
   updateMathKeypadKeys();
 }
 
 function toggleFractionAnswerShape() {
-  if (!isFractionExerciseMode() || answerShapeToggleBtn.disabled) {
+  if (!isFractionAnswerInputMode() || answerShapeToggleBtn.disabled) {
     return;
   }
 
@@ -6096,7 +7231,14 @@ function toggleFractionAnswerShape() {
 }
 
 function setAnswerInputMode(mode) {
-  if (mode === 'integer-add-subtract'
+  if (mode === 'multi-mode') {
+    return;
+  }
+
+  currentAnswerInputMode = mode;
+
+  if (mode === 'powers'
+    || mode === 'integer-add-subtract'
     || mode === 'integer-multiply-divide'
     || mode === 'integer-combined') {
     fractionAnswerInputShape = 'number';
@@ -6104,7 +7246,8 @@ function setAnswerInputMode(mode) {
     return;
   }
 
-  if (mode === 'non-integer-add-subtract') {
+  if (mode === 'non-integer-add-subtract' || mode === 'non-integer-multiply-divide') {
+    fractionAnswerInputShape = 'fraction';
     updateFractionAnswerShapeUi();
     return;
   }
@@ -6146,6 +7289,11 @@ function insertIntoAnswer(value) {
   }
 
   if (value === '-') {
+    if (isNonIntegerMultiplyDivideFractionAnswerInputShape()) {
+      toggleNegativeSignInInput(getActiveAnswerInputEl());
+      return;
+    }
+
     if (isNonIntegerFractionAnswerInputShape()) {
       toggleAnswerFractionNegative();
       return;
@@ -6159,7 +7307,7 @@ function insertIntoAnswer(value) {
     return;
   }
 
-  if (isIntegerExerciseMode()) {
+  if (usesIntegerAnswerInput()) {
     if (value === ',') {
       return;
     }
@@ -6280,6 +7428,14 @@ function showProblem(problem) {
     answerDenominatorEl.maxLength = maxInputLength;
     problemEl.innerHTML = formatNonIntegerAddSubtractDisplayHtml(problem);
     updateFractionAnswerShapeUi();
+  } else if (problem.type === 'non-integer-multiply-divide') {
+    const maxInputLength = String(FRACTION_ADD_ANSWER_MAX).length + 1;
+    answerNumeratorEl.maxLength = maxInputLength;
+    answerDenominatorEl.maxLength = String(FRACTION_ADD_ANSWER_MAX).length;
+    problemEl.innerHTML = formatNonIntegerMultiplyDivideDisplayHtml(problem);
+    updateFractionAnswerShapeUi();
+  } else if (problem.type === 'powers') {
+    problemEl.innerHTML = formatPowersDisplayHtml(problem);
   } else {
   problemEl.textContent = formatProblemText(problem);
   }
@@ -6289,10 +7445,17 @@ function showProblem(problem) {
     updateFractionAnswerShapeUi();
   }
 
-  const canAnswer = isFractionExerciseMode()
-    || isIntegerExerciseMode()
-    || isNonIntegerExerciseMode()
-    || getSelectedOperations().length > 0;
+  if (isMultiModeExercise()) {
+    setAnswerInputModeForProblem(problem);
+  }
+
+  const canAnswer = isMultiModeExercise()
+    ? canAnswerProblem(problem)
+    : (isFractionExerciseMode()
+      || isIntegerExerciseMode()
+      || isNonIntegerExerciseMode()
+      || isPowersExerciseMode()
+      || getSelectedOperations().length > 0);
   setFormEnabled(canAnswer);
 
   if (canAnswer) {
@@ -6302,7 +7465,7 @@ function showProblem(problem) {
 
   feedbackEl.textContent = '';
   feedbackEl.className = 'feedback';
-  nextBtn.hidden = true;
+  showVerifyAction();
 }
 
 function queueRetry(problem) {
@@ -6380,6 +7543,19 @@ function queueRetry(problem) {
     item.answerDecimals = problem.answerDecimals;
     item.answerNum = problem.answerNum;
     item.answerDen = problem.answerDen;
+    item.answerNegative = problem.answerNegative;
+  } else if (problem.type === 'non-integer-multiply-divide') {
+    item.type = 'non-integer-multiply-divide';
+    item.terms = problem.terms.map((term) => ({ ...term }));
+    item.operators = [...problem.operators];
+    item.answerNum = problem.answerNum;
+    item.answerDen = problem.answerDen;
+    item.answerNegative = problem.answerNegative;
+  } else if (problem.type === 'powers') {
+    item.type = 'powers';
+    item.terms = problem.terms.map((term) => ({ ...term }));
+    item.operators = [...problem.operators];
+    item.answer = problem.answer;
   } else {
     item.operands = problem.operands.map((operand) => ({ ...operand }));
     item.operation = problem.operation;
@@ -6529,6 +7705,31 @@ function pickNextProblem() {
         answerDecimals: dueRetry.answerDecimals,
         answerNum: dueRetry.answerNum,
         answerDen: dueRetry.answerDen,
+        answerNegative: dueRetry.answerNegative,
+        level: dueRetry.level,
+        isRetry: true,
+      };
+    }
+
+    if (dueRetry.type === 'non-integer-multiply-divide') {
+      return {
+        type: 'non-integer-multiply-divide',
+        terms: dueRetry.terms.map((term) => ({ ...term })),
+        operators: [...dueRetry.operators],
+        answerNum: dueRetry.answerNum,
+        answerDen: dueRetry.answerDen,
+        answerNegative: dueRetry.answerNegative,
+        level: dueRetry.level,
+        isRetry: true,
+      };
+    }
+
+    if (dueRetry.type === 'powers') {
+      return {
+        type: 'powers',
+        terms: dueRetry.terms.map((term) => ({ ...term })),
+        operators: [...dueRetry.operators],
+        answer: dueRetry.answer,
         level: dueRetry.level,
         isRetry: true,
       };
@@ -6561,11 +7762,26 @@ function updateTitle() {
       return;
     }
 
+    if (hasPowersOnlySelection()) {
+      appTitleEl.textContent = POWERS_APP_TITLE;
+      return;
+    }
+
     appTitleEl.textContent = APP_TITLE;
     return;
   }
 
-  if (isIntegerExerciseMode() || activeExerciseMode === 'non-integer-add-subtract') {
+  if (isMultiModeExercise()) {
+    appTitleEl.textContent = APP_TITLE;
+    return;
+  }
+
+  if (isPowersExerciseMode()) {
+    appTitleEl.textContent = POWERS_APP_TITLE;
+    return;
+  }
+
+  if (isIntegerExerciseMode() || isNonIntegerExerciseMode()) {
     appTitleEl.textContent = INTEGER_APP_TITLE;
     return;
   }
@@ -6586,7 +7802,12 @@ function updateTitle() {
     return;
   }
 
-  appTitleEl.textContent = DECIMAL_APP_TITLE;
+  if (activeExerciseMode === 'decimal') {
+    appTitleEl.textContent = DECIMAL_APP_TITLE;
+    return;
+  }
+
+  appTitleEl.textContent = APP_TITLE;
 }
 
 function showSetupFeedback(message) {
@@ -6596,6 +7817,8 @@ function showSetupFeedback(message) {
 
 function resetSession() {
   sessionResults = [];
+  sessionSelectedModes = [];
+  activeExerciseModePool = [];
   analysisNameInputEl.value = '';
   viewingSharedAnalysis = false;
   hideAnalysisLinkUi();
@@ -6636,9 +7859,10 @@ function newProblem() {
 function showSetupScreen({ preserveAnalysisHash = false } = {}) {
   hideAllScreens();
   setupScreenEl.hidden = false;
-  appEl.classList.remove('app--wide');
+  appEl.classList.remove('app--wide', 'app--exercise');
   viewingSharedAnalysis = false;
-  activeExerciseMode = 'decimal';
+  activeExerciseMode = null;
+  currentAnswerInputMode = null;
   setAnswerInputMode('decimal');
   showSetupFeedback('');
   updateStartButton();
@@ -6650,13 +7874,27 @@ function showSetupScreen({ preserveAnalysisHash = false } = {}) {
 }
 
 function showExerciseScreen() {
-  activeExerciseMode = resolveActiveExerciseMode();
+  const resolvedMode = resolveActiveExerciseMode();
+  if (resolvedMode === null) {
+    showSetupFeedback(getSetupStartBlockReason());
+    return;
+  }
+
+  activeExerciseMode = resolvedMode;
+  const selectedModes = captureSessionModeSelection();
 
   hideAllScreens();
   exerciseScreenEl.hidden = false;
   appEl.classList.remove('app--wide');
+  appEl.classList.add('app--exercise');
   resetProgress();
-  setAnswerInputMode(activeExerciseMode);
+  sessionSelectedModes = selectedModes;
+  activeExerciseModePool = resolvedMode === 'multi-mode'
+    ? buildExerciseModePool()
+    : [resolvedMode];
+  if (activeExerciseMode !== 'multi-mode') {
+    setAnswerInputMode(activeExerciseMode);
+  }
   updateTitle();
   newProblem();
 }
@@ -6664,6 +7902,7 @@ function showExerciseScreen() {
 function showAnalysisScreen() {
   hideAllScreens();
   analysisScreenEl.hidden = false;
+  appEl.classList.remove('app--exercise');
   appEl.classList.add('app--wide');
   renderAnalysis();
   if (location.hash.startsWith('#a=')) {
@@ -6694,11 +7933,25 @@ function handleIntegerModeSelectionChange() {
   updateTitle();
 }
 
+function handlePowersModeSelectionChange() {
+  showSetupFeedback('');
+  updateStartButton();
+  updateTitle();
+}
+
+primaryActionBtn.addEventListener('click', () => {
+  if (awaitingNextProblem) {
+    newProblem();
+    return;
+  }
+
+  formEl.requestSubmit();
+});
+
 formEl.addEventListener('submit', (event) => {
   event.preventDefault();
 
-  if (!nextBtn.hidden) {
-    newProblem();
+  if (awaitingNextProblem) {
     return;
   }
 
@@ -6711,8 +7964,7 @@ formEl.addEventListener('submit', (event) => {
     if (isNumberAnswerInputShape()) {
       const userValue = parseAnswer(inputEl.value);
       if (userValue === null) {
-        feedbackEl.textContent = 'Zadej platné číslo (např. 0,75).';
-        feedbackEl.className = 'feedback feedback--wrong';
+        showAnswerValidationFeedback();
         return;
       }
 
@@ -6724,24 +7976,18 @@ formEl.addEventListener('submit', (event) => {
 
       if (isCorrect) {
         handleCorrectAnswer();
-        feedbackEl.className = 'feedback feedback--correct';
       } else {
         handleWrongAnswer();
-        feedbackEl.className = 'feedback feedback--wrong';
       }
 
-      feedbackEl.textContent = isCorrect ? 'Správně!' : 'Špatně.';
       recordSessionAnswer(userValue, isCorrect);
-      setFormEnabled(false);
-      nextBtn.hidden = false;
-      nextBtn.focus();
+      finishAnswerReview(isCorrect);
       return;
     }
 
     const userAnswer = getFractionAnswerFromInputs();
     if (userAnswer === null) {
-      feedbackEl.textContent = 'Vyplň čitatele a jmenovatele.';
-      feedbackEl.className = 'feedback feedback--wrong';
+      showAnswerValidationFeedback();
       return;
     }
 
@@ -6751,34 +7997,27 @@ formEl.addEventListener('submit', (event) => {
     if (currentProblem.type === 'basic-form'
       && (!isProductOfBasicFormPrimes(userAnswer.num) || !isProductOfBasicFormPrimes(userAnswer.den))) {
       feedbackMessage = 'Špatně.';
-    } else if (!isBasicFormFraction(userAnswer.num, userAnswer.den)) {
-      feedbackMessage = BASIC_FORM_REQUIRED_MESSAGE;
-    } else if (fractionAnswersMatch(userAnswer, correctFraction)) {
-      isCorrect = true;
-      feedbackMessage = 'Správně!';
+    } else {
+      const result = evaluateFractionAnswer(userAnswer, correctFraction);
+      isCorrect = result.isCorrect;
+      feedbackMessage = result.feedbackMessage;
     }
 
     if (isCorrect) {
       handleCorrectAnswer();
-      feedbackEl.className = 'feedback feedback--correct';
     } else {
       handleWrongAnswer();
-      feedbackEl.className = 'feedback feedback--wrong';
     }
 
-    feedbackEl.textContent = feedbackMessage;
     recordSessionAnswer(userAnswer, isCorrect);
-    setFormEnabled(false);
-    nextBtn.hidden = false;
-    nextBtn.focus();
+    finishAnswerReview(isCorrect);
     return;
   }
 
-  if (isIntegerArithmeticProblem(currentProblem)) {
+  if (isIntegerArithmeticProblem(currentProblem) || isPowersProblem(currentProblem)) {
     const userAnswer = parseAnswer(inputEl.value);
     if (userAnswer === null || !Number.isInteger(userAnswer)) {
-      feedbackEl.textContent = 'Zadej platné celé číslo (např. -5).';
-      feedbackEl.className = 'feedback feedback--wrong';
+      showAnswerValidationFeedback();
       return;
     }
 
@@ -6786,18 +8025,36 @@ formEl.addEventListener('submit', (event) => {
 
     if (isCorrect) {
       handleCorrectAnswer();
-      feedbackEl.textContent = 'Správně!';
-      feedbackEl.className = 'feedback feedback--correct';
     } else {
       handleWrongAnswer();
-      feedbackEl.textContent = 'Špatně.';
-      feedbackEl.className = 'feedback feedback--wrong';
     }
 
     recordSessionAnswer(userAnswer, isCorrect);
-    setFormEnabled(false);
-    nextBtn.hidden = false;
-    nextBtn.focus();
+    finishAnswerReview(isCorrect);
+    return;
+  }
+
+  if (currentProblem?.type === 'non-integer-multiply-divide') {
+    const userAnswer = getNonIntegerFractionAnswerFromInputs();
+    if (userAnswer === null) {
+      showAnswerValidationFeedback();
+      return;
+    }
+
+    const { isCorrect, feedbackMessage } = evaluateFractionAnswer(userAnswer, {
+      num: currentProblem.answerNum,
+      den: currentProblem.answerDen,
+      negative: currentProblem.answerNegative,
+    });
+
+    if (isCorrect) {
+      handleCorrectAnswer();
+    } else {
+      handleWrongAnswer();
+    }
+
+    recordSessionAnswer(userAnswer, isCorrect);
+    finishAnswerReview(isCorrect);
     return;
   }
 
@@ -6805,8 +8062,7 @@ formEl.addEventListener('submit', (event) => {
     if (getNonIntegerAnswerKind(currentProblem) === 'decimal') {
       const userAnswer = parseAnswer(inputEl.value);
       if (userAnswer === null) {
-        feedbackEl.textContent = 'Zadej platné desetinné číslo v řádu desetin (např. -0,5).';
-        feedbackEl.className = 'feedback feedback--wrong';
+        showAnswerValidationFeedback();
         return;
       }
 
@@ -6818,29 +8074,22 @@ formEl.addEventListener('submit', (event) => {
 
       if (isCorrect) {
         handleCorrectAnswer();
-        feedbackEl.textContent = 'Správně!';
-        feedbackEl.className = 'feedback feedback--correct';
       } else {
         handleWrongAnswer();
-        feedbackEl.textContent = 'Špatně.';
-        feedbackEl.className = 'feedback feedback--wrong';
       }
 
       recordSessionAnswer(userAnswer, isCorrect);
-      setFormEnabled(false);
-      nextBtn.hidden = false;
-      nextBtn.focus();
+      finishAnswerReview(isCorrect);
       return;
     }
 
     const userAnswer = getNonIntegerFractionAnswerFromInputs();
     if (userAnswer === null) {
-      feedbackEl.textContent = 'Vyplň čitatele a jmenovatele.';
-      feedbackEl.className = 'feedback feedback--wrong';
+      showAnswerValidationFeedback();
       return;
     }
 
-    const isCorrect = fractionAnswersMatch(userAnswer, {
+    const { isCorrect, feedbackMessage } = evaluateFractionAnswer(userAnswer, {
       num: currentProblem.answerNum,
       den: currentProblem.answerDen,
       negative: currentProblem.answerNegative,
@@ -6848,18 +8097,12 @@ formEl.addEventListener('submit', (event) => {
 
     if (isCorrect) {
       handleCorrectAnswer();
-      feedbackEl.textContent = 'Správně!';
-      feedbackEl.className = 'feedback feedback--correct';
     } else {
       handleWrongAnswer();
-      feedbackEl.textContent = 'Špatně.';
-      feedbackEl.className = 'feedback feedback--wrong';
     }
 
     recordSessionAnswer(userAnswer, isCorrect);
-    setFormEnabled(false);
-    nextBtn.hidden = false;
-    nextBtn.focus();
+    finishAnswerReview(isCorrect);
     return;
   }
 
@@ -6869,8 +8112,7 @@ formEl.addEventListener('submit', (event) => {
 
   const userAnswer = parseAnswer(inputEl.value);
   if (userAnswer === null) {
-    feedbackEl.textContent = 'Zadej platné desetinné číslo (např. 3,5).';
-    feedbackEl.className = 'feedback feedback--wrong';
+    showAnswerValidationFeedback();
     return;
   }
 
@@ -6882,35 +8124,26 @@ formEl.addEventListener('submit', (event) => {
 
   if (isCorrect) {
     handleCorrectAnswer();
-    feedbackEl.textContent = 'Správně!';
-    feedbackEl.className = 'feedback feedback--correct';
   } else {
     handleWrongAnswer();
-    feedbackEl.textContent = 'Špatně.';
-    feedbackEl.className = 'feedback feedback--wrong';
   }
 
   recordSessionAnswer(userAnswer, isCorrect);
-
-  setFormEnabled(false);
-  nextBtn.hidden = false;
-  nextBtn.focus();
+  finishAnswerReview(isCorrect);
 });
 
 document.addEventListener('keydown', (event) => {
-  if (event.key !== 'Enter' || exerciseScreenEl.hidden || nextBtn.hidden) {
+  if (event.key !== 'Enter' || exerciseScreenEl.hidden || !awaitingNextProblem) {
     return;
   }
 
-  if (event.target === nextBtn || event.target === backBtn || event.target === finishBtn) {
+  if (event.target === primaryActionBtn || event.target === backBtn || event.target === finishBtn) {
     return;
   }
 
   event.preventDefault();
   newProblem();
 });
-
-nextBtn.addEventListener('click', newProblem);
 
 mathKeypadKeys.forEach((key) => {
   key.addEventListener('click', handleKeypadClick);
@@ -6927,7 +8160,9 @@ answerDenominatorEl.addEventListener('focus', () => {
 answerShapeToggleBtn.addEventListener('click', toggleFractionAnswerShape);
 
 startBtn.addEventListener('click', () => {
-  if (startBtn.disabled) {
+  const startBlockReason = getSetupStartBlockReason();
+  if (startBlockReason !== '') {
+    showSetupFeedback(startBlockReason);
     return;
   }
 
@@ -6964,6 +8199,10 @@ fractionModeCheckboxes.forEach((checkbox) => {
 
 integerModeCheckboxes.forEach((checkbox) => {
   checkbox.addEventListener('change', handleIntegerModeSelectionChange);
+});
+
+powersModeCheckboxes.forEach((checkbox) => {
+  checkbox.addEventListener('change', handlePowersModeSelectionChange);
 });
 
 (async () => {
