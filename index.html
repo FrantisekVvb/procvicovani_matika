@@ -45,6 +45,24 @@
           </div>
         </fieldset>
 
+        <fieldset class="operation-picker" id="integer-operation-picker">
+          <legend class="operation-picker__legend">Početní operace se zápornými čísly</legend>
+          <div class="operation-picker__options">
+            <label class="operation-picker__option">
+              <input type="checkbox" name="integer-mode" value="integer-add-subtract">
+              Sčítání a odčítání celých čísel
+            </label>
+            <label class="operation-picker__option">
+              <input type="checkbox" name="integer-mode" value="integer-multiply-divide">
+              Násobení a dělení celých čísel
+            </label>
+            <label class="operation-picker__option">
+              <input type="checkbox" name="integer-mode" value="non-integer-add-subtract">
+              Sčítání a odčítání necelých čísel
+            </label>
+          </div>
+        </fieldset>
+
         <fieldset class="operation-picker" id="fraction-operation-picker">
           <legend class="operation-picker__legend">Početní operace se zlomky</legend>
           <div class="operation-picker__options">
@@ -103,7 +121,7 @@
         </div>
 
         <div class="answer-form__fraction-wrap" id="fraction-answer-wrap" hidden>
-          <div class="fraction answer-fraction">
+          <div class="fraction answer-fraction" id="answer-fraction">
             <input
               class="answer-form__fraction-input fraction__num"
               id="answer-numerator"
@@ -113,7 +131,10 @@
               maxlength="3"
               aria-label="Čitatel"
             >
-            <span class="fraction__bar" aria-hidden="true"></span>
+            <span class="fraction__bar-row">
+              <span class="fraction__sign" id="answer-fraction-sign" aria-hidden="true"></span>
+              <span class="fraction__bar" aria-hidden="true"></span>
+            </span>
             <input
               class="answer-form__fraction-input fraction__den"
               id="answer-denominator"
@@ -139,6 +160,7 @@
             <button class="math-keypad__key" type="button" data-value="3">3</button>
             <button class="math-keypad__key" type="button" data-value=",">,</button>
             <button class="math-keypad__key" type="button" data-value="0">0</button>
+            <button class="math-keypad__key" type="button" data-value="-">−</button>
             <button class="math-keypad__key math-keypad__key--wide" type="button" data-action="backspace" aria-label="Smazat">⌫</button>
           </div>
           <button
