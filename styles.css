@@ -193,6 +193,23 @@ body {
   text-align: center;
 }
 
+.problem-expression__sqrt {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.problem-expression__sqrt-symbol {
+  font-size: 1.15em;
+  line-height: 1;
+  margin-right: 0.05em;
+}
+
+.problem-expression__sqrt-radicand {
+  text-decoration: overline;
+  text-underline-offset: 0.12em;
+}
+
 .problem-expression__power sup {
   font-size: 0.72em;
   line-height: 0;

@@ -60,6 +60,7 @@ const MULTI_OPERAND_DISPLAY_LEVEL = 7;
 const MULTI_OPERAND_COUNT = 4;
 
 const CORRECT_STREAK_TO_LEVEL_UP = 2;
+const MULTI_MODE_COMBINATION_EXTRA_LEVELS = 2;
 const PROBLEMS_BEFORE_RETRY = 3;
 const MIXED_OPERATOR_RATE = 0.8;
 const PARENTHESES_RATE = 0.5;
@@ -76,6 +77,11 @@ const POWER_HIGH_EXP_BASE_MAX = 5;
 const POWER_ANSWER_MIN = -1000;
 const POWER_ANSWER_MAX = 1000;
 const POWER_PAREN_OPERAND_MAX = 9;
+const SQRT_MAX_LEVEL = 3;
+const SQRT_MAX_ROOT = 15;
+const SQRT_ANSWER_MIN = -1000;
+const SQRT_ANSWER_MAX = 1000;
+const POWERS_SQRT_COMBINED_MAX_LEVEL = 3;
 const INTEGER_ADD_SUBTRACT_MAX_LEVEL = 4;
 const INTEGER_MULTIPLY_DIVIDE_MAX_LEVEL = 2;
 const INTEGER_COMBINED_MAX_LEVEL = 4;
@@ -127,6 +133,8 @@ let sessionSelectedModes = [];
 let activeExerciseModePool = [];
 let shuffledExerciseModeDeck = [];
 let lastPickedExerciseMode = null;
+let multiModeFocusedModeIndex = 0;
+let multiModeIndividualPhaseComplete = false;
 let currentAnswerInputMode = null;
 let viewingSharedAnalysis = false;
 let activeFractionInputEl = null;
@@ -144,14 +152,18 @@ function getSelectedIntegerModes() {
     .map((checkbox) => checkbox.value);
 }
 
-function getSelectedPowersModes() {
+function getPowersModePickerValues() {
   return [...powersModeCheckboxes]
     .filter((checkbox) => checkbox.checked)
     .map((checkbox) => checkbox.value);
 }
 
-function hasPowersMode(selected = getSelectedPowersModes()) {
+function hasPowersMode(selected = getPowersModePickerValues()) {
   return selected.includes('powers');
+}
+
+function hasSqrtMode(selected = getPowersModePickerValues()) {
+  return selected.includes('sqrt');
 }
 
 function hasIntegerAddSubtractMode(selected = getSelectedIntegerModes()) {
@@ -192,11 +204,28 @@ function hasIntegerOnlySelection() {
   return getSelectedIntegerModes().length > 0
     && getSelectedOperations().length === 0
     && getSelectedFractionModes().length === 0
-    && getSelectedPowersModes().length === 0;
+    && !hasPowersMode()
+    && !hasSqrtMode();
 }
 
 function hasPowersOnlySelection() {
-  return getSelectedPowersModes().length > 0
+  return hasPowersMode()
+    && !hasSqrtMode()
+    && getSelectedOperations().length === 0
+    && getSelectedFractionModes().length === 0
+    && getSelectedIntegerModes().length === 0;
+}
+
+function hasSqrtOnlySelection() {
+  return hasSqrtMode()
+    && !hasPowersMode()
+    && getSelectedOperations().length === 0
+    && getSelectedFractionModes().length === 0
+    && getSelectedIntegerModes().length === 0;
+}
+
+function hasPowersSqrtOnlySelection() {
+  return hasPowersSqrtCombinedSelection()
     && getSelectedOperations().length === 0
     && getSelectedFractionModes().length === 0
     && getSelectedIntegerModes().length === 0;
@@ -206,7 +235,8 @@ function hasSetupSelection() {
   return getSelectedOperations().length > 0
     || getSelectedFractionModes().length > 0
     || getSelectedIntegerModes().length > 0
-    || getSelectedPowersModes().length > 0;
+    || hasPowersMode()
+    || hasSqrtMode();
 }
 
 function updateStartButton() {
@@ -606,6 +636,10 @@ function resolveFractionExerciseModeFromSelection(modes = getSelectedFractionMod
   return null;
 }
 
+function hasPowersSqrtCombinedSelection() {
+  return hasPowersMode() && hasSqrtMode();
+}
+
 function buildExerciseModePool() {
   if (hasCrossTypeSelection()) {
     return ['decimal-fraction-combined'];
@@ -613,8 +647,16 @@ function buildExerciseModePool() {
 
   const pool = [];
 
-  if (hasPowersMode()) {
-    pool.push('powers');
+  if (hasPowersSqrtCombinedSelection()) {
+    pool.push('powers-sqrt-combined');
+  } else {
+    if (hasPowersMode()) {
+      pool.push('powers');
+    }
+
+    if (hasSqrtMode()) {
+      pool.push('sqrt');
+    }
   }
 
   const integerMode = resolveIntegerExerciseModeFromSelection();
@@ -694,7 +736,9 @@ function isFractionExerciseMode() {
     && !isIntegerExerciseMode()
     && activeExerciseMode !== 'non-integer-add-subtract'
     && activeExerciseMode !== 'non-integer-multiply-divide'
-    && activeExerciseMode !== 'powers';
+    && activeExerciseMode !== 'powers'
+    && activeExerciseMode !== 'sqrt'
+    && activeExerciseMode !== 'powers-sqrt-combined';
 }
 
 function isNonIntegerAnswerInputMode() {
@@ -722,6 +766,14 @@ function isPowersExerciseMode() {
   return activeExerciseMode === 'powers';
 }
 
+function isSqrtExerciseMode() {
+  return activeExerciseMode === 'sqrt';
+}
+
+function isPowersSqrtCombinedExerciseMode() {
+  return activeExerciseMode === 'powers-sqrt-combined';
+}
+
 function isMultiModeExercise() {
   return activeExerciseMode === 'multi-mode';
 }
@@ -729,6 +781,14 @@ function isMultiModeExercise() {
 function getExerciseModeForProblem(problem) {
   if (problem?.type === 'powers') {
     return 'powers';
+  }
+
+  if (problem?.type === 'sqrt') {
+    return 'sqrt';
+  }
+
+  if (problem?.type === 'powers-sqrt-combined') {
+    return 'powers-sqrt-combined';
   }
 
   if (problem?.type === 'integer-add-subtract') {
@@ -789,14 +849,27 @@ function isPowersAnswerInputMode() {
   return getActiveAnswerInputMode() === 'powers';
 }
 
+function isSqrtAnswerInputMode() {
+  return getActiveAnswerInputMode() === 'sqrt';
+}
+
+function isPowersSqrtCombinedAnswerInputMode() {
+  return getActiveAnswerInputMode() === 'powers-sqrt-combined';
+}
+
 function usesIntegerAnswerInput() {
-  return isIntegerAnswerInputMode() || isPowersAnswerInputMode();
+  return isIntegerAnswerInputMode()
+    || isPowersAnswerInputMode()
+    || isSqrtAnswerInputMode()
+    || isPowersSqrtCombinedAnswerInputMode();
 }
 
 function canAnswerProblem(problem) {
   return isFractionAnswerProblem(problem)
     || isIntegerArithmeticProblem(problem)
     || isPowersProblem(problem)
+    || isSqrtProblem(problem)
+    || isPowersSqrtCombinedProblem(problem)
     || problem?.type === 'non-integer-add-subtract'
     || problem?.type === 'non-integer-multiply-divide'
     || Boolean(problem?.operands);
@@ -804,6 +877,14 @@ function canAnswerProblem(problem) {
 
 function isPowersProblem(problem) {
   return problem?.type === 'powers';
+}
+
+function isSqrtProblem(problem) {
+  return problem?.type === 'sqrt';
+}
+
+function isPowersSqrtCombinedProblem(problem) {
+  return problem?.type === 'powers-sqrt-combined';
 }
 
 function isIntegerArithmeticProblem(problem) {
@@ -3105,6 +3186,14 @@ function getMaxDifficultyLevelForMode(mode) {
     return POWER_MAX_LEVEL;
   }
 
+  if (mode === 'sqrt') {
+    return SQRT_MAX_LEVEL;
+  }
+
+  if (mode === 'powers-sqrt-combined') {
+    return POWERS_SQRT_COMBINED_MAX_LEVEL;
+  }
+
   if (mode === 'decimal-fraction-combined') {
     return getCrossTypeCombinedMaxLevel();
   }
@@ -3167,12 +3256,43 @@ function getMaxDifficultyLevelForMode(mode) {
   return MULTI_OP_MIXED_START_LEVEL;
 }
 
+function getMultiModeIndividualMaxDifficulty() {
+  if (activeExerciseModePool.length === 0) {
+    return 0;
+  }
+
+  return Math.max(...activeExerciseModePool.map(getMaxDifficultyLevelForMode));
+}
+
+function isMultiModeCombinationPhase() {
+  return activeExerciseMode === 'multi-mode'
+    && activeExerciseModePool.length > 1
+    && multiModeIndividualPhaseComplete;
+}
+
 function getMaxDifficultyLevel() {
   if (activeExerciseMode === 'multi-mode') {
-    return Math.min(...activeExerciseModePool.map(getMaxDifficultyLevelForMode));
+    if (activeExerciseModePool.length <= 1) {
+      const mode = activeExerciseModePool[0] ?? 'decimal';
+      return getMaxDifficultyLevelForMode(mode);
+    }
+
+    return getMultiModeIndividualMaxDifficulty() + MULTI_MODE_COMBINATION_EXTRA_LEVELS;
   }
 
   return getMaxDifficultyLevelForMode(activeExerciseMode);
+}
+
+function applyMultiModeDisplayLevel(problem, difficultyLevel) {
+  if (!isMultiModeCombinationPhase()) {
+    return problem;
+  }
+
+  const individualMax = getMultiModeIndividualMaxDifficulty();
+  return {
+    ...problem,
+    level: individualMax + 1 + (difficultyLevel - individualMax),
+  };
 }
 
 function pickRandomItem(items) {
@@ -6031,6 +6151,394 @@ function createPowersProblem(difficultyLevel) {
   return createPowersLevel5Problem(displayLevel);
 }
 
+function randomSqrtRadicand() {
+  const root = randomWhole(1, SQRT_MAX_ROOT);
+
+  return root * root;
+}
+
+function createSqrtTerm(radicand) {
+  return {
+    kind: 'sqrt',
+    radicand,
+  };
+}
+
+function getSqrtRootValue(radicand) {
+  return Math.sqrt(radicand);
+}
+
+function isValidSqrtRadicand(radicand) {
+  const root = getSqrtRootValue(radicand);
+
+  return Number.isInteger(root) && root >= 1 && root < 16;
+}
+
+function getSqrtTermValue(term) {
+  return getSqrtRootValue(term.radicand);
+}
+
+function evaluateSqrtExpression(terms, operators) {
+  if (terms.length === 0) {
+    return null;
+  }
+
+  if (operators.length === 0) {
+    return getSqrtTermValue(terms[0]);
+  }
+
+  const values = terms.map(getSqrtTermValue);
+  const result = evaluateExpressionWithOperatorPrecedence(
+    values,
+    operators,
+    applyIntegerBinaryOperation,
+  );
+
+  if (result === null || !Number.isFinite(result)) {
+    return null;
+  }
+
+  return result;
+}
+
+function formatSqrtTermText(term) {
+  return `√${term.radicand}`;
+}
+
+function formatSqrtTermHtml(term) {
+  return `<span class="problem-expression__term problem-expression__sqrt" aria-label="odmocnina z ${escapeHtml(term.radicand)}"><span class="problem-expression__sqrt-symbol" aria-hidden="true">√</span><span class="problem-expression__sqrt-radicand">${escapeHtml(term.radicand)}</span></span>`;
+}
+
+function formatSqrtProblemText(problem) {
+  let text = formatSqrtTermText(problem.terms[0]);
+
+  problem.operators.forEach((operator, index) => {
+    text += `${formatIntegerArithmeticOperatorSymbol(operator, true)}${formatSqrtTermText(problem.terms[index + 1])}`;
+  });
+
+  return `${text} =`;
+}
+
+function formatSqrtDisplayHtml(problem) {
+  let html = formatSqrtTermHtml(problem.terms[0]);
+
+  problem.operators.forEach((operator, index) => {
+    html += `<span class="problem-expression__operator">${formatIntegerArithmeticOperatorSymbol(operator)}</span>${formatSqrtTermHtml(problem.terms[index + 1])}`;
+  });
+
+  return `<span class="problem-expression">${html}<span class="problem-expression__equals">=</span></span>`;
+}
+
+function buildSqrtProblem(terms, operators, displayLevel) {
+  return {
+    type: 'sqrt',
+    terms,
+    operators,
+    answer: evaluateSqrtExpression(terms, operators),
+    level: displayLevel,
+    isRetry: false,
+  };
+}
+
+function isValidSqrtProblem(problem) {
+  if (!problem.terms.every((term) => term.kind === 'sqrt')) {
+    return false;
+  }
+
+  if (!problem.terms.every((term) => isValidSqrtRadicand(term.radicand))) {
+    return false;
+  }
+
+  if (!Number.isInteger(problem.answer)) {
+    return false;
+  }
+
+  if (problem.answer < SQRT_ANSWER_MIN || problem.answer > SQRT_ANSWER_MAX) {
+    return false;
+  }
+
+  return true;
+}
+
+function pickSqrtOperators(operandCount) {
+  if (operandCount <= 1) {
+    return [];
+  }
+
+  const operators = Array.from({ length: operandCount - 1 }, () => pickRandomItem([
+    'add',
+    'subtract',
+    'multiply',
+    'divide',
+  ]));
+
+  if (operandCount >= 3) {
+    if (!operators.some((operator) => isMultiplyOrDivide(operator))) {
+      operators[0] = Math.random() < 0.5 ? 'multiply' : 'divide';
+    }
+
+    if (!operators.some((operator) => isAddOrSubtract(operator))) {
+      operators[operators.length - 1] = Math.random() < 0.5 ? 'add' : 'subtract';
+    }
+  }
+
+  return operators;
+}
+
+function generateSqrtTerms(operandCount) {
+  return Array.from({ length: operandCount }, () => createSqrtTerm(randomSqrtRadicand()));
+}
+
+function createSqrtProblem(difficultyLevel) {
+  const displayLevel = difficultyLevel + 1;
+  const operandCount = displayLevel;
+
+  if (displayLevel === 1) {
+    return buildSqrtProblem([createSqrtTerm(randomSqrtRadicand())], [], displayLevel);
+  }
+
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const terms = generateSqrtTerms(operandCount);
+    const operators = pickSqrtOperators(operandCount);
+    const problem = buildSqrtProblem(terms, operators, displayLevel);
+
+    if (isValidSqrtProblem(problem)) {
+      return problem;
+    }
+  }
+
+  const fallbacks = {
+    2: buildSqrtProblem(
+      [createSqrtTerm(4), createSqrtTerm(16)],
+      ['add'],
+      2,
+    ),
+    3: buildSqrtProblem(
+      [createSqrtTerm(4), createSqrtTerm(9), createSqrtTerm(16)],
+      ['add', 'add'],
+      3,
+    ),
+    4: buildSqrtProblem(
+      [createSqrtTerm(4), createSqrtTerm(9), createSqrtTerm(16), createSqrtTerm(25)],
+      ['add', 'add', 'add'],
+      4,
+    ),
+  };
+
+  return fallbacks[displayLevel];
+}
+
+function getCombinedPowerSqrtTermValue(term) {
+  if (term.kind === 'sqrt') {
+    return getSqrtTermValue(term);
+  }
+
+  return getPowerTermValue(term);
+}
+
+function evaluateCombinedPowerSqrtExpression(terms, operators) {
+  if (terms.length === 0) {
+    return null;
+  }
+
+  if (operators.length === 0) {
+    return getCombinedPowerSqrtTermValue(terms[0]);
+  }
+
+  const values = terms.map(getCombinedPowerSqrtTermValue);
+  const result = evaluateExpressionWithOperatorPrecedence(
+    values,
+    operators,
+    applyIntegerBinaryOperation,
+  );
+
+  if (result === null || !Number.isFinite(result)) {
+    return null;
+  }
+
+  return result;
+}
+
+function formatCombinedPowerSqrtTermText(term, precedingOperator = null) {
+  if (term.kind === 'sqrt') {
+    return formatSqrtTermText(term);
+  }
+
+  return formatPowerTermText(term, precedingOperator);
+}
+
+function formatCombinedPowerSqrtTermHtml(term, precedingOperator = null) {
+  if (term.kind === 'sqrt') {
+    return formatSqrtTermHtml(term);
+  }
+
+  return formatPowerTermHtml(term, precedingOperator);
+}
+
+function formatPowersSqrtCombinedProblemText(problem) {
+  let text = formatCombinedPowerSqrtTermText(problem.terms[0]);
+
+  problem.operators.forEach((operator, index) => {
+    text += `${formatIntegerArithmeticOperatorSymbol(operator, true)}${formatCombinedPowerSqrtTermText(problem.terms[index + 1], operator)}`;
+  });
+
+  return `${text} =`;
+}
+
+function formatPowersSqrtCombinedDisplayHtml(problem) {
+  let html = formatCombinedPowerSqrtTermHtml(problem.terms[0]);
+
+  problem.operators.forEach((operator, index) => {
+    html += `<span class="problem-expression__operator">${formatIntegerArithmeticOperatorSymbol(operator)}</span>${formatCombinedPowerSqrtTermHtml(problem.terms[index + 1], operator)}`;
+  });
+
+  return `<span class="problem-expression">${html}<span class="problem-expression__equals">=</span></span>`;
+}
+
+function buildPowersSqrtCombinedProblem(terms, operators, displayLevel) {
+  return {
+    type: 'powers-sqrt-combined',
+    terms,
+    operators,
+    answer: evaluateCombinedPowerSqrtExpression(terms, operators),
+    level: displayLevel,
+    isRetry: false,
+  };
+}
+
+function isValidCombinedPowerSqrtTerm(term) {
+  if (term.kind === 'sqrt') {
+    return isValidSqrtRadicand(term.radicand);
+  }
+
+  return term.kind === 'power'
+    || term.kind === 'plain'
+    || term.kind === 'parenthesis-power';
+}
+
+function isValidPowersSqrtCombinedProblem(problem, displayLevel) {
+  if (!problem.terms.every(isValidCombinedPowerSqrtTerm)) {
+    return false;
+  }
+
+  if (!Number.isInteger(problem.answer)) {
+    return false;
+  }
+
+  if (problem.answer < POWER_ANSWER_MIN || problem.answer > POWER_ANSWER_MAX) {
+    return false;
+  }
+
+  if (displayLevel >= 2) {
+    const hasSqrt = problem.terms.some((term) => term.kind === 'sqrt');
+    const hasPower = problem.terms.some((term) => term.kind !== 'sqrt');
+
+    if (!hasSqrt || !hasPower) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function createRandomCombinedPowerTerm(displayLevel) {
+  if (displayLevel <= 2) {
+    return createPositiveSquareTerm(randomWhole(1, POWER_SQUARE_BASE_MAX));
+  }
+
+  if (displayLevel === 3) {
+    const exponent = Math.random() < 0.5 ? 3 : 4;
+    const base = randomWhole(1, POWER_HIGH_EXP_BASE_MAX);
+    return createHighExponentTerm(base, exponent, true);
+  }
+
+  if (displayLevel >= 5 && Math.random() < 0.45) {
+    return createRandomParenthesisPowerTerm();
+  }
+
+  return createRandomPowerTermForLevel4();
+}
+
+function generateCombinedPowerSqrtTerms(displayLevel, operandCount, requireBoth = false) {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const terms = Array.from({ length: operandCount }, () => (
+      Math.random() < 0.5
+        ? createSqrtTerm(randomSqrtRadicand())
+        : createRandomCombinedPowerTerm(displayLevel)
+    ));
+
+    if (requireBoth) {
+      const hasSqrt = terms.some((term) => term.kind === 'sqrt');
+      const hasPower = terms.some((term) => term.kind !== 'sqrt');
+
+      if (!hasSqrt) {
+        terms[randomWhole(0, operandCount - 1)] = createSqrtTerm(randomSqrtRadicand());
+      }
+
+      if (!hasPower) {
+        const index = randomWhole(0, operandCount - 1);
+        terms[index] = createRandomCombinedPowerTerm(displayLevel);
+      }
+    }
+
+    return terms;
+  }
+
+  return [
+    createSqrtTerm(4),
+    createPositiveSquareTerm(2),
+  ];
+}
+
+function createPowersSqrtCombinedProblem(difficultyLevel) {
+  const displayLevel = difficultyLevel + 1;
+  const operandCount = Math.min(displayLevel, 4);
+  const requireBoth = displayLevel >= 2;
+
+  if (displayLevel === 1) {
+    const term = Math.random() < 0.5
+      ? createSqrtTerm(randomSqrtRadicand())
+      : createPositiveSquareTerm(randomWhole(1, POWER_SQUARE_BASE_MAX));
+
+    return buildPowersSqrtCombinedProblem([term], [], displayLevel);
+  }
+
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const terms = generateCombinedPowerSqrtTerms(displayLevel, operandCount, requireBoth);
+    const operators = pickSqrtOperators(operandCount);
+    const problem = buildPowersSqrtCombinedProblem(terms, operators, displayLevel);
+
+    if (isValidPowersSqrtCombinedProblem(problem, displayLevel)) {
+      return problem;
+    }
+  }
+
+  const fallbacks = {
+    2: buildPowersSqrtCombinedProblem(
+      [createSqrtTerm(4), createPositiveSquareTerm(3)],
+      ['add'],
+      2,
+    ),
+    3: buildPowersSqrtCombinedProblem(
+      [createSqrtTerm(9), createPositiveSquareTerm(2), createSqrtTerm(16)],
+      ['add', 'add'],
+      3,
+    ),
+    4: buildPowersSqrtCombinedProblem(
+      [
+        createSqrtTerm(4),
+        createPositiveSquareTerm(2),
+        createSqrtTerm(25),
+        createPositiveSquareTerm(3),
+      ],
+      ['add', 'multiply', 'add'],
+      4,
+    ),
+  };
+
+  return fallbacks[displayLevel];
+}
+
 function createProblemForExerciseMode(mode, level) {
   if (mode === 'basic-form') {
     return createBasicFormProblem(level);
@@ -6058,6 +6566,14 @@ function createProblemForExerciseMode(mode, level) {
 
   if (mode === 'powers') {
     return createPowersProblem(level);
+  }
+
+  if (mode === 'sqrt') {
+    return createSqrtProblem(level);
+  }
+
+  if (mode === 'powers-sqrt-combined') {
+    return createPowersSqrtCombinedProblem(level);
   }
 
   if (mode === 'decimal-fraction-combined') {
@@ -6114,6 +6630,10 @@ function createProblemForExerciseMode(mode, level) {
 
 function pickExerciseModeForNextProblem() {
   if (activeExerciseMode === 'multi-mode') {
+    if (!multiModeIndividualPhaseComplete && activeExerciseModePool.length > 1) {
+      return activeExerciseModePool[multiModeFocusedModeIndex];
+    }
+
     if (shuffledExerciseModeDeck.length === 0) {
       refillExerciseModeDeck();
     }
@@ -6127,7 +6647,15 @@ function pickExerciseModeForNextProblem() {
 }
 
 function createRandomProblem(level) {
-  return createProblemForExerciseMode(pickExerciseModeForNextProblem(), level);
+  const mode = pickExerciseModeForNextProblem();
+  const levelForGeneration = isMultiModeCombinationPhase()
+    ? getMaxDifficultyLevelForMode(mode)
+    : level;
+
+  return applyMultiModeDisplayLevel(
+    createProblemForExerciseMode(mode, levelForGeneration),
+    level,
+  );
 }
 
 function isPowerTenProblem(problem) {
@@ -6578,6 +7106,14 @@ function formatProblemText(problem) {
     return formatPowersProblemText(problem);
   }
 
+  if (problem.type === 'sqrt') {
+    return formatSqrtProblemText(problem);
+  }
+
+  if (problem.type === 'powers-sqrt-combined') {
+    return formatPowersSqrtCombinedProblemText(problem);
+  }
+
   if (problem.type === 'fraction-add') {
     return formatFractionAddProblemText(problem);
   }
@@ -6650,7 +7186,7 @@ function recordSessionAnswer(userAnswer, isCorrect) {
     return;
   }
 
-  if (isIntegerArithmeticProblem(currentProblem) || isPowersProblem(currentProblem)) {
+  if (isIntegerArithmeticProblem(currentProblem) || isPowersProblem(currentProblem) || isSqrtProblem(currentProblem) || isPowersSqrtCombinedProblem(currentProblem)) {
     sessionResults.push({
       uloha: formatProblemText(currentProblem),
       uroven: getDisplayLevel(currentProblem),
@@ -7322,7 +7858,7 @@ function updateMathKeypadKeys() {
   const usesFractionFields = usesFractionAnswerFields() && !isNumberAnswerInputShape();
 
   if (commaKey) {
-    commaKey.hidden = usesFractionFields || isIntegerAnswerInputMode() || isPowersAnswerInputMode();
+    commaKey.hidden = usesFractionFields || isIntegerAnswerInputMode() || isPowersAnswerInputMode() || isSqrtAnswerInputMode() || isPowersSqrtCombinedAnswerInputMode();
   }
 
   if (minusKey) {
@@ -7348,7 +7884,7 @@ function toggleNegativeSignInInput(target) {
 }
 
 function updateFractionAnswerShapeUi() {
-  if (isIntegerAnswerInputMode() || isPowersAnswerInputMode()) {
+  if (isIntegerAnswerInputMode() || isPowersAnswerInputMode() || isSqrtAnswerInputMode() || isPowersSqrtCombinedAnswerInputMode()) {
     answerShapeToggleBtn.hidden = true;
     setAnswerWrapVisible(decimalAnswerWrapEl, true);
     setAnswerWrapVisible(fractionAnswerWrapEl, false);
@@ -7447,6 +7983,8 @@ function setAnswerInputMode(mode) {
   currentAnswerInputMode = mode;
 
   if (mode === 'powers'
+    || mode === 'sqrt'
+    || mode === 'powers-sqrt-combined'
     || mode === 'integer-add-subtract'
     || mode === 'integer-multiply-divide'
     || mode === 'integer-combined') {
@@ -7645,6 +8183,10 @@ function showProblem(problem) {
     updateFractionAnswerShapeUi();
   } else if (problem.type === 'powers') {
     problemEl.innerHTML = formatPowersDisplayHtml(problem);
+  } else if (problem.type === 'sqrt') {
+    problemEl.innerHTML = formatSqrtDisplayHtml(problem);
+  } else if (problem.type === 'powers-sqrt-combined') {
+    problemEl.innerHTML = formatPowersSqrtCombinedDisplayHtml(problem);
   } else {
   problemEl.textContent = formatProblemText(problem);
   }
@@ -7664,6 +8206,8 @@ function showProblem(problem) {
       || isIntegerExerciseMode()
       || isNonIntegerExerciseMode()
       || isPowersExerciseMode()
+      || isSqrtExerciseMode()
+      || isPowersSqrtCombinedExerciseMode()
       || getSelectedOperations().length > 0);
   setFormEnabled(canAnswer);
 
@@ -7762,6 +8306,16 @@ function queueRetry(problem) {
     item.answerNegative = problem.answerNegative;
   } else if (problem.type === 'powers') {
     item.type = 'powers';
+    item.terms = problem.terms.map((term) => ({ ...term }));
+    item.operators = [...problem.operators];
+    item.answer = problem.answer;
+  } else if (problem.type === 'sqrt') {
+    item.type = 'sqrt';
+    item.terms = problem.terms.map((term) => ({ ...term }));
+    item.operators = [...problem.operators];
+    item.answer = problem.answer;
+  } else if (problem.type === 'powers-sqrt-combined') {
+    item.type = 'powers-sqrt-combined';
     item.terms = problem.terms.map((term) => ({ ...term }));
     item.operators = [...problem.operators];
     item.answer = problem.answer;
@@ -7944,6 +8498,28 @@ function pickNextProblem() {
       };
     }
 
+    if (dueRetry.type === 'sqrt') {
+      return {
+        type: 'sqrt',
+        terms: dueRetry.terms.map((term) => ({ ...term })),
+        operators: [...dueRetry.operators],
+        answer: dueRetry.answer,
+        level: dueRetry.level,
+        isRetry: true,
+      };
+    }
+
+    if (dueRetry.type === 'powers-sqrt-combined') {
+      return {
+        type: 'powers-sqrt-combined',
+        terms: dueRetry.terms.map((term) => ({ ...term })),
+        operators: [...dueRetry.operators],
+        answer: dueRetry.answer,
+        level: dueRetry.level,
+        isRetry: true,
+      };
+    }
+
     return {
       operands: dueRetry.operands.map((operand) => ({ ...operand })),
       operation: dueRetry.operation,
@@ -7971,7 +8547,7 @@ function updateTitle() {
       return;
     }
 
-    if (hasPowersOnlySelection()) {
+    if (hasPowersOnlySelection() || hasSqrtOnlySelection() || hasPowersSqrtOnlySelection()) {
       appTitleEl.textContent = POWERS_APP_TITLE;
       return;
     }
@@ -7985,7 +8561,7 @@ function updateTitle() {
     return;
   }
 
-  if (isPowersExerciseMode()) {
+  if (isPowersExerciseMode() || isSqrtExerciseMode() || isPowersSqrtCombinedExerciseMode()) {
     appTitleEl.textContent = POWERS_APP_TITLE;
     return;
   }
@@ -8041,11 +8617,34 @@ function resetProgress() {
   fractionAnswerInputShape = 'fraction';
   shuffledExerciseModeDeck = [];
   lastPickedExerciseMode = null;
+  multiModeFocusedModeIndex = 0;
+  multiModeIndividualPhaseComplete = false;
   resetSession();
 }
 
 function handleCorrectAnswer() {
   correctStreak += 1;
+
+  if (activeExerciseMode === 'multi-mode'
+    && activeExerciseModePool.length > 1
+    && !multiModeIndividualPhaseComplete) {
+    const focusMode = activeExerciseModePool[multiModeFocusedModeIndex];
+    const modeMax = getMaxDifficultyLevelForMode(focusMode);
+
+    if (correctStreak >= CORRECT_STREAK_TO_LEVEL_UP && difficultyLevel >= modeMax) {
+      multiModeFocusedModeIndex += 1;
+
+      if (multiModeFocusedModeIndex >= activeExerciseModePool.length) {
+        multiModeIndividualPhaseComplete = true;
+        difficultyLevel = getMultiModeIndividualMaxDifficulty() + 1;
+      } else {
+        difficultyLevel = 0;
+      }
+
+      correctStreak = 0;
+      return;
+    }
+  }
 
   if (correctStreak >= CORRECT_STREAK_TO_LEVEL_UP && difficultyLevel < getMaxDifficultyLevel()) {
     difficultyLevel += 1;
@@ -8056,7 +8655,11 @@ function handleCorrectAnswer() {
 function handleWrongAnswer() {
   correctStreak = 0;
 
-  if (difficultyLevel > 0) {
+  const minDifficultyLevel = isMultiModeCombinationPhase()
+    ? getMultiModeIndividualMaxDifficulty() + 1
+    : 0;
+
+  if (difficultyLevel > minDifficultyLevel) {
     difficultyLevel -= 1;
   }
 
@@ -8225,7 +8828,7 @@ formEl.addEventListener('submit', (event) => {
     return;
   }
 
-  if (isIntegerArithmeticProblem(currentProblem) || isPowersProblem(currentProblem)) {
+  if (isIntegerArithmeticProblem(currentProblem) || isPowersProblem(currentProblem) || isSqrtProblem(currentProblem) || isPowersSqrtCombinedProblem(currentProblem)) {
     const userAnswer = parseAnswer(inputEl.value);
     if (userAnswer === null || !Number.isInteger(userAnswer)) {
       showAnswerValidationFeedback();

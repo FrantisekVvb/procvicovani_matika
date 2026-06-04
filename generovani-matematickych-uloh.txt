@@ -1,0 +1,123 @@
+Jak aplikace generuje matematické úlohy
+========================================
+
+Generování probíhá celé v main.js při procvičování. Není to databáze hotových úloh,
+ale náhodný generátor s pravidly — u každého režimu a úrovně platí jiná omezení.
+
+
+1. Celkový průběh
+-----------------
+
+1. Uživatel zaškrtne režimy (desetinná čísla, zlomky, celá čísla, mocniny…).
+2. Aplikace z toho sestaví pool režimů (buildExerciseModePool). Jeden režim → procvičuje
+   se jen ten; více režimů → multi-mode a režimy se střídají přes promíchaný balíček
+   (každý režim jednou, pak znovu zamíchat).
+3. Běží vnitřní obtížnost difficultyLevel (0 = Úroveň 1). Po 2 správných odpovědích za
+   sebou roste, po chybě klesne (ne pod 0).
+4. pickNextProblem() nejdřív zkontroluje frontu opakování — špatně vyřešená úloha se
+   vrátí po 3 jiných úlohách.
+5. Jinak se zavolá createRandomProblem(difficultyLevel) → vybere režim →
+   createProblemForExerciseMode(mode, level) → konkrétní generátor.
+
+
+2. Základní vzor generování
+---------------------------
+
+Většina úloh vzniká stejným schématem:
+
+1. Náhodně poskládat operand(y), operátory, případně závorky podle pravidel dané úrovně.
+2. Spočítat správnou odpověď stejným výrazem jako v zobrazení.
+3. Zkontrolovat validitu (isValid…Problem) — např. celé číslo, rozsah výsledku,
+   povolený tvar závorek, nesmí být dělení nulou.
+4. Pokud nevyhovuje, opakovat až 200 pokusů.
+5. Když generátor selže, použít předpřipravenou záložní úlohu (fallback).
+
+Úloha je vždy objekt s typem (integer-add-subtract, fraction-divide, powers…), daty výrazu
+(terms, operators, operands…) a polem answer / answerNum + answerDen.
+
+Zobrazení (format…ProblemText, format…DisplayHtml) je oddělené od generování — stejná data
+se jen naformátují pro obrazovku.
+
+
+3. Obtížnost a úrovně
+---------------------
+
+- Uživatel vidí Úroveň 1, 2, 3… (problem.level = difficultyLevel + 1).
+- Každý režim má vlastní maximální úroveň (konstanty typu INTEGER_ADD_SUBTRACT_MAX_LEVEL,
+  POWER_MAX_LEVEL…).
+- Při více režimech najednou je strop obtížnosti minimum z maxů vybraných režimů.
+- Pravidla se mění podle displayLevel — funkce jako integerLevelRequiresWrapped(3) nebo
+  createPowersLevel5Problem určují, co smí být v úloze.
+
+
+4. Režimy a jejich logika
+-------------------------
+
+Desetinná čísla
+- Jedna operace: konfigurace z DIFFICULTY_LEVELS (počet operandů, počet desetinných míst,
+  součty < 1 apod.).
+- Více operací: kombinace vybraných operací, od určité úrovně i smíšené operátory a závorky
+  u sčítání/odčítání.
+- Násobení/dělení 10, 100, 1000: speciální úlohy s pevným dělitelem/násobitelem.
+- Validace: konečná odpověď, rozumný počet desetinných míst, u kombinovaných režimů další
+  pravidla (např. „přátelská“ čísla).
+
+Sčítání a odčítání celých čísel
+- Operand 1–20, výsledek −100 až 100.
+- Úroveň má vlastní generátor (např. úroveň 2 = řetězec 6 − 8 + 3 − 5 bez + (−8)).
+- Musí být záporné číslo ve výrazu nebo záporný výsledek — čistě kladné úlohy se zahodí.
+
+Násobení a dělení celých čísel, kombinovaný režim celých čísel
+- Podobný model terms + operators, validace celočíselného výsledku.
+- Kombinovaný režim od vyšších úrovní míchá +, −, ·, : v jednom výrazu.
+
+Necelá čísla (desetinná / zlomková)
+- Operand jako desetinné číslo nebo zlomek, někdy obojí v jedné úloze.
+- Úroveň 3+ může vyžadovat závorky u záporných hodnot.
+
+Zlomky
+- Samostatné generátory pro sčítání, odčítání, násobení, dělení, základní tvar, složený zlomek.
+- Více operací → fraction-combined / fraction-mixed.
+- Odpověď často jako zlomek; u základního tvaru kontrola nzv (součin prvočísel 2, 3, 5, 7).
+
+Mocniny celých čísel
+- Termy typu plain (číslo), power (např. 3², (−2)²), parenthesis-power ((2+3)²).
+- Výraz se vyhodnotí s prioritou · a : před + a −.
+- Úroveň 5 může záměrně generovat (a ± b)² · n.
+
+Kombinace desetinných čísel a zlomků
+- Pokud jsou zaškrtnuté operace z obou skupin, aktivuje se decimal-fraction-combined —
+  smíšené výrazy s pravidly pro oba typy operandů.
+
+
+5. Náhodnost a férovost
+-----------------------
+
+Math.random()              — volba čísel, operátorů, počtu operandů
+Validace + opakování       — úloha musí splnit didaktická pravidla
+Fallback                   — aplikace nikdy nezůstane bez úlohy
+Promíchaný balíček režimů   — při více režimech se střídají rovnoměře, ne čistě náhodně
+Fronta opakování           — špatná úloha se vrátí po 3 jiných
+
+
+6. Ověření odpovědi
+-------------------
+
+Generátor uloží správný výsledek do objektu úlohy. Po odeslání formuláře aplikace:
+
+- u desetinných čísel parsuje vstup (čárka),
+- u zlomků porovnává čitatele/jmenovatele, případně základní tvar,
+- u celých čísel a mocnin porovnává celé číslo,
+
+a výsledek zapíše do analýzy (tabulka úloh, úrovně, správně/špatně).
+
+
+Shrnutí
+-------
+
+Úlohy se náhodně skládají podle pravidel vybraného režimu a aktuální úrovně, filtrují se
+validací, při selhání se opakují nebo nahradí zálohou, při procvičování střídají režimy
+a přizpůsobují obtížnost podle úspěšnosti uživatele.
+
+Skripty generate-*.mjs a simulate-user.mjs používají stejnou logiku z main.js pro simulace
+a přehledy — v prohlížeči běží ta samá „matematická engine“ část kódu.
