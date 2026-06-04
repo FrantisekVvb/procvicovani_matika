@@ -126,6 +126,10 @@ body {
   grid-template-columns: 1fr;
 }
 
+.operation-picker__option[hidden] {
+  display: none !important;
+}
+
 .operation-picker__option {
   display: flex;
   align-items: center;
