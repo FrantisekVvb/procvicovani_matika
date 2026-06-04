@@ -78,6 +78,14 @@
               <input type="checkbox" name="powers-mode" value="sqrt">
               Druhá odmocnina
             </label>
+            <label class="operation-picker__option">
+              <input type="checkbox" name="powers-mode" value="non-integer-powers">
+              Mocniny necelých čísel
+            </label>
+            <label class="operation-picker__option">
+              <input type="checkbox" name="powers-mode" value="non-integer-sqrt">
+              Odmocniny necelých čísel
+            </label>
           </div>
         </fieldset>
 
@@ -137,42 +145,62 @@
       </div>
 
       <form class="answer-form" id="answer-form" novalidate>
-        <div class="answer-form__decimal-wrap is-visible" id="decimal-answer-wrap">
-          <input
-            class="answer-form__input"
-            id="answer-input"
-            type="text"
-            inputmode="none"
-            autocomplete="off"
-            required
-          >
-        </div>
+        <div class="answer-form__entry">
+          <div class="answer-form__fields">
+            <div class="answer-form__decimal-wrap is-visible" id="decimal-answer-wrap">
+              <input
+                class="answer-form__input"
+                id="answer-input"
+                type="text"
+                inputmode="none"
+                autocomplete="off"
+                required
+              >
+            </div>
 
-        <div class="answer-form__fraction-wrap" id="fraction-answer-wrap" hidden>
-          <div class="fraction answer-fraction" id="answer-fraction">
-            <input
-              class="answer-form__fraction-input fraction__num"
-              id="answer-numerator"
-              type="text"
-              inputmode="none"
-              autocomplete="off"
-              maxlength="3"
-              aria-label="Čitatel"
-            >
-            <span class="fraction__bar-row">
-              <span class="fraction__sign" id="answer-fraction-sign" aria-hidden="true"></span>
-              <span class="fraction__bar" aria-hidden="true"></span>
-            </span>
-            <input
-              class="answer-form__fraction-input fraction__den"
-              id="answer-denominator"
-              type="text"
-              inputmode="none"
-              autocomplete="off"
-              maxlength="3"
-              aria-label="Jmenovatel"
-            >
+            <div class="answer-form__fraction-wrap" id="fraction-answer-wrap" hidden>
+              <div class="fraction answer-fraction" id="answer-fraction">
+                <input
+                  class="answer-form__fraction-input fraction__num"
+                  id="answer-numerator"
+                  type="text"
+                  inputmode="none"
+                  autocomplete="off"
+                  maxlength="3"
+                  aria-label="Čitatel"
+                >
+                <span class="fraction__bar-row">
+                  <span class="fraction__sign" id="answer-fraction-sign" aria-hidden="true"></span>
+                  <span class="fraction__bar" aria-hidden="true"></span>
+                </span>
+                <input
+                  class="answer-form__fraction-input fraction__den"
+                  id="answer-denominator"
+                  type="text"
+                  inputmode="none"
+                  autocomplete="off"
+                  maxlength="3"
+                  aria-label="Jmenovatel"
+                >
+              </div>
+            </div>
           </div>
+
+          <button
+            class="answer-form__shape-toggle"
+            type="button"
+            id="answer-shape-toggle-btn"
+            data-action="toggle-answer-shape"
+            aria-label="Přepnout odpověď na zlomek"
+          >
+            <svg class="answer-form__shape-toggle-icon" viewBox="0 0 88 47" fill="none" aria-hidden="true">
+              <rect x="5" width="20" height="20" rx="6" fill="#D9D9D9"/>
+              <rect x="54" y="17" width="34" height="20" rx="6" fill="#D9D9D9"/>
+              <rect x="5" y="27" width="20" height="20" rx="6" fill="#D9D9D9"/>
+              <path d="M0.5 23.5H29.5" stroke="currentColor" stroke-linecap="round"/>
+              <path d="M49 9.5L38 38.5" stroke="currentColor" stroke-linecap="round"/>
+            </svg>
+          </button>
         </div>
 
         <div class="math-keypad" id="math-keypad" aria-label="Matematická klávesnice">
@@ -191,15 +219,6 @@
             <button class="math-keypad__key" type="button" data-value="-">−</button>
             <button class="math-keypad__key math-keypad__key--wide" type="button" data-action="backspace" aria-label="Smazat">⌫</button>
           </div>
-          <button
-            class="math-keypad__shape-toggle"
-            type="button"
-            id="answer-shape-toggle-btn"
-            data-action="toggle-answer-shape"
-            hidden
-          >
-            Číslo
-          </button>
         </div>
       </form>
 
@@ -225,6 +244,13 @@
 
       <div class="analysis__summary" id="analysis-summary"></div>
       <div class="analysis__levels" id="analysis-levels"></div>
+      <div class="analysis__problem-view" id="analysis-problem-view" hidden>
+        <span class="analysis__problem-view-label">Zobrazení úloh:</span>
+        <div class="analysis__problem-view-options" role="group" aria-label="Zobrazení úloh">
+          <button class="analysis__problem-view-btn is-active" type="button" data-problem-view="text">Textově</button>
+          <button class="analysis__problem-view-btn" type="button" data-problem-view="formatted">Graficky</button>
+        </div>
+      </div>
       <div class="analysis__table-wrap">
         <table class="analysis__table">
           <thead>

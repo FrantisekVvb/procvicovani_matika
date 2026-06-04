@@ -195,25 +195,88 @@ body {
 
 .problem-expression__sqrt {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-end;
+  vertical-align: middle;
   white-space: nowrap;
 }
 
-.problem-expression__sqrt-symbol {
-  font-size: 1.15em;
+.math-sqrt {
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
   line-height: 1;
-  margin-right: 0.05em;
 }
 
-.problem-expression__sqrt-radicand {
-  text-decoration: overline;
-  text-underline-offset: 0.12em;
+.math-sqrt__overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 0;
+}
+
+.math-sqrt__content {
+  position: relative;
+  z-index: 1;
+  display: block;
+  padding: 0.24em 0.14em 0.14em 0.52em;
+}
+
+.fraction__num .math-sqrt__content,
+.fraction__den .math-sqrt__content {
+  padding: 0.18em 0.1em 0.1em 0.44em;
+}
+
+.math-parens {
+  display: inline-flex;
+  align-items: stretch;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+.math-parens__brace {
+  width: 0.38em;
+  flex-shrink: 0;
+  align-self: stretch;
+  height: auto;
+  min-height: 1.85em;
+  overflow: visible;
+}
+
+.math-parens__body {
+  display: flex;
+  align-items: center;
+  padding: 0.02em 0.04em;
 }
 
 .problem-expression__power sup {
   font-size: 0.72em;
   line-height: 0;
   vertical-align: super;
+}
+
+.problem-expression__power:has(.fraction-power-whole) {
+  display: inline-flex;
+  align-items: flex-start;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+.problem-expression__power:has(.fraction-power-whole) > sup {
+  font-size: 0.65em;
+  line-height: 1;
+  vertical-align: top;
+  align-self: flex-start;
+  margin-left: 0.05em;
+}
+
+.fraction-power-whole {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
 }
 
 .compound-fraction {
@@ -465,11 +528,53 @@ body {
   border-color: #cf222e;
 }
 
+.answer-form__entry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.answer-form__fields {
+  display: flex;
+  justify-content: center;
+}
+
+.answer-form__shape-toggle {
+  flex: 0 0 auto;
+  min-width: 56px;
+  min-height: 48px;
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  color: #222;
+  font-family: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.answer-form__shape-toggle-icon {
+  width: 44px;
+  height: auto;
+  display: block;
+}
+
+.answer-form__shape-toggle:hover:not(:disabled) {
+  background: #f7f7f7;
+}
+
+.answer-form__shape-toggle:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .answer-form__decimal-wrap,
 .answer-form__fraction-wrap {
   display: none;
-  width: 100%;
-  justify-content: center;
 }
 
 .answer-form__decimal-wrap.is-visible {
@@ -568,29 +673,6 @@ body {
 .math-keypad__key--wide {
   grid-column: span 3;
   font-size: 1.125rem;
-}
-
-.math-keypad__shape-toggle {
-  width: 100%;
-  margin-top: 8px;
-  min-height: 44px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  background: #fff;
-  color: #222;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-}
-
-.math-keypad__shape-toggle:hover:not(:disabled) {
-  background: #f7f7f7;
-}
-
-.math-keypad__shape-toggle:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }
 
 .btn {
@@ -750,6 +832,68 @@ body {
   font-size: 0.9375rem;
   font-weight: 600;
   margin-bottom: 8px;
+}
+
+.analysis__problem-view {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.analysis__problem-view-label {
+  font-size: 0.875rem;
+  color: #666;
+}
+
+.analysis__problem-view-options {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.analysis__problem-view-btn {
+  padding: 6px 12px;
+  font-size: 0.8125rem;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: #fff;
+  color: #333;
+  cursor: pointer;
+}
+
+.analysis__problem-view-btn:hover:not(:disabled) {
+  border-color: #999;
+}
+
+.analysis__problem-view-btn.is-active {
+  border-color: #333;
+  background: #f3f3f3;
+  font-weight: 600;
+}
+
+.analysis__problem-view-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.analysis__problem--formatted {
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.analysis__problem--formatted .problem-expression {
+  justify-content: flex-start;
+}
+
+.analysis__problem--formatted .math-sqrt__content {
+  padding: 0.2em 0.12em 0.12em 0.48em;
+}
+
+.analysis__problem--formatted .math-parens__brace {
+  min-height: 1.6em;
 }
 
 .analysis__table-wrap {
