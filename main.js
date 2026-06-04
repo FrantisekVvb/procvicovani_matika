@@ -75,6 +75,7 @@ const POWER_SQUARE_BASE_MAX = 15;
 const POWER_HIGH_EXP_BASE_MAX = 5;
 const POWER_ANSWER_MIN = -1000;
 const POWER_ANSWER_MAX = 1000;
+const POWER_PAREN_OPERAND_MAX = 9;
 const INTEGER_ADD_SUBTRACT_MAX_LEVEL = 4;
 const INTEGER_MULTIPLY_DIVIDE_MAX_LEVEL = 2;
 const INTEGER_COMBINED_MAX_LEVEL = 4;
@@ -4293,7 +4294,7 @@ function createIntegerTerm(magnitude, sign, wrapped = false) {
 }
 
 function pickIntegerOperator(displayLevel) {
-  if (displayLevel === 2 || displayLevel === 4) {
+  if (displayLevel === 4) {
     return 'add';
   }
 
@@ -4314,6 +4315,10 @@ function integerLevelRequiresWrapped(displayLevel) {
 
 function integerLevelRequiresWrappedBetweenAllPairs(displayLevel) {
   return displayLevel === 4;
+}
+
+function integerLevelUsesPlainAddSubtractChain(displayLevel) {
+  return displayLevel === 2;
 }
 
 function buildIntegerAddSubtractProblem(terms, operators, displayLevel) {
@@ -4368,6 +4373,20 @@ function isValidIntegerAddSubtractProblem(terms, operators, displayLevel) {
     if (terms.length !== 2 || !terms.some((term) => term.wrapped)) {
       return false;
     }
+  } else if (integerLevelUsesPlainAddSubtractChain(displayLevel)) {
+    if (operators.some((operator) => operator !== 'add' && operator !== 'subtract')) {
+      return false;
+    }
+
+    if (terms.some((term) => term.wrapped)) {
+      return false;
+    }
+
+    for (let i = 1; i < terms.length; i += 1) {
+      if (terms[i].sign < 0) {
+        return false;
+      }
+    }
   } else if (terms.some((term) => term.wrapped)) {
     return false;
   }
@@ -4411,6 +4430,36 @@ function generateIntegerLevel4Terms(operandCount) {
   return null;
 }
 
+function generateIntegerLevel2Terms(operandCount) {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const terms = [
+      createIntegerTerm(
+        randomWhole(INTEGER_OPERAND_MIN, INTEGER_OPERAND_MAX),
+        Math.random() < 0.5 ? -1 : 1,
+        false,
+      ),
+    ];
+
+    for (let i = 1; i < operandCount; i += 1) {
+      terms.push(createIntegerTerm(
+        randomWhole(INTEGER_OPERAND_MIN, INTEGER_OPERAND_MAX),
+        1,
+        false,
+      ));
+    }
+
+    const operators = Array.from({ length: operandCount - 1 }, () => (
+      Math.random() < 0.5 ? 'add' : 'subtract'
+    ));
+
+    if (isValidIntegerAddSubtractProblem(terms, operators, 2)) {
+      return { terms, operators };
+    }
+  }
+
+  return null;
+}
+
 function pickIntegerOperatorFromPool(displayLevel, allowedOps = null) {
   if (allowedOps && allowedOps.length > 0) {
     return pickRandomItem(allowedOps);
@@ -4422,6 +4471,10 @@ function pickIntegerOperatorFromPool(displayLevel, allowedOps = null) {
 function generateIntegerTerms(displayLevel, operandCount, allowedOps = null) {
   if (integerLevelRequiresWrappedBetweenAllPairs(displayLevel)) {
     return generateIntegerLevel4Terms(operandCount);
+  }
+
+  if (integerLevelUsesPlainAddSubtractChain(displayLevel)) {
+    return generateIntegerLevel2Terms(operandCount);
   }
 
   for (let attempt = 0; attempt < 200; attempt += 1) {
@@ -4756,11 +4809,12 @@ function createIntegerAddSubtractProblem(difficultyLevel, allowedOps = null) {
     ),
     2: buildIntegerAddSubtractProblem(
       [
-        createIntegerTerm(2, -1),
-        createIntegerTerm(4, 1),
-        createIntegerTerm(3, -1),
+        createIntegerTerm(6, 1),
+        createIntegerTerm(8, 1),
+        createIntegerTerm(3, 1),
+        createIntegerTerm(5, 1),
       ],
-      ['add', 'add'],
+      ['subtract', 'add', 'subtract'],
       2,
     ),
     3: buildIntegerAddSubtractProblem(
@@ -5459,7 +5513,29 @@ function createPlainPowerTerm(value) {
   };
 }
 
+function createParenthesisPowerTerm(left, right, innerOperator, exponent = 2, {
+  leadingNegative = false,
+} = {}) {
+  return {
+    kind: 'parenthesis-power',
+    left,
+    right,
+    innerOperator,
+    exponent,
+    leadingNegative,
+  };
+}
+
 function evaluatePowerTerm(term) {
+  if (term.kind === 'parenthesis-power') {
+    const innerValue = term.innerOperator === 'add'
+      ? term.left + term.right
+      : term.left - term.right;
+    const power = integerPow(innerValue, term.exponent);
+
+    return term.leadingNegative ? -power : power;
+  }
+
   const magnitudePower = integerPow(term.base, term.exponent);
 
   if (term.wrapped) {
@@ -5525,7 +5601,23 @@ function powerTermNeedsParensAfterOperator(term, precedingOperator) {
     return term.value < 0;
   }
 
+  if (term.kind === 'parenthesis-power') {
+    return term.leadingNegative;
+  }
+
   return term.leadingNegative || term.baseSign < 0;
+}
+
+function formatParenthesisPowerInnerText(term) {
+  const operatorSymbol = formatIntegerArithmeticOperatorSymbol(term.innerOperator, false).trim();
+
+  return `(${term.left} ${operatorSymbol} ${term.right})${formatPowerExponentText(term.exponent)}`;
+}
+
+function formatParenthesisPowerInnerHtml(term) {
+  const operatorSymbol = formatIntegerArithmeticOperatorSymbol(term.innerOperator);
+
+  return `(${term.left}<span class="problem-expression__operator">${operatorSymbol}</span>${term.right})${formatPowerExponentHtml(term.exponent)}`;
 }
 
 function formatPowerTermInnerText(term) {
@@ -5593,6 +5685,20 @@ function formatPowerTermText(term, precedingOperator = null) {
     return String(value);
   }
 
+  if (term.kind === 'parenthesis-power') {
+    let text = formatParenthesisPowerInnerText(term);
+
+    if (term.leadingNegative) {
+      text = `-${text}`;
+    }
+
+    if (powerTermNeedsParensAfterOperator(term, precedingOperator)) {
+      return `(${text})`;
+    }
+
+    return text;
+  }
+
   const inner = formatPowerTermInnerText(term);
 
   if (powerTermNeedsParensAfterOperator(term, precedingOperator)) {
@@ -5605,6 +5711,20 @@ function formatPowerTermText(term, precedingOperator = null) {
 function formatPowerTermHtml(term, precedingOperator = null) {
   if (term.kind === 'plain') {
     return `<span class="problem-expression__term">${escapeHtml(formatPowerTermText(term, precedingOperator))}</span>`;
+  }
+
+  if (term.kind === 'parenthesis-power') {
+    let inner = formatParenthesisPowerInnerHtml(term);
+
+    if (term.leadingNegative) {
+      inner = `−${inner}`;
+    }
+
+    const content = powerTermNeedsParensAfterOperator(term, precedingOperator)
+      ? `(${inner})`
+      : inner;
+
+    return `<span class="problem-expression__term problem-expression__power">${content}</span>`;
   }
 
   const inner = formatPowerTermInnerHtml(term);
@@ -5696,6 +5816,14 @@ function createRandomPowerTermForLevel4() {
   return createHighExponentTerm(base, exponent, allowNegative);
 }
 
+function createRandomParenthesisPowerTerm() {
+  const innerOperator = Math.random() < 0.65 ? 'add' : 'subtract';
+  const left = randomWhole(1, POWER_PAREN_OPERAND_MAX);
+  const right = randomWhole(1, POWER_PAREN_OPERAND_MAX);
+
+  return createParenthesisPowerTerm(left, right, innerOperator, 2);
+}
+
 function createRandomPlainTermForPowers(displayLevel) {
   const maxValue = displayLevel >= 5 ? 20 : 15;
   const magnitude = randomWhole(1, maxValue);
@@ -5754,6 +5882,8 @@ function generatePowersTerms(displayLevel, operandCount, requirePower = false) {
           const exponent = Math.random() < 0.5 ? 3 : 4;
           const base = randomWhole(1, POWER_HIGH_EXP_BASE_MAX);
           terms.push(createHighExponentTerm(base, exponent, true));
+        } else if (displayLevel >= 5 && Math.random() < 0.45) {
+          terms.push(createRandomParenthesisPowerTerm());
         } else {
           terms.push(createRandomPowerTermForLevel4());
         }
@@ -5764,9 +5894,11 @@ function generatePowersTerms(displayLevel, operandCount, requirePower = false) {
     }
 
     if (requirePower && !hasPower) {
-      terms[0] = displayLevel <= 2
-        ? createPositiveSquareTerm(randomWhole(1, POWER_SQUARE_BASE_MAX))
-        : createRandomPowerTermForLevel4();
+      terms[0] = displayLevel >= 5 && Math.random() < 0.45
+        ? createRandomParenthesisPowerTerm()
+        : (displayLevel <= 2
+          ? createPositiveSquareTerm(randomWhole(1, POWER_SQUARE_BASE_MAX))
+          : createRandomPowerTermForLevel4());
     }
 
     return terms;
@@ -5827,7 +5959,34 @@ function createPowersLevel4Problem(displayLevel) {
   );
 }
 
+function tryCreatePowersLevel5ParenthesisPowerProblem(displayLevel) {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const powerTerm = createRandomParenthesisPowerTerm();
+    const operators = [Math.random() < 0.75
+      ? pickRandomItem(['multiply', 'divide'])
+      : pickPowerBinaryOperator()];
+    const terms = [
+      powerTerm,
+      createRandomPlainTermForPowers(displayLevel),
+    ];
+    const problem = buildPowersProblem(terms, operators, displayLevel);
+
+    if (isValidPowersProblem(problem)) {
+      return problem;
+    }
+  }
+
+  return null;
+}
+
 function createPowersLevel5Problem(displayLevel) {
+  if (Math.random() < 0.4) {
+    const parenthesisProblem = tryCreatePowersLevel5ParenthesisPowerProblem(displayLevel);
+    if (parenthesisProblem) {
+      return parenthesisProblem;
+    }
+  }
+
   const operandCount = pickPowerOperandCount(displayLevel);
   const operators = pickPowerOperatorsForLevel5(operandCount);
 
@@ -5842,11 +6001,10 @@ function createPowersLevel5Problem(displayLevel) {
 
   return buildPowersProblem(
     [
-      createWrappedNegativeSquareTerm(2),
-      createPlainPowerTerm(-3),
-      createPowerTerm(2, 3, { baseSign: 1 }),
+      createParenthesisPowerTerm(2, 3, 'add', 2),
+      createPlainPowerTerm(5),
     ],
-    ['multiply', 'add'],
+    ['multiply'],
     displayLevel,
   );
 }
@@ -8186,16 +8344,32 @@ formEl.addEventListener('submit', (event) => {
 });
 
 document.addEventListener('keydown', (event) => {
-  if (event.key !== 'Enter' || exerciseScreenEl.hidden || !awaitingNextProblem) {
+  if (event.key !== 'Enter' || exerciseScreenEl.hidden) {
     return;
   }
 
-  if (event.target === primaryActionBtn || event.target === backBtn || event.target === finishBtn) {
+  if (event.target === backBtn || event.target === finishBtn) {
     return;
   }
 
-  event.preventDefault();
-  newProblem();
+  if (awaitingNextProblem) {
+    if (event.target === primaryActionBtn) {
+      return;
+    }
+
+    event.preventDefault();
+    newProblem();
+    return;
+  }
+
+  const isAnswerInput = event.target === inputEl
+    || event.target === answerNumeratorEl
+    || event.target === answerDenominatorEl;
+
+  if (isAnswerInput) {
+    event.preventDefault();
+    formEl.requestSubmit();
+  }
 });
 
 mathKeypadKeys.forEach((key) => {
