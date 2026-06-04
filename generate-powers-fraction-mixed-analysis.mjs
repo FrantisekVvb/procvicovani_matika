@@ -1,13 +1,14 @@
 import { readFileSync } from 'node:fs';
 
 const TOTAL_ANSWERS = 100;
-const SEED = 202606041;
-const USER_NAME = 'Fiktivní uživatel – zlomky, mocniny a odmocnina, kombinační fáze (100 %)';
-const CORRECT_STREAK_TO_LEVEL_UP = 2;
+const SEED = 20260604;
+const USER_NAME = 'Fiktivní uživatel – mocniny, odmocnina a zlomky (100 %)';
 const SELECTED_MODE_LABELS = [
-  'Sčítání zlomků',
   'Mocniny celých čísel',
   'Druhá odmocnina',
+  'Sčítání zlomků',
+  'Odčítání zlomků',
+  'Násobení zlomků',
 ];
 
 const ENGINE_STUBS = `
@@ -16,7 +17,7 @@ function getPowersModePickerValues() {
 }
 
 function getSelectedFractionModes() {
-  return ['fraction-add'];
+  return ['fraction-add', 'fraction-subtract', 'fraction-multiply'];
 }
 
 function getSelectedOperations() {
@@ -26,6 +27,8 @@ function getSelectedOperations() {
 function getSelectedIntegerModes() {
   return [];
 }
+
+function queueRetry() {}
 
 activeExerciseMode = 'multi-mode';
 activeExerciseModePool = buildExerciseModePool();
@@ -89,10 +92,6 @@ ${ENGINE_STUBS}
 }
 
 function getCorrectAnswerText(problem) {
-  if (problem.type === 'fraction-add') {
-    return `${problem.answerNum}/${problem.answerDen}`;
-  }
-
   if (problem.type === 'powers' || problem.type === 'sqrt' || problem.type === 'powers-sqrt-combined') {
     return String(problem.answer);
   }

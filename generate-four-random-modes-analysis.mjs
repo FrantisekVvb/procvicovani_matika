@@ -121,8 +121,7 @@ activeExerciseMode = 'multi-mode';
 activeExerciseModePool = buildExerciseModePool();
 shuffledExerciseModeDeck = [];
 lastPickedExerciseMode = null;
-multiModeFocusedModeIndex = 0;
-multiModeIndividualPhaseComplete = false;
+initMultiModeProgress();
 `;
 }
 
@@ -130,7 +129,7 @@ function loadEngine(random, engineStubs) {
   const mainJs = readFileSync(new URL('./main.js', import.meta.url), 'utf8');
   const start = mainJs.indexOf('const DIFFICULTY_LEVELS');
   const end = mainJs.indexOf('function recordSessionAnswer(userAnswer, isCorrect)');
-  const progressionStart = mainJs.indexOf('function handleCorrectAnswer()');
+  const progressionStart = mainJs.indexOf('function advanceMultiModePhaseAfterIndividualComplete()');
   const progressionEnd = mainJs.indexOf('function newProblem()');
   if (start === -1 || end === -1 || progressionStart === -1 || progressionEnd === -1) {
     throw new Error('Nepodařilo se načíst logiku z main.js');

@@ -59,8 +59,14 @@ const MULTI_OP_EXTRA_MIXED_START_LEVEL = 5;
 const MULTI_OPERAND_DISPLAY_LEVEL = 7;
 const MULTI_OPERAND_COUNT = 4;
 
+const WITHIN_PANEL_COMBINATION_LEVEL_BOOST = 1;
+const MULTI_MODE_PHASE = {
+  INDIVIDUAL: 'individual',
+  COMBINATION: 'combination',
+};
+const USER_VISIBLE_LEVEL_THRESHOLD = 4;
+const USER_VISIBLE_MAX_LEVEL = 5;
 const CORRECT_STREAK_TO_LEVEL_UP = 2;
-const MULTI_MODE_COMBINATION_EXTRA_LEVELS = 2;
 const PROBLEMS_BEFORE_RETRY = 3;
 const MIXED_OPERATOR_RATE = 0.8;
 const PARENTHESES_RATE = 0.5;
@@ -134,7 +140,12 @@ let activeExerciseModePool = [];
 let shuffledExerciseModeDeck = [];
 let lastPickedExerciseMode = null;
 let multiModeFocusedModeIndex = 0;
-let multiModeIndividualPhaseComplete = false;
+let multiModePhase = MULTI_MODE_PHASE.INDIVIDUAL;
+let multiModeIndividualQueue = [];
+let multiModeWithinPanelQueue = [];
+let multiModeCombinationUseCrossPanel = true;
+let shuffledWithinPanelDeck = [];
+let lastPickedWithinPanel = null;
 let currentAnswerInputMode = null;
 let viewingSharedAnalysis = false;
 let activeFractionInputEl = null;
@@ -433,7 +444,7 @@ function getBasicFormMaxValue(displayLevel) {
 
 function getFractionAnswerMaxValue() {
   if (currentProblem?.type === 'basic-form') {
-    return getBasicFormMaxValue(getDisplayLevel(currentProblem));
+    return getBasicFormMaxValue(getInternalDisplayLevel(currentProblem));
   }
 
   if (currentProblem?.type === 'fraction-add'
@@ -442,7 +453,8 @@ function getFractionAnswerMaxValue() {
     || currentProblem?.type === 'fraction-multiply'
     || currentProblem?.type === 'fraction-divide'
     || currentProblem?.type === 'fraction-compound'
-    || currentProblem?.type === 'decimal-fraction-mixed') {
+    || currentProblem?.type === 'decimal-fraction-mixed'
+    || currentProblem?.type === 'cross-panel-mixed') {
     return FRACTION_ADD_ANSWER_MAX;
   }
 
@@ -457,7 +469,8 @@ function isFractionAnswerProblem(problem) {
     || problem?.type === 'fraction-multiply'
     || problem?.type === 'fraction-divide'
     || problem?.type === 'fraction-compound'
-    || problem?.type === 'decimal-fraction-mixed';
+    || problem?.type === 'decimal-fraction-mixed'
+    || problem?.type === 'cross-panel-mixed';
 }
 
 function getSelectedFractionOperations(selected = getSelectedFractionModes()) {
@@ -813,6 +826,10 @@ function getExerciseModeForProblem(problem) {
 
   if (problem?.type === 'decimal-fraction-mixed') {
     return 'decimal-fraction-combined';
+  }
+
+  if (problem?.type === 'cross-panel-mixed') {
+    return 'fraction-add';
   }
 
   if (problem?.type === 'basic-form') {
@@ -1919,6 +1936,14 @@ function createDecimalFractionMixedProblem(difficultyLevel) {
 }
 
 function createDecimalFractionCombinedProblem(difficultyLevel) {
+  if (activeExerciseMode === 'multi-mode') {
+    if (multiModePhase === MULTI_MODE_PHASE.COMBINATION) {
+      return createDecimalFractionMixedProblem(difficultyLevel);
+    }
+
+    return createCrossTypePoolProblem(difficultyLevel);
+  }
+
   if (shouldUseCrossTypeMixedProblem(difficultyLevel)) {
     return createDecimalFractionMixedProblem(difficultyLevel);
   }
@@ -3256,18 +3281,397 @@ function getMaxDifficultyLevelForMode(mode) {
   return MULTI_OP_MIXED_START_LEVEL;
 }
 
+function getActiveExercisePanels() {
+  const panels = [];
+
+  if (getSelectedOperations().length > 0) {
+    panels.push('decimal');
+  }
+
+  if (getSelectedIntegerModes().length > 0) {
+    panels.push('integer');
+  }
+
+  if (hasPowersMode() || hasSqrtMode()) {
+    panels.push('powers');
+  }
+
+  if (getSelectedFractionModes().length > 0) {
+    panels.push('fraction');
+  }
+
+  return panels;
+}
+
+function buildMultiModeIndividualQueue() {
+  if (hasCrossTypeSelection()) {
+    return ['decimal-fraction-combined'];
+  }
+
+  const queue = [];
+
+  if (hasPowersMode()) {
+    queue.push('powers');
+  }
+
+  if (hasSqrtMode()) {
+    queue.push('sqrt');
+  }
+
+  const integerMode = resolveIntegerExerciseModeFromSelection();
+  if (integerMode) {
+    queue.push(integerMode);
+  }
+
+  if (getSelectedOperations().length > 0) {
+    queue.push('decimal');
+  }
+
+  const fractionMode = resolveFractionExerciseModeFromSelection();
+  if (fractionMode) {
+    queue.push(fractionMode);
+  }
+
+  return queue;
+}
+
+function buildMultiModeWithinPanelQueue() {
+  const queue = [];
+
+  if (hasPowersSqrtCombinedSelection()) {
+    queue.push('powers');
+  }
+
+  if (hasMultipleFractionOperations()) {
+    queue.push('fraction');
+  }
+
+  if (hasIntegerArithmeticCombinedModes()) {
+    queue.push('integer');
+  }
+
+  if (getSelectedOperations().length > 1) {
+    queue.push('decimal');
+  }
+
+  return queue;
+}
+
+function hasMultiModeCrossPanelCombination() {
+  const panels = getActiveExercisePanels();
+
+  if (panels.length < 2) {
+    return false;
+  }
+
+  const hasDecimal = getSelectedOperations().length > 0;
+  const hasFractionOps = getSelectedFractionOperations().length > 0;
+  const hasPowersPanel = hasPowersMode() || hasSqrtMode();
+  const hasInteger = getSelectedIntegerModes().length > 0;
+
+  if (hasFractionOps && hasPowersPanel) {
+    return true;
+  }
+
+  if (hasDecimal && hasPowersPanel) {
+    return true;
+  }
+
+  if (hasInteger && hasFractionOps) {
+    return true;
+  }
+
+  if (hasInteger && hasPowersPanel) {
+    return true;
+  }
+
+  if (hasDecimal && hasInteger) {
+    return true;
+  }
+
+  return false;
+}
+
+function initMultiModeProgress() {
+  multiModePhase = MULTI_MODE_PHASE.INDIVIDUAL;
+  multiModeIndividualQueue = buildMultiModeIndividualQueue();
+  multiModeWithinPanelQueue = buildMultiModeWithinPanelQueue();
+  multiModeFocusedModeIndex = 0;
+  multiModeCombinationUseCrossPanel = true;
+  shuffledWithinPanelDeck = [];
+  lastPickedWithinPanel = null;
+}
+
 function getMultiModeIndividualMaxDifficulty() {
-  if (activeExerciseModePool.length === 0) {
+  const queue = activeExerciseMode === 'multi-mode' && multiModeIndividualQueue.length > 0
+    ? multiModeIndividualQueue
+    : activeExerciseModePool;
+
+  if (queue.length === 0) {
     return 0;
   }
 
-  return Math.max(...activeExerciseModePool.map(getMaxDifficultyLevelForMode));
+  return Math.max(...queue.map(getMaxDifficultyLevelForMode));
 }
 
-function isMultiModeCombinationPhase() {
-  return activeExerciseMode === 'multi-mode'
-    && activeExerciseModePool.length > 1
-    && multiModeIndividualPhaseComplete;
+function refillWithinPanelDeck() {
+  shuffledWithinPanelDeck = shuffleArray(multiModeWithinPanelQueue);
+
+  if (lastPickedWithinPanel != null
+    && shuffledWithinPanelDeck.length > 1
+    && shuffledWithinPanelDeck[0] === lastPickedWithinPanel) {
+    shuffledWithinPanelDeck.push(shuffledWithinPanelDeck.shift());
+  }
+}
+
+function pickWithinPanelForNextProblem() {
+  if (shuffledWithinPanelDeck.length === 0) {
+    refillWithinPanelDeck();
+  }
+
+  const panel = shuffledWithinPanelDeck.shift();
+  lastPickedWithinPanel = panel;
+  return panel;
+}
+
+function createMultiModeWithinPanelProblem(panel) {
+  const difficultyLevel = getMultiModeIndividualMaxDifficulty();
+
+  if (panel === 'powers') {
+    return createPowersSqrtCombinedProblem(POWERS_SQRT_COMBINED_MAX_LEVEL);
+  }
+
+  if (panel === 'fraction') {
+    return createFractionCombinedMixedProblem(
+      getSelectedFractionOperations(),
+      FRACTION_MIXED_DISPLAY_LEVEL - 1,
+    );
+  }
+
+  if (panel === 'integer') {
+    return createIntegerCombinedMixedProblem(
+      getSelectedIntegerArithmeticOperations(),
+      INTEGER_COMBINED_MAX_LEVEL - 1,
+    );
+  }
+
+  const selected = getSelectedOperations();
+  return createMultiOperationProblem(selected, getDecimalMaxLevelForSelection());
+}
+
+function createRandomCrossPanelPowerTerm() {
+  const options = [];
+
+  if (hasSqrtMode()) {
+    options.push(() => createSqrtTerm(randomSqrtRadicand()));
+  }
+
+  if (hasPowersMode()) {
+    options.push(() => createPositiveSquareTerm(randomWhole(1, POWER_SQUARE_BASE_MAX)));
+    options.push(() => {
+      const exponent = Math.random() < 0.5 ? 3 : 4;
+      return createHighExponentTerm(randomWhole(1, POWER_HIGH_EXP_BASE_MAX), exponent, true);
+    });
+    options.push(() => createWrappedNegativeSquareTerm(randomWhole(1, POWER_SQUARE_BASE_MAX)));
+    options.push(() => createUnaryMinusSquareTerm(randomWhole(1, POWER_SQUARE_BASE_MAX)));
+    options.push(() => createRandomPowerTermForLevel4());
+  }
+
+  if (options.length === 0) {
+    return createSqrtTerm(4);
+  }
+
+  return pickRandomItem(options)();
+}
+
+function crossPanelTermToRational(term) {
+  if (term.kind === 'fraction') {
+    return [term.num, term.den];
+  }
+
+  const value = getCombinedPowerSqrtTermValue(term);
+  if (!Number.isInteger(value)) {
+    return null;
+  }
+
+  return [value, 1];
+}
+
+function createCrossPanelFractionTerm() {
+  const properFraction = randomProperFraction(12);
+  return { kind: 'fraction', num: properFraction.num, den: properFraction.den };
+}
+
+function hasCrossPanelTermMix(terms) {
+  const hasFraction = terms.some((term) => term.kind === 'fraction');
+  const hasPower = terms.some((term) => term.kind !== 'fraction');
+  return hasFraction && hasPower;
+}
+
+function pickCrossPanelOperators(operandCount) {
+  return pickSqrtOperators(operandCount);
+}
+
+function evaluateCrossPanelMultiTermExpression(terms, operators) {
+  const resolvedOperators = Array.isArray(operators)
+    ? operators
+    : [operators];
+  const rationals = terms.map(crossPanelTermToRational);
+
+  if (rationals.some((rational) => !rational)) {
+    return null;
+  }
+
+  const result = evaluateExpressionWithOperatorPrecedence(
+    rationals,
+    resolvedOperators,
+    (left, right, op) => {
+      const [answerNum, answerDen] = combineFractions(left[0], left[1], right[0], right[1], op);
+
+      if (answerDen === 0) {
+        return null;
+      }
+
+      return [answerNum, answerDen];
+    },
+  );
+
+  if (!result) {
+    return null;
+  }
+
+  return { answerNum: result[0], answerDen: result[1] };
+}
+
+function isValidCrossPanelProblem(problem) {
+  if (!problem) {
+    return false;
+  }
+
+  if (problem.answerNum <= 0) {
+    return false;
+  }
+
+  return problem.answerNum <= FRACTION_ADD_ANSWER_MAX
+    && problem.answerDen <= FRACTION_ADD_ANSWER_MAX;
+}
+
+function buildCrossPanelMixedProblem(terms, operators, displayLevel) {
+  const resolvedOperators = Array.isArray(operators) ? operators : [operators];
+  const answer = evaluateCrossPanelMultiTermExpression(terms, resolvedOperators);
+
+  if (!answer) {
+    return null;
+  }
+
+  const problem = {
+    type: 'cross-panel-mixed',
+    terms,
+    operators: resolvedOperators,
+    answerNum: answer.answerNum,
+    answerDen: answer.answerDen,
+    level: displayLevel,
+    isRetry: false,
+  };
+
+  return isValidCrossPanelProblem(problem) ? problem : null;
+}
+
+function createFractionPowersCrossPanelProblem(difficultyLevel) {
+  const displayLevel = difficultyLevel + 1;
+  const termCount = Math.random() < 0.5 ? 3 : 4;
+
+  for (let attempt = 0; attempt < 300; attempt += 1) {
+    const terms = [];
+    const firstFromFraction = Math.random() < 0.5;
+    terms.push(firstFromFraction ? createCrossPanelFractionTerm() : createRandomCrossPanelPowerTerm());
+    terms.push(firstFromFraction ? createRandomCrossPanelPowerTerm() : createCrossPanelFractionTerm());
+
+    while (terms.length < termCount) {
+      terms.push(Math.random() < 0.5
+        ? createCrossPanelFractionTerm()
+        : createRandomCrossPanelPowerTerm());
+    }
+
+    if (Math.random() < 0.6) {
+      shuffleArray(terms);
+    }
+
+    if (!hasCrossPanelTermMix(terms)) {
+      continue;
+    }
+
+    const operators = pickCrossPanelOperators(terms.length);
+    const problem = buildCrossPanelMixedProblem(terms, operators, displayLevel);
+
+    if (problem) {
+      return problem;
+    }
+  }
+
+  return buildCrossPanelMixedProblem(
+    [
+      { kind: 'fraction', num: 1, den: 2 },
+      createPositiveSquareTerm(2),
+      { kind: 'fraction', num: 1, den: 3 },
+    ],
+    ['add', 'multiply'],
+    displayLevel,
+  );
+}
+
+function createDecimalFractionCrossPanelProblem(difficultyLevel) {
+  return createDecimalFractionMixedProblem(difficultyLevel);
+}
+
+function buildMultiModeCrossPanelGenerators() {
+  const maxDifficulty = getMultiModeIndividualMaxDifficulty();
+  const generators = [];
+
+  if (getSelectedFractionOperations().length > 0 && (hasPowersMode() || hasSqrtMode())) {
+    generators.push(() => createFractionPowersCrossPanelProblem(maxDifficulty));
+  }
+
+  if (getSelectedOperations().length > 0 && getSelectedFractionOperations().length > 0) {
+    generators.push(() => createDecimalFractionCrossPanelProblem(maxDifficulty));
+  }
+
+  return generators;
+}
+
+function createMultiModeCrossPanelProblem() {
+  const generators = buildMultiModeCrossPanelGenerators();
+
+  if (generators.length === 0) {
+    throw new Error('Chybí generátor pro kombinaci režimů z různých panelů.');
+  }
+
+  return pickRandomItem(generators)();
+}
+
+function canUseMultiModeWithinPanelCombination() {
+  return multiModeWithinPanelQueue.length > 0;
+}
+
+function createMultiModeCombinationProblem() {
+  const canWithin = canUseMultiModeWithinPanelCombination();
+  const canCross = hasMultiModeCrossPanelCombination();
+
+  if (canWithin && canCross) {
+    multiModeCombinationUseCrossPanel = !multiModeCombinationUseCrossPanel;
+
+    if (multiModeCombinationUseCrossPanel) {
+      return createMultiModeCrossPanelProblem();
+    }
+
+    return createMultiModeWithinPanelProblem(pickWithinPanelForNextProblem());
+  }
+
+  if (canCross) {
+    return createMultiModeCrossPanelProblem();
+  }
+
+  return createMultiModeWithinPanelProblem(pickWithinPanelForNextProblem());
 }
 
 function getMaxDifficultyLevel() {
@@ -3277,22 +3681,10 @@ function getMaxDifficultyLevel() {
       return getMaxDifficultyLevelForMode(mode);
     }
 
-    return getMultiModeIndividualMaxDifficulty() + MULTI_MODE_COMBINATION_EXTRA_LEVELS;
+    return getMultiModeIndividualMaxDifficulty();
   }
 
   return getMaxDifficultyLevelForMode(activeExerciseMode);
-}
-
-function applyMultiModeDisplayLevel(problem, difficultyLevel) {
-  if (!isMultiModeCombinationPhase()) {
-    return problem;
-  }
-
-  const individualMax = getMultiModeIndividualMaxDifficulty();
-  return {
-    ...problem,
-    level: individualMax + 1 + (difficultyLevel - individualMax),
-  };
 }
 
 function pickRandomItem(items) {
@@ -6630,8 +7022,8 @@ function createProblemForExerciseMode(mode, level) {
 
 function pickExerciseModeForNextProblem() {
   if (activeExerciseMode === 'multi-mode') {
-    if (!multiModeIndividualPhaseComplete && activeExerciseModePool.length > 1) {
-      return activeExerciseModePool[multiModeFocusedModeIndex];
+    if (multiModePhase === MULTI_MODE_PHASE.INDIVIDUAL) {
+      return multiModeIndividualQueue[multiModeFocusedModeIndex];
     }
 
     if (shuffledExerciseModeDeck.length === 0) {
@@ -6647,15 +7039,16 @@ function pickExerciseModeForNextProblem() {
 }
 
 function createRandomProblem(level) {
-  const mode = pickExerciseModeForNextProblem();
-  const levelForGeneration = isMultiModeCombinationPhase()
-    ? getMaxDifficultyLevelForMode(mode)
-    : level;
+  if (activeExerciseMode === 'multi-mode') {
+    if (multiModePhase === MULTI_MODE_PHASE.COMBINATION) {
+      return createMultiModeCombinationProblem();
+    }
 
-  return applyMultiModeDisplayLevel(
-    createProblemForExerciseMode(mode, levelForGeneration),
-    level,
-  );
+    const mode = multiModeIndividualQueue[multiModeFocusedModeIndex];
+    return createProblemForExerciseMode(mode, level);
+  }
+
+  return createProblemForExerciseMode(pickExerciseModeForNextProblem(), level);
 }
 
 function isPowerTenProblem(problem) {
@@ -6670,12 +7063,64 @@ function isDividePowerTenProblem(problem) {
     && POWER_TEN_MULTIPLIERS.includes(problem.operands[1].value);
 }
 
-function getDisplayLevel(problem) {
+function problemCombinesPowersPanelModes(problem) {
+  if (problem?.type !== 'powers-sqrt-combined' || !Array.isArray(problem.terms)) {
+    return false;
+  }
+
+  const hasSqrt = problem.terms.some((term) => term.kind === 'sqrt');
+  const hasPower = problem.terms.some((term) => term.kind !== 'sqrt');
+  return hasSqrt && hasPower;
+}
+
+function getRegimeCombinationLevelBoost(problem) {
+  if (!problem) {
+    return 0;
+  }
+
+  if (problem.type === 'decimal-fraction-mixed' || problem.type === 'cross-panel-mixed') {
+    return WITHIN_PANEL_COMBINATION_LEVEL_BOOST;
+  }
+
+  if (problem.type === 'fraction-mixed' || problem.type === 'integer-mixed') {
+    return WITHIN_PANEL_COMBINATION_LEVEL_BOOST;
+  }
+
+  if (problemCombinesPowersPanelModes(problem)) {
+    return WITHIN_PANEL_COMBINATION_LEVEL_BOOST;
+  }
+
+  return 0;
+}
+
+function getCombinationLevelBoost(problem) {
+  if (activeExerciseMode === 'multi-mode') {
+    if (multiModePhase === MULTI_MODE_PHASE.COMBINATION) {
+      return WITHIN_PANEL_COMBINATION_LEVEL_BOOST;
+    }
+
+    return 0;
+  }
+
+  return getRegimeCombinationLevelBoost(problem);
+}
+
+function getInternalDisplayLevel(problem) {
   if (isPowerTenProblem(problem) || isDividePowerTenProblem(problem)) {
     return POWER_TEN_MULTIPLIERS.indexOf(problem.operands[1].value) + 1;
   }
 
-  return problem.level;
+  return problem.level + getCombinationLevelBoost(problem);
+}
+
+function getDisplayLevel(problem) {
+  const internalLevel = getInternalDisplayLevel(problem);
+
+  if (internalLevel > USER_VISIBLE_LEVEL_THRESHOLD) {
+    return USER_VISIBLE_MAX_LEVEL;
+  }
+
+  return internalLevel;
 }
 
 function formatProblemLevel(problem) {
@@ -7085,6 +7530,60 @@ function formatCompoundFractionProblemText(problem) {
   return `${formatCompoundPartText(problem.numerator)}/${formatCompoundPartText(problem.denominator)} =`;
 }
 
+function cloneCrossPanelTerm(term) {
+  if (term.kind === 'fraction') {
+    return { kind: 'fraction', num: term.num, den: term.den };
+  }
+
+  return { ...term };
+}
+
+function formatCrossPanelMixedTermText(term, precedingOperator = null) {
+  if (term.kind === 'fraction') {
+    return `${term.num}/${term.den}`;
+  }
+
+  return formatCombinedPowerSqrtTermText(term, precedingOperator);
+}
+
+function formatCrossPanelMixedTermHtml(term, precedingOperator = null) {
+  if (term.kind === 'fraction') {
+    return formatSingleFractionHtml(term.num, term.den);
+  }
+
+  return formatCombinedPowerSqrtTermHtml(term, precedingOperator);
+}
+
+function getCrossPanelMixedOperators(problem) {
+  if (Array.isArray(problem.operators)) {
+    return problem.operators;
+  }
+
+  return [problem.operator];
+}
+
+function formatCrossPanelMixedProblemText(problem) {
+  const operators = getCrossPanelMixedOperators(problem);
+  let text = formatCrossPanelMixedTermText(problem.terms[0]);
+
+  operators.forEach((operator, index) => {
+    text += `${formatIntegerArithmeticOperatorSymbol(operator, true)}${formatCrossPanelMixedTermText(problem.terms[index + 1], operator)}`;
+  });
+
+  return `${text} =`;
+}
+
+function formatCrossPanelMixedDisplayHtml(problem) {
+  const operators = getCrossPanelMixedOperators(problem);
+  let html = formatCrossPanelMixedTermHtml(problem.terms[0]);
+
+  operators.forEach((operator, index) => {
+    html += `<span class="problem-expression__operator">${formatIntegerArithmeticOperatorSymbol(operator)}</span>${formatCrossPanelMixedTermHtml(problem.terms[index + 1], operator)}`;
+  });
+
+  return `<span class="problem-expression">${html}<span class="problem-expression__equals">=</span></span>`;
+}
+
 function formatProblemText(problem) {
   if (problem.type === 'basic-form') {
     return `${problem.givenNum}/${problem.givenDen} =`;
@@ -7140,6 +7639,10 @@ function formatProblemText(problem) {
 
   if (problem.type === 'decimal-fraction-mixed') {
     return formatDecimalFractionMixedProblemText(problem);
+  }
+
+  if (problem.type === 'cross-panel-mixed') {
+    return formatCrossPanelMixedProblemText(problem);
   }
 
   if (activeExerciseMode === 'decimal' && getSelectedOperations().length === 0) {
@@ -8127,7 +8630,7 @@ function showProblem(problem) {
   problemLevelEl.textContent = formatProblemLevel(problem);
 
   if (problem.type === 'basic-form') {
-    const maxInputLength = String(getBasicFormMaxValue(getDisplayLevel(problem))).length;
+    const maxInputLength = String(getBasicFormMaxValue(getInternalDisplayLevel(problem))).length;
     answerNumeratorEl.maxLength = maxInputLength;
     answerDenominatorEl.maxLength = maxInputLength;
     problemEl.innerHTML = formatFractionDisplayHtml(problem.givenNum, problem.givenDen);
@@ -8166,6 +8669,11 @@ function showProblem(problem) {
     answerNumeratorEl.maxLength = maxInputLength;
     answerDenominatorEl.maxLength = maxInputLength;
     problemEl.innerHTML = formatDecimalFractionMixedDisplayHtml(problem);
+  } else if (problem.type === 'cross-panel-mixed') {
+    const maxInputLength = String(FRACTION_ADD_ANSWER_MAX).length;
+    answerNumeratorEl.maxLength = maxInputLength;
+    answerDenominatorEl.maxLength = maxInputLength;
+    problemEl.innerHTML = formatCrossPanelMixedDisplayHtml(problem);
   } else if (isIntegerArithmeticProblem(problem)) {
     problemEl.innerHTML = formatIntegerArithmeticDisplayHtml(problem);
   } else if (problem.type === 'non-integer-add-subtract') {
@@ -8431,6 +8939,18 @@ function pickNextProblem() {
       };
     }
 
+    if (dueRetry.type === 'cross-panel-mixed') {
+      return {
+        type: 'cross-panel-mixed',
+        terms: dueRetry.terms.map(cloneCrossPanelTerm),
+        operators: [...getCrossPanelMixedOperators(dueRetry)],
+        answerNum: dueRetry.answerNum,
+        answerDen: dueRetry.answerDen,
+        level: dueRetry.level,
+        isRetry: true,
+      };
+    }
+
     if (dueRetry.type === 'decimal-fraction-mixed') {
       return {
         type: 'decimal-fraction-mixed',
@@ -8618,8 +9138,20 @@ function resetProgress() {
   shuffledExerciseModeDeck = [];
   lastPickedExerciseMode = null;
   multiModeFocusedModeIndex = 0;
-  multiModeIndividualPhaseComplete = false;
+  multiModePhase = MULTI_MODE_PHASE.INDIVIDUAL;
+  multiModeIndividualQueue = [];
+  multiModeWithinPanelQueue = [];
+  multiModeCombinationUseCrossPanel = true;
+  shuffledWithinPanelDeck = [];
+  lastPickedWithinPanel = null;
   resetSession();
+}
+
+function advanceMultiModePhaseAfterIndividualComplete() {
+  if (multiModeWithinPanelQueue.length > 0 || hasMultiModeCrossPanelCombination()) {
+    multiModePhase = MULTI_MODE_PHASE.COMBINATION;
+    multiModeCombinationUseCrossPanel = true;
+  }
 }
 
 function handleCorrectAnswer() {
@@ -8627,16 +9159,16 @@ function handleCorrectAnswer() {
 
   if (activeExerciseMode === 'multi-mode'
     && activeExerciseModePool.length > 1
-    && !multiModeIndividualPhaseComplete) {
-    const focusMode = activeExerciseModePool[multiModeFocusedModeIndex];
+    && multiModePhase === MULTI_MODE_PHASE.INDIVIDUAL) {
+    const focusMode = multiModeIndividualQueue[multiModeFocusedModeIndex];
     const modeMax = getMaxDifficultyLevelForMode(focusMode);
 
     if (correctStreak >= CORRECT_STREAK_TO_LEVEL_UP && difficultyLevel >= modeMax) {
       multiModeFocusedModeIndex += 1;
 
-      if (multiModeFocusedModeIndex >= activeExerciseModePool.length) {
-        multiModeIndividualPhaseComplete = true;
-        difficultyLevel = getMultiModeIndividualMaxDifficulty() + 1;
+      if (multiModeFocusedModeIndex >= multiModeIndividualQueue.length) {
+        difficultyLevel = getMultiModeIndividualMaxDifficulty();
+        advanceMultiModePhaseAfterIndividualComplete();
       } else {
         difficultyLevel = 0;
       }
@@ -8655,11 +9187,7 @@ function handleCorrectAnswer() {
 function handleWrongAnswer() {
   correctStreak = 0;
 
-  const minDifficultyLevel = isMultiModeCombinationPhase()
-    ? getMultiModeIndividualMaxDifficulty() + 1
-    : 0;
-
-  if (difficultyLevel > minDifficultyLevel) {
+  if (difficultyLevel > 0) {
     difficultyLevel -= 1;
   }
 
@@ -8706,6 +9234,9 @@ function showExerciseScreen() {
   activeExerciseModePool = resolvedMode === 'multi-mode'
     ? buildExerciseModePool()
     : [resolvedMode];
+  if (activeExerciseMode === 'multi-mode') {
+    initMultiModeProgress();
+  }
   if (activeExerciseMode !== 'multi-mode') {
     setAnswerInputMode(activeExerciseMode);
   }
