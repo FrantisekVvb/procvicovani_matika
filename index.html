@@ -14,7 +14,8 @@
     <h1 class="app__title" id="app-title">Procvičování matematiky</h1>
 
     <section class="screen" id="setup-screen">
-      <div class="setup-panels">
+      <div class="setup-layout">
+        <div class="setup-panels">
         <fieldset class="operation-picker" id="decimal-operation-picker">
           <legend class="operation-picker__legend">Početní operace s desetinnými čísly</legend>
           <div class="operation-picker__options">
@@ -114,6 +115,22 @@
             </label>
           </div>
         </fieldset>
+        </div>
+
+        <fieldset class="operation-picker operation-picker--exclusive" id="exclusive-mode-picker">
+          <legend class="operation-picker__legend">Samostatné režimy</legend>
+          <p class="operation-picker__hint">Lze vybrat nejvýše jeden. Nelze kombinovat s režimy vlevo.</p>
+          <div class="operation-picker__options operation-picker__options--single">
+            <label class="operation-picker__option">
+              <input type="radio" name="exclusive-mode" value="basic-form">
+              Základní tvar
+            </label>
+            <label class="operation-picker__option">
+              <input type="radio" name="exclusive-mode" value="linear-equation">
+              Lineární rovnice
+            </label>
+          </div>
+        </fieldset>
       </div>
 
       <div class="setup-option" id="require-basic-form-option">
@@ -135,14 +152,22 @@
         <button class="btn btn--secondary btn--back" type="button" id="back-btn">Zpět</button>
       </div>
 
+      <div class="exercise-stats" id="exercise-stats" aria-live="polite">
+        <p class="exercise-stats__total">Celkem <span id="exercise-stats-total">0</span></p>
+        <p class="exercise-stats__detail">
+          <span class="exercise-stats__correct">Správně <span id="exercise-stats-correct">0</span></span>
+          <span class="exercise-stats__wrong">Špatně <span id="exercise-stats-wrong">0</span></span>
+        </p>
+      </div>
+
       <div class="problem-area">
-        <p class="problem-level" id="problem-level"></p>
         <p class="problem" id="problem" aria-live="polite"></p>
       </div>
 
       <form class="answer-form" id="answer-form" novalidate>
         <div class="answer-form__entry">
           <div class="answer-form__fields">
+            <span class="answer-form__variable-prefix" id="answer-variable-prefix" hidden aria-hidden="true">x =</span>
             <div class="answer-form__decimal-wrap is-visible" id="decimal-answer-wrap">
               <input
                 class="answer-form__input"
@@ -217,6 +242,23 @@
           </div>
         </div>
       </form>
+
+      <div class="linear-equation-actions" id="linear-equation-actions" hidden>
+        <button
+          class="btn btn--secondary linear-equation-actions__btn"
+          type="button"
+          data-linear-equation-answer="none"
+        >
+          Nemá řešení
+        </button>
+        <button
+          class="btn btn--secondary linear-equation-actions__btn"
+          type="button"
+          data-linear-equation-answer="infinite"
+        >
+          Libovolné číslo
+        </button>
+      </div>
 
       <button class="btn btn--primary" type="button" id="primary-action-btn">Ověřit</button>
 

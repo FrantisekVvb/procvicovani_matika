@@ -1,5 +1,4 @@
 const problemEl = document.getElementById('problem');
-const problemLevelEl = document.getElementById('problem-level');
 const appTitleEl = document.getElementById('app-title');
 const appEl = document.querySelector('.app');
 const setupScreenEl = document.getElementById('setup-screen');
@@ -9,6 +8,9 @@ const analysisScreenEl = document.getElementById('analysis-screen');
 const startBtn = document.getElementById('start-btn');
 const backBtn = document.getElementById('back-btn');
 const finishBtn = document.getElementById('finish-btn');
+const exerciseStatsTotalEl = document.getElementById('exercise-stats-total');
+const exerciseStatsCorrectEl = document.getElementById('exercise-stats-correct');
+const exerciseStatsWrongEl = document.getElementById('exercise-stats-wrong');
 const analysisSummaryEl = document.getElementById('analysis-summary');
 const analysisNameInputEl = document.getElementById('analysis-name-input');
 const analysisNameDisplayEl = document.getElementById('analysis-name-display');
@@ -41,7 +43,11 @@ const operationCheckboxes = document.querySelectorAll('#decimal-operation-picker
 const integerModeCheckboxes = document.querySelectorAll('#integer-operation-picker input[type="checkbox"]');
 const powersModeCheckboxes = document.querySelectorAll('#powers-operation-picker input[type="checkbox"]');
 const fractionModeCheckboxes = document.querySelectorAll('#fraction-operation-picker input[type="checkbox"]');
+const exclusiveModeRadios = document.querySelectorAll('#exclusive-mode-picker input[type="radio"]');
 const requireBasicFormCheckbox = document.getElementById('require-basic-form-checkbox');
+const linearEquationActionsEl = document.getElementById('linear-equation-actions');
+const linearEquationActionButtons = document.querySelectorAll('[data-linear-equation-answer]');
+const answerVariablePrefixEl = document.getElementById('answer-variable-prefix');
 
 const DIFFICULTY_LEVELS = [
   { type: 'two', min: 0.1, max: 9.9, decimals: 1, decimalPartsSumBelowOne: true },
@@ -79,6 +85,9 @@ const FRACTION_APP_TITLE = 'Početní operace se zlomky';
 const INTEGER_APP_TITLE = 'Početní operace se zápornými čísly';
 const DECIMAL_FRACTION_COMBINED_APP_TITLE = 'Početní operace s desetinnými čísly a se zlomky';
 const POWERS_APP_TITLE = 'Počítání s mocninami a druhou odmocninou';
+const LINEAR_EQUATION_APP_TITLE = 'Lineární rovnice';
+const LINEAR_EQUATION_NO_SOLUTION_LABEL = 'nemá řešení';
+const LINEAR_EQUATION_INFINITE_SOLUTION_LABEL = 'libovolné číslo';
 const POWER_MAX_LEVEL = 4;
 const POWER_SQUARE_BASE_MAX = 15;
 const POWER_HIGH_EXP_BASE_MAX = 5;
@@ -121,6 +130,8 @@ const NON_INTEGER_ANSWER_MIN = -100;
 const NON_INTEGER_ANSWER_MAX = 100;
 const BASIC_FORM_PRIMES = [2, 3, 5, 7];
 const FRACTION_BASIC_FORM_MAX_LEVEL = 2;
+const LINEAR_EQUATION_MAX_LEVEL = 3;
+const LINEAR_EQUATION_COEF_MAX = 9;
 const BASIC_FORM_MAX_BY_LEVEL = {
   1: 32,
   2: 56,
@@ -166,6 +177,25 @@ let viewingSharedAnalysis = false;
 let activeFractionInputEl = null;
 let fractionAnswerInputShape = 'fraction';
 let analysisProblemDisplayMode = 'text';
+let linearEquationSpecialAnswer = null;
+
+function getSelectedExclusiveMode() {
+  const selected = [...exclusiveModeRadios].find((radio) => radio.checked);
+
+  return selected?.value ?? null;
+}
+
+function hasBasicFormMode() {
+  return getSelectedExclusiveMode() === 'basic-form';
+}
+
+function hasLinearEquationMode() {
+  return getSelectedExclusiveMode() === 'linear-equation';
+}
+
+function isLinearEquationExerciseMode() {
+  return activeExerciseMode === 'linear-equation';
+}
 
 function getSelectedFractionModes() {
   return [...fractionModeCheckboxes]
@@ -239,6 +269,33 @@ function hasIntegerOnlySelection() {
   return getSelectedIntegerModes().length > 0
     && getSelectedOperations().length === 0
     && getSelectedFractionModes().length === 0
+    && !hasExclusiveModeSelection()
+    && !hasPowersMode()
+    && !hasSqrtMode()
+    && !hasNonIntegerPowersMode()
+    && !hasNonIntegerSqrtMode();
+}
+
+function hasExclusiveModeSelection() {
+  return getSelectedExclusiveMode() !== null;
+}
+
+function hasBasicFormOnlySelection() {
+  return hasBasicFormMode()
+    && getSelectedOperations().length === 0
+    && getSelectedFractionModes().length === 0
+    && getSelectedIntegerModes().length === 0
+    && !hasPowersMode()
+    && !hasSqrtMode()
+    && !hasNonIntegerPowersMode()
+    && !hasNonIntegerSqrtMode();
+}
+
+function hasLinearEquationOnlySelection() {
+  return hasLinearEquationMode()
+    && getSelectedOperations().length === 0
+    && getSelectedFractionModes().length === 0
+    && getSelectedIntegerModes().length === 0
     && !hasPowersMode()
     && !hasSqrtMode()
     && !hasNonIntegerPowersMode()
@@ -250,6 +307,7 @@ function hasPowersOnlySelection() {
     && !hasSqrtMode()
     && !hasNonIntegerPowersMode()
     && !hasNonIntegerSqrtMode()
+    && !hasExclusiveModeSelection()
     && getSelectedOperations().length === 0
     && getSelectedFractionModes().length === 0
     && getSelectedIntegerModes().length === 0;
@@ -260,6 +318,7 @@ function hasSqrtOnlySelection() {
     && !hasPowersMode()
     && !hasNonIntegerPowersMode()
     && !hasNonIntegerSqrtMode()
+    && !hasExclusiveModeSelection()
     && getSelectedOperations().length === 0
     && getSelectedFractionModes().length === 0
     && getSelectedIntegerModes().length === 0;
@@ -270,6 +329,7 @@ function hasNonIntegerPowersOnlySelection() {
     && !hasNonIntegerSqrtMode()
     && !hasPowersMode()
     && !hasSqrtMode()
+    && !hasExclusiveModeSelection()
     && getSelectedOperations().length === 0
     && getSelectedFractionModes().length === 0
     && getSelectedIntegerModes().length === 0;
@@ -280,6 +340,7 @@ function hasNonIntegerSqrtOnlySelection() {
     && !hasNonIntegerPowersMode()
     && !hasPowersMode()
     && !hasSqrtMode()
+    && !hasExclusiveModeSelection()
     && getSelectedOperations().length === 0
     && getSelectedFractionModes().length === 0
     && getSelectedIntegerModes().length === 0;
@@ -289,6 +350,7 @@ function hasPowersSqrtOnlySelection() {
   return hasPowersSqrtCombinedSelection()
     && !hasNonIntegerPowersMode()
     && !hasNonIntegerSqrtMode()
+    && !hasExclusiveModeSelection()
     && getSelectedOperations().length === 0
     && getSelectedFractionModes().length === 0
     && getSelectedIntegerModes().length === 0;
@@ -298,10 +360,53 @@ function hasSetupSelection() {
   return getSelectedOperations().length > 0
     || getSelectedFractionModes().length > 0
     || getSelectedIntegerModes().length > 0
+    || hasExclusiveModeSelection()
     || hasPowersMode()
     || hasSqrtMode()
     || hasNonIntegerPowersMode()
     || hasNonIntegerSqrtMode();
+}
+
+function hasCombinableModeSelection() {
+  return getSelectedOperations().length > 0
+    || getSelectedFractionModes().length > 0
+    || getSelectedIntegerModes().length > 0
+    || hasPowersMode()
+    || hasSqrtMode()
+    || hasNonIntegerPowersMode()
+    || hasNonIntegerSqrtMode();
+}
+
+function clearCombinableModeSelection() {
+  operationCheckboxes.forEach((checkbox) => {
+    checkbox.checked = false;
+  });
+  integerModeCheckboxes.forEach((checkbox) => {
+    checkbox.checked = false;
+  });
+  powersModeCheckboxes.forEach((checkbox) => {
+    checkbox.checked = false;
+  });
+  fractionModeCheckboxes.forEach((checkbox) => {
+    checkbox.checked = false;
+  });
+}
+
+function clearExclusiveModeSelection() {
+  exclusiveModeRadios.forEach((radio) => {
+    radio.checked = false;
+    radio.dataset.wasChecked = 'false';
+  });
+}
+
+function handleCombinableModeSelectionChange() {
+  if (hasCombinableModeSelection()) {
+    clearExclusiveModeSelection();
+  }
+
+  showSetupFeedback('');
+  updateStartButton();
+  updateTitle();
 }
 
 function updateStartButton() {
@@ -668,10 +773,6 @@ function resolveFractionExerciseModeFromSelection(modes = getSelectedFractionMod
     return null;
   }
 
-  if (modes.includes('basic-form')) {
-    return 'basic-form';
-  }
-
   if (isCompoundFractionOnlySelection(modes)) {
     return 'fraction-compound';
   }
@@ -748,6 +849,11 @@ function buildExerciseModePool() {
     pool.push(fractionMode);
   }
 
+  const exclusiveMode = getSelectedExclusiveMode();
+  if (exclusiveMode) {
+    pool.push(exclusiveMode);
+  }
+
   return pool;
 }
 
@@ -815,7 +921,8 @@ function isFractionExerciseMode() {
     && activeExerciseMode !== 'non-integer-sqrt'
     && activeExerciseMode !== 'powers'
     && activeExerciseMode !== 'sqrt'
-    && activeExerciseMode !== 'powers-sqrt-combined';
+    && activeExerciseMode !== 'powers-sqrt-combined'
+    && activeExerciseMode !== 'linear-equation';
 }
 
 function isNonIntegerAnswerInputMode() {
@@ -849,6 +956,10 @@ function usesSignedFractionAnswerInput() {
   }
 
   if (currentProblem?.type === 'non-integer-multiply-divide') {
+    return true;
+  }
+
+  if (isLinearEquationFractionAnswerProblem(currentProblem)) {
     return true;
   }
 
@@ -933,6 +1044,10 @@ function getExerciseModeForProblem(problem) {
     return 'basic-form';
   }
 
+  if (problem?.type === 'linear-equation') {
+    return 'linear-equation';
+  }
+
   if (problem?.type?.startsWith('fraction-')) {
     return problem.type;
   }
@@ -996,6 +1111,7 @@ function canAnswerProblem(problem) {
     || problem?.type === 'non-integer-multiply-divide'
     || problem?.type === 'non-integer-powers'
     || problem?.type === 'non-integer-sqrt'
+    || isLinearEquationProblem(problem)
     || Boolean(problem?.operands);
 }
 
@@ -1354,6 +1470,729 @@ function createBasicFormProblem(difficultyLevel) {
     level: displayLevel,
     isRetry: false,
   };
+}
+
+function randomNonZeroInteger(min = -LINEAR_EQUATION_COEF_MAX, max = LINEAR_EQUATION_COEF_MAX) {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const value = randomWhole(min, max);
+    if (value !== 0) {
+      return value;
+    }
+  }
+
+  return 1;
+}
+
+function randomLinearEquationInnerConstant() {
+  let inner = randomWhole(-6, 6);
+  if (inner === 0) {
+    inner = randomWhole(1, 6) * (Math.random() < 0.5 ? 1 : -1);
+  }
+
+  return inner;
+}
+
+function pickLinearEquationSolutionType(displayLevel) {
+  if (displayLevel <= 1) {
+    return 'unique';
+  }
+
+  const roll = Math.random();
+  if (roll < 0.1) {
+    return 'none';
+  }
+
+  if (roll < 0.2) {
+    return 'infinite';
+  }
+
+  return 'unique';
+}
+
+function formatLinearXTermText(coef) {
+  if (coef === 1) {
+    return 'x';
+  }
+
+  if (coef === -1) {
+    return '−x';
+  }
+
+  return `${coef}x`;
+}
+
+function formatLinearSignedConstantText(value, isLeading = false) {
+  if (value === 0) {
+    return '';
+  }
+
+  const abs = Math.abs(value);
+  if (isLeading) {
+    return value < 0 ? `−${abs}` : `${abs}`;
+  }
+
+  return value < 0 ? ` − ${abs}` : ` + ${abs}`;
+}
+
+function formatLinearEquationSideText(xCoef, constant) {
+  return `${formatLinearXTermText(xCoef)}${formatLinearSignedConstantText(constant)}`;
+}
+
+function formatLinearEquationLevel1RightText(value) {
+  return String(value);
+}
+
+function formatLinearParenthesisInnerText(inner) {
+  return inner >= 0 ? `(x + ${inner})` : `(x − ${Math.abs(inner)})`;
+}
+
+function formatLinearDistributedSideText(outer, inner, addConst) {
+  let text = `${outer}·${formatLinearParenthesisInnerText(inner)}`;
+
+  if (addConst !== 0) {
+    text += formatLinearSignedConstantText(addConst);
+  }
+
+  return text;
+}
+
+function formatLinearDistributedSideHtml(outer, inner, addConst) {
+  let html = `<span class="problem-expression__term">${escapeHtml(String(outer))}</span><span class="problem-expression__operator">·</span><span class="problem-expression__term">${escapeHtml(formatLinearParenthesisInnerText(inner))}</span>`;
+
+  if (addConst !== 0) {
+    html += `<span class="problem-expression__term">${escapeHtml(formatLinearSignedConstantText(addConst))}</span>`;
+  }
+
+  return html;
+}
+
+function formatLinearEquationSideHtml(xCoef, constant) {
+  return `<span class="problem-expression__term">${escapeHtml(formatLinearEquationSideText(xCoef, constant))}</span>`;
+}
+
+function formatLinearEquationProblemText(problem) {
+  return `${problem.displayLeft} = ${problem.displayRight}`;
+}
+
+function formatLinearEquationDisplayHtml(problem) {
+  let leftHtml;
+  let rightHtml;
+
+  if (problem.variant === 4 && problem.leftInner != null && problem.rightInner != null) {
+    leftHtml = formatLinearDistributedSideHtml(problem.k, problem.leftInner, problem.leftExtra);
+    rightHtml = formatLinearDistributedSideHtml(problem.l, problem.rightInner, problem.rightExtra);
+  } else if (problem.level === 1) {
+    leftHtml = formatLinearEquationSideHtml(problem.k, problem.a);
+    rightHtml = `<span class="problem-expression__term">${escapeHtml(formatLinearEquationLevel1RightText(problem.b))}</span>`;
+  } else {
+    leftHtml = formatLinearEquationSideHtml(problem.k, problem.a);
+    rightHtml = formatLinearEquationSideHtml(problem.l, problem.b);
+  }
+
+  return `<span class="problem-expression problem-expression--linear-equation">${leftHtml}<span class="problem-expression__equals">=</span>${rightHtml}</span>`;
+}
+
+function buildLinearEquationProblem({
+  displayLevel,
+  variant,
+  k,
+  l,
+  a,
+  b,
+  solutionType,
+  answerKind = null,
+  answer = null,
+  answerNum = null,
+  answerDen = null,
+  answerNegative = false,
+  displayLeft = null,
+  displayRight = null,
+  leftInner = null,
+  leftExtra = null,
+  rightInner = null,
+  rightExtra = null,
+}) {
+  const resolvedDisplayLeft = displayLeft ?? (displayLevel === 1
+    ? formatLinearEquationSideText(k, a)
+    : formatLinearEquationSideText(k, a));
+  const resolvedDisplayRight = displayRight ?? (displayLevel === 1
+    ? formatLinearEquationLevel1RightText(b)
+    : formatLinearEquationSideText(l, b));
+
+  return {
+    type: 'linear-equation',
+    variant,
+    level: displayLevel,
+    k,
+    l,
+    a,
+    b,
+    displayLeft: resolvedDisplayLeft,
+    displayRight: resolvedDisplayRight,
+    leftInner,
+    leftExtra,
+    rightInner,
+    rightExtra,
+    solutionType,
+    answerKind: solutionType === 'unique' ? answerKind : null,
+    answer: solutionType === 'unique' && answerKind === 'integer' ? answer : null,
+    answerNum: solutionType === 'unique' && answerKind === 'fraction' ? answerNum : null,
+    answerDen: solutionType === 'unique' && answerKind === 'fraction' ? answerDen : null,
+    answerNegative: solutionType === 'unique' && answerKind === 'fraction' ? answerNegative : false,
+    isRetry: false,
+  };
+}
+
+function randomLinearEquationK(displayLevel) {
+  if (displayLevel === 2) {
+    return randomWhole(1, LINEAR_EQUATION_COEF_MAX);
+  }
+
+  return randomNonZeroInteger();
+}
+
+function randomLinearEquationL(displayLevel, k) {
+  if (displayLevel === 2) {
+    let l = randomWhole(1, LINEAR_EQUATION_COEF_MAX);
+
+    while (l === k) {
+      l = randomWhole(1, LINEAR_EQUATION_COEF_MAX);
+    }
+
+    return l;
+  }
+
+  let l = randomNonZeroInteger();
+
+  while (l === k) {
+    l = randomNonZeroInteger();
+  }
+
+  return l;
+}
+
+function createLinearEquationNoneProblem(displayLevel, variant) {
+  const k = randomLinearEquationK(displayLevel);
+  const a = randomNonZeroInteger();
+  let b = randomNonZeroInteger();
+
+  while (b === a) {
+    b = randomNonZeroInteger();
+  }
+
+  return buildLinearEquationProblem({
+    displayLevel,
+    variant,
+    k,
+    l: k,
+    a,
+    b,
+    solutionType: 'none',
+  });
+}
+
+function createLinearEquationInfiniteProblem(displayLevel, variant) {
+  const k = randomLinearEquationK(displayLevel);
+  const a = randomNonZeroInteger();
+
+  return buildLinearEquationProblem({
+    displayLevel,
+    variant,
+    k,
+    l: k,
+    a,
+    b: a,
+    solutionType: 'infinite',
+  });
+}
+
+function createLinearEquationUniqueIntegerProblem(displayLevel, variant) {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const k = randomLinearEquationK(displayLevel);
+    const l = randomLinearEquationL(displayLevel, k);
+
+    const a = randomNonZeroInteger();
+    const x = randomNonZeroInteger(-12, 12);
+    const b = k * x + a - l * x;
+
+    if (b === 0) {
+      continue;
+    }
+
+    return buildLinearEquationProblem({
+      displayLevel,
+      variant,
+      k,
+      l,
+      a,
+      b,
+      solutionType: 'unique',
+      answerKind: 'integer',
+      answer: x,
+    });
+  }
+
+  return buildLinearEquationProblem({
+    displayLevel,
+    variant,
+    k: 2,
+    l: 5,
+    a: 1,
+    b: -5,
+    solutionType: 'unique',
+    answerKind: 'integer',
+    answer: -2,
+  });
+}
+
+function createLinearEquationUniqueFractionProblem(displayLevel, variant) {
+  for (let attempt = 0; attempt < 300; attempt += 1) {
+    const k = randomNonZeroInteger();
+    let l = randomNonZeroInteger();
+
+    while (l === k) {
+      l = randomNonZeroInteger();
+    }
+
+    const a = randomNonZeroInteger();
+    const den = randomWhole(2, 12);
+    let num = randomWhole(-den + 1, den - 1);
+
+    if (num === 0 || num % den === 0) {
+      continue;
+    }
+
+    const b = ((k - l) * num) / den + a;
+
+    if (!Number.isInteger(b) || b === 0) {
+      continue;
+    }
+
+    const negative = num < 0;
+    const reduced = reduceFraction(Math.abs(num), den);
+
+    return buildLinearEquationProblem({
+      displayLevel,
+      variant,
+      k,
+      l,
+      a,
+      b,
+      solutionType: 'unique',
+      answerKind: 'fraction',
+      answerNum: reduced.num,
+      answerDen: reduced.den,
+      answerNegative: negative,
+    });
+  }
+
+  return buildLinearEquationProblem({
+    displayLevel,
+    variant,
+    k: 3,
+    l: 5,
+    a: 2,
+    b: 1,
+    solutionType: 'unique',
+    answerKind: 'fraction',
+    answerNum: 1,
+    answerDen: 2,
+    answerNegative: false,
+  });
+}
+
+function createLinearEquationTwoSideProblem(displayLevel, variant, preferFraction = false) {
+  const solutionType = pickLinearEquationSolutionType(displayLevel);
+
+  if (solutionType === 'none') {
+    return createLinearEquationNoneProblem(displayLevel, variant);
+  }
+
+  if (solutionType === 'infinite') {
+    return createLinearEquationInfiniteProblem(displayLevel, variant);
+  }
+
+  if (preferFraction || displayLevel === 3) {
+    return createLinearEquationUniqueFractionProblem(displayLevel, variant);
+  }
+
+  return createLinearEquationUniqueIntegerProblem(displayLevel, variant);
+}
+
+function wrapLinearEquationInDistributiveForm(problem) {
+  const leftInner = randomLinearEquationInnerConstant();
+  const leftExtra = problem.a - problem.k * leftInner;
+  const rightInner = randomLinearEquationInnerConstant();
+  const rightExtra = problem.b - problem.l * rightInner;
+
+  return buildLinearEquationProblem({
+    displayLevel: problem.level,
+    variant: 4,
+    k: problem.k,
+    l: problem.l,
+    a: problem.a,
+    b: problem.b,
+    solutionType: problem.solutionType,
+    answerKind: problem.answerKind,
+    answer: problem.answer,
+    answerNum: problem.answerNum,
+    answerDen: problem.answerDen,
+    answerNegative: problem.answerNegative,
+    displayLeft: formatLinearDistributedSideText(problem.k, leftInner, leftExtra),
+    displayRight: formatLinearDistributedSideText(problem.l, rightInner, rightExtra),
+    leftInner,
+    leftExtra,
+    rightInner,
+    rightExtra,
+  });
+}
+
+function createLinearEquationLevel1Problem(displayLevel) {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const k = randomWhole(1, LINEAR_EQUATION_COEF_MAX);
+    const a = randomNonZeroInteger();
+    const x = randomNonZeroInteger(-12, 12);
+    const b = k * x + a;
+
+    if (b < 0) {
+      continue;
+    }
+
+    return buildLinearEquationProblem({
+      displayLevel,
+      variant: 1,
+      k,
+      l: 0,
+      a,
+      b,
+      solutionType: 'unique',
+      answerKind: 'integer',
+      answer: x,
+    });
+  }
+
+  return buildLinearEquationProblem({
+    displayLevel,
+    variant: 1,
+    k: 2,
+    l: 0,
+    a: 4,
+    b: 0,
+    solutionType: 'unique',
+    answerKind: 'integer',
+    answer: -2,
+  });
+}
+
+function createLinearEquationLevel4Problem(displayLevel) {
+  const preferFraction = Math.random() < 0.5;
+  const base = createLinearEquationTwoSideProblem(displayLevel, 4, preferFraction);
+  return wrapLinearEquationInDistributiveForm(base);
+}
+
+function createLinearEquationProblem(difficultyLevel) {
+  const displayLevel = difficultyLevel + 1;
+
+  if (displayLevel === 1) {
+    return createLinearEquationLevel1Problem(displayLevel);
+  }
+
+  if (displayLevel === 2) {
+    return createLinearEquationTwoSideProblem(displayLevel, 2, false);
+  }
+
+  if (displayLevel === 3) {
+    return createLinearEquationTwoSideProblem(displayLevel, 3, true);
+  }
+
+  return createLinearEquationLevel4Problem(displayLevel);
+}
+
+function isLinearEquationProblem(problem) {
+  return problem?.type === 'linear-equation';
+}
+
+function isLinearEquationIntegerAnswerInput() {
+  return isLinearEquationProblem(currentProblem)
+    && currentProblem.solutionType === 'unique'
+    && currentProblem.answerKind === 'integer';
+}
+
+function maybeClearLinearEquationSpecialAnswerOnInput() {
+  if (!isLinearEquationProblem(currentProblem)) {
+    return;
+  }
+
+  if (linearEquationSpecialAnswer) {
+    clearLinearEquationSpecialAnswer();
+  }
+
+  if (inputEl.value === LINEAR_EQUATION_NO_SOLUTION_LABEL
+    || inputEl.value === LINEAR_EQUATION_INFINITE_SOLUTION_LABEL) {
+    inputEl.value = '';
+  }
+
+  updateLinearEquationAnswerInputWidth();
+}
+
+function isLinearEquationFractionAnswerProblem(problem) {
+  return isLinearEquationProblem(problem)
+    && problem.solutionType === 'unique'
+    && problem.answerKind === 'fraction';
+}
+
+function getLinearEquationCorrectAnswerLabel(problem) {
+  if (problem.solutionType === 'none') {
+    return LINEAR_EQUATION_NO_SOLUTION_LABEL;
+  }
+
+  if (problem.solutionType === 'infinite') {
+    return LINEAR_EQUATION_INFINITE_SOLUTION_LABEL;
+  }
+
+  if (problem.answerKind === 'fraction') {
+    return formatSignedFractionText({
+      num: problem.answerNum,
+      den: problem.answerDen,
+      negative: problem.answerNegative,
+    });
+  }
+
+  return formatIntegerAnswer(problem.answer);
+}
+
+function linearEquationProblemFromRetry(dueRetry) {
+  const problem = buildLinearEquationProblem({
+    displayLevel: dueRetry.level,
+    variant: dueRetry.variant,
+    k: dueRetry.k,
+    l: dueRetry.l,
+    a: dueRetry.a,
+    b: dueRetry.b,
+    solutionType: dueRetry.solutionType,
+    answerKind: dueRetry.answerKind,
+    answer: dueRetry.answer,
+    answerNum: dueRetry.answerNum,
+    answerDen: dueRetry.answerDen,
+    answerNegative: dueRetry.answerNegative,
+    displayLeft: dueRetry.displayLeft,
+    displayRight: dueRetry.displayRight,
+    leftInner: dueRetry.leftInner ?? null,
+    leftExtra: dueRetry.leftExtra ?? null,
+    rightInner: dueRetry.rightInner ?? null,
+    rightExtra: dueRetry.rightExtra ?? null,
+  });
+  problem.isRetry = true;
+  return problem;
+}
+
+function getLinearEquationSpecialAnswerLabel(kind) {
+  return kind === 'none'
+    ? LINEAR_EQUATION_NO_SOLUTION_LABEL
+    : LINEAR_EQUATION_INFINITE_SOLUTION_LABEL;
+}
+
+function getLinearEquationSpecialAnswerFromInput() {
+  const text = inputEl.value.trim();
+
+  if (text === LINEAR_EQUATION_NO_SOLUTION_LABEL) {
+    return { kind: 'special', value: 'none' };
+  }
+
+  if (text === LINEAR_EQUATION_INFINITE_SOLUTION_LABEL) {
+    return { kind: 'special', value: 'infinite' };
+  }
+
+  return null;
+}
+
+function updateLinearEquationAnswerFormUi(problem) {
+  const isLinearEquation = isLinearEquationProblem(problem);
+
+  formEl.classList.toggle('answer-form--linear-equation', isLinearEquation);
+
+  if (answerVariablePrefixEl) {
+    answerVariablePrefixEl.hidden = !isLinearEquation;
+    answerVariablePrefixEl.setAttribute('aria-hidden', isLinearEquation ? 'false' : 'true');
+  }
+
+  if (!isLinearEquation) {
+    inputEl.classList.remove('answer-form__input--special-answer');
+  } else {
+    updateLinearEquationAnswerInputWidth();
+  }
+}
+
+function updateLinearEquationAnswerInputWidth() {
+  const isSpecial = inputEl.value === LINEAR_EQUATION_NO_SOLUTION_LABEL
+    || inputEl.value === LINEAR_EQUATION_INFINITE_SOLUTION_LABEL
+    || linearEquationSpecialAnswer !== null;
+
+  inputEl.classList.toggle('answer-form__input--special-answer', isSpecial);
+}
+
+function clearLinearEquationSpecialAnswer() {
+  linearEquationSpecialAnswer = null;
+
+  linearEquationActionButtons.forEach((button) => {
+    button.classList.remove('is-selected');
+  });
+
+  updateLinearEquationAnswerInputWidth();
+}
+
+function setLinearEquationSpecialAnswer(kind) {
+  linearEquationSpecialAnswer = kind;
+  answerNumeratorEl.value = '';
+  answerDenominatorEl.value = '';
+  setAnswerFractionNegative(false);
+  clearAnswerFieldHighlight();
+
+  fractionAnswerInputShape = 'number';
+  updateFractionAnswerShapeUi();
+  inputEl.value = getLinearEquationSpecialAnswerLabel(kind);
+  updateLinearEquationAnswerInputWidth();
+
+  linearEquationActionButtons.forEach((button) => {
+    button.classList.toggle(
+      'is-selected',
+      button.dataset.linearEquationAnswer === kind,
+    );
+  });
+}
+
+function updateLinearEquationActionsUi(problem) {
+  if (!linearEquationActionsEl) {
+    return;
+  }
+
+  const visible = isLinearEquationProblem(problem) && problem.level >= 2;
+  linearEquationActionsEl.hidden = !visible;
+
+  if (!visible) {
+    clearLinearEquationSpecialAnswer();
+    return;
+  }
+
+  linearEquationActionButtons.forEach((button) => {
+    button.classList.toggle(
+      'is-selected',
+      button.dataset.linearEquationAnswer === linearEquationSpecialAnswer,
+    );
+  });
+}
+
+function evaluateLinearEquationAnswer(problem, userAnswer) {
+  if (problem.solutionType === 'none') {
+    const isCorrect = userAnswer?.kind === 'special' && userAnswer.value === 'none';
+    return {
+      isCorrect,
+      feedbackMessage: isCorrect ? 'Správně!' : 'Špatně.',
+    };
+  }
+
+  if (problem.solutionType === 'infinite') {
+    const isCorrect = userAnswer?.kind === 'special' && userAnswer.value === 'infinite';
+    return {
+      isCorrect,
+      feedbackMessage: isCorrect ? 'Správně!' : 'Špatně.',
+    };
+  }
+
+  if (userAnswer?.kind === 'special') {
+    return {
+      isCorrect: false,
+      feedbackMessage: 'Špatně.',
+    };
+  }
+
+  if (problem.answerKind === 'integer') {
+    const isCorrect = userAnswer?.kind === 'integer' && userAnswer.value === problem.answer;
+    return {
+      isCorrect,
+      feedbackMessage: isCorrect ? 'Správně!' : 'Špatně.',
+    };
+  }
+
+  if (userAnswer?.kind === 'integer') {
+    const correctNum = problem.answerNegative ? -problem.answerNum : problem.answerNum;
+    const isCorrect = userAnswer.value * problem.answerDen === correctNum;
+    return {
+      isCorrect,
+      feedbackMessage: isCorrect ? 'Správně!' : 'Špatně.',
+    };
+  }
+
+  if (userAnswer?.kind === 'fraction') {
+    return evaluateFractionAnswer(userAnswer.value, {
+      num: problem.answerNum,
+      den: problem.answerDen,
+      negative: problem.answerNegative,
+    });
+  }
+
+  return {
+    isCorrect: false,
+    feedbackMessage: 'Špatně.',
+  };
+}
+
+function getLinearEquationUserAnswer(problem) {
+  const specialFromInput = getLinearEquationSpecialAnswerFromInput();
+  if (specialFromInput) {
+    return specialFromInput;
+  }
+
+  if (linearEquationSpecialAnswer) {
+    return { kind: 'special', value: linearEquationSpecialAnswer };
+  }
+
+  if (problem.solutionType !== 'unique') {
+    return null;
+  }
+
+  if (problem.answerKind === 'fraction') {
+    if (isNumberAnswerInputShape()) {
+      const userValue = parseAnswer(inputEl.value);
+      if (userValue === null) {
+        return null;
+      }
+
+      return { kind: 'integer', value: userValue };
+    }
+
+    const fraction = getNonIntegerFractionAnswerFromInputs();
+    if (!fraction) {
+      return null;
+    }
+
+    return { kind: 'fraction', value: fraction };
+  }
+
+  const integer = getIntegerAnswerFromUserInput();
+  if (integer === null) {
+    return null;
+  }
+
+  return { kind: 'integer', value: integer };
+}
+
+function formatLinearEquationSessionAnswer(userAnswer) {
+  if (userAnswer?.kind === 'special') {
+    return userAnswer.value === 'none'
+      ? LINEAR_EQUATION_NO_SOLUTION_LABEL
+      : LINEAR_EQUATION_INFINITE_SOLUTION_LABEL;
+  }
+
+  if (userAnswer?.kind === 'integer') {
+    return formatIntegerAnswer(userAnswer.value);
+  }
+
+  if (userAnswer?.kind === 'fraction') {
+    return formatSignedFractionText(userAnswer.value);
+  }
+
+  return '';
 }
 
 function applyOperator(result, value, op) {
@@ -3341,6 +4180,10 @@ function getMaxDifficultyLevelForMode(mode) {
     return FRACTION_BASIC_FORM_MAX_LEVEL;
   }
 
+  if (mode === 'linear-equation') {
+    return LINEAR_EQUATION_MAX_LEVEL;
+  }
+
   if (mode === 'integer-add-subtract') {
     return INTEGER_ADD_SUBTRACT_MAX_LEVEL;
   }
@@ -3462,6 +4305,10 @@ function getActiveExercisePanels() {
     panels.push('fraction');
   }
 
+  if (hasExclusiveModeSelection()) {
+    panels.push('exclusive');
+  }
+
   return panels;
 }
 
@@ -3500,6 +4347,10 @@ function buildMultiModeIndividualQueue() {
   const fractionMode = resolveFractionExerciseModeFromSelection();
   if (fractionMode) {
     queue.push(fractionMode);
+  }
+
+  if (hasBasicFormMode()) {
+    queue.push('basic-form');
   }
 
   return queue;
@@ -8100,6 +8951,10 @@ function createProblemForExerciseMode(mode, level) {
     return createBasicFormProblem(level);
   }
 
+  if (mode === 'linear-equation') {
+    return createLinearEquationProblem(level);
+  }
+
   if (mode === 'integer-add-subtract') {
     return createIntegerAddSubtractProblem(level);
   }
@@ -8293,10 +9148,6 @@ function getDisplayLevel(problem) {
   }
 
   return internalLevel;
-}
-
-function formatProblemLevel(problem) {
-  return `Úroveň ${getDisplayLevel(problem)}`;
 }
 
 function formatMultiOperandExpression(problem) {
@@ -8793,6 +9644,10 @@ function formatProblemText(problem) {
     return formatNonIntegerSqrtProblemText(problem);
   }
 
+  if (problem.type === 'linear-equation') {
+    return formatLinearEquationProblemText(problem);
+  }
+
   if (problem.type === 'fraction-add') {
     return formatFractionAddProblemText(problem);
   }
@@ -8910,6 +9765,10 @@ function formatProblemDisplayHtml(problem) {
     return formatNonIntegerSqrtDisplayHtml(problem);
   }
 
+  if (problem.type === 'linear-equation') {
+    return formatLinearEquationDisplayHtml(problem);
+  }
+
   return `<span class="problem-expression problem-expression--plain">${escapeHtml(formatProblemText(problem))}</span>`;
 }
 
@@ -8954,6 +9813,15 @@ function recordSessionAnswer(userAnswer, isCorrect) {
     sessionResults.push(createSessionResultEntry(
       formatIntegerAnswer(userAnswer),
       formatIntegerAnswer(currentProblem.answer),
+      isCorrect,
+    ));
+    return;
+  }
+
+  if (currentProblem?.type === 'linear-equation') {
+    sessionResults.push(createSessionResultEntry(
+      formatLinearEquationSessionAnswer(userAnswer),
+      getLinearEquationCorrectAnswerLabel(currentProblem),
       isCorrect,
     ));
     return;
@@ -9060,6 +9928,16 @@ function recordSessionAnswer(userAnswer, isCorrect) {
   ));
 }
 
+function updateExerciseStatsUi() {
+  const total = sessionResults.length;
+  const correct = sessionResults.filter((row) => row.vysledek === 'správně').length;
+  const wrong = total - correct;
+
+  exerciseStatsTotalEl.textContent = String(total);
+  exerciseStatsCorrectEl.textContent = String(correct);
+  exerciseStatsWrongEl.textContent = String(wrong);
+}
+
 function getCheckboxLabel(checkbox) {
   const label = checkbox.closest('label');
   if (!label) {
@@ -9099,6 +9977,12 @@ function captureSessionModeSelection() {
   fractionModeCheckboxes.forEach((checkbox) => {
     if (checkbox.checked) {
       modes.push(getCheckboxLabel(checkbox));
+    }
+  });
+
+  exclusiveModeRadios.forEach((radio) => {
+    if (radio.checked) {
+      modes.push(getCheckboxLabel(radio));
     }
   });
 
@@ -9602,6 +10486,7 @@ function showNextExampleAction() {
 }
 
 function finishAnswerReview(isCorrect) {
+  updateExerciseStatsUi();
   setFormEnabled(false);
   setAnswerFieldHighlight(isCorrect ? 'correct' : 'wrong');
   feedbackEl.textContent = '';
@@ -9620,6 +10505,9 @@ function setFormEnabled(enabled) {
   }
   mathKeypadKeys.forEach((key) => {
     key.disabled = !enabled;
+  });
+  linearEquationActionButtons.forEach((button) => {
+    button.disabled = !enabled;
   });
 }
 
@@ -9680,6 +10568,7 @@ function clearAnswerInputs() {
   answerDenominatorEl.value = '';
   setAnswerFractionNegative(false);
   clearAnswerFieldHighlight();
+  clearLinearEquationSpecialAnswer();
 }
 
 function shouldUseKeypadOnlyAnswerInput() {
@@ -9724,7 +10613,7 @@ function updateMathKeypadKeys() {
 
   if (commaKey) {
     commaKey.hidden = usesFractionFields
-      || (usesIntegerAnswerInput() && isNumberAnswerInputShape())
+      || ((usesIntegerAnswerInput() || isLinearEquationIntegerAnswerInput()) && isNumberAnswerInputShape())
       || (isPowersAnswerInputMode() && isNumberAnswerInputShape())
       || (isSqrtAnswerInputMode() && isNumberAnswerInputShape())
       || (isPowersSqrtCombinedAnswerInputMode() && isNumberAnswerInputShape());
@@ -9766,7 +10655,7 @@ function updateFractionAnswerShapeUi() {
   }
 
   inputEl.placeholder = '';
-  inputEl.inputMode = usesIntegerAnswerInput() && isNumberAnswerInputShape()
+  inputEl.inputMode = (usesIntegerAnswerInput() || isLinearEquationIntegerAnswerInput()) && isNumberAnswerInputShape()
     ? 'numeric'
     : 'decimal';
   updateMathKeypadKeys();
@@ -9814,6 +10703,12 @@ function setAnswerInputMode(mode) {
     return;
   }
 
+  if (mode === 'linear-equation') {
+    fractionAnswerInputShape = 'number';
+    updateFractionAnswerShapeUi();
+    return;
+  }
+
   if (mode !== 'basic-form'
     && mode !== 'fraction-add'
     && mode !== 'fraction-subtract'
@@ -9850,6 +10745,8 @@ function insertIntoAnswer(value) {
     return;
   }
 
+  maybeClearLinearEquationSpecialAnswerOnInput();
+
   if (value === '-') {
     if (usesSignedFractionAnswerInput()) {
       toggleAnswerFractionNegative();
@@ -9864,7 +10761,7 @@ function insertIntoAnswer(value) {
     return;
   }
 
-  if (usesIntegerAnswerInput() && isNumberAnswerInputShape()) {
+  if ((usesIntegerAnswerInput() || isLinearEquationIntegerAnswerInput()) && isNumberAnswerInputShape()) {
     if (value === ',') {
       return;
     }
@@ -9908,6 +10805,8 @@ function backspaceAnswer() {
     return;
   }
 
+  maybeClearLinearEquationSpecialAnswerOnInput();
+
   target.value = target.value.slice(0, -1);
   target.focus();
 }
@@ -9934,7 +10833,6 @@ function handleKeypadClick(event) {
 
 function showProblem(problem) {
   currentProblem = problem;
-  problemLevelEl.textContent = formatProblemLevel(problem);
 
   if (problem.type === 'basic-form') {
     const maxInputLength = String(getBasicFormMaxValue(getInternalDisplayLevel(problem))).length;
@@ -10009,15 +10907,33 @@ function showProblem(problem) {
     answerNumeratorEl.maxLength = maxInputLength;
     answerDenominatorEl.maxLength = maxInputLength;
     problemEl.innerHTML = formatNonIntegerSqrtDisplayHtml(problem);
+  } else if (problem.type === 'linear-equation') {
+    if (problem.solutionType === 'unique' && problem.answerKind === 'fraction') {
+      const maxInputLength = String(FRACTION_ADD_ANSWER_MAX).length + 1;
+      answerNumeratorEl.maxLength = maxInputLength;
+      answerDenominatorEl.maxLength = String(FRACTION_ADD_ANSWER_MAX).length;
+      fractionAnswerInputShape = 'fraction';
+    } else {
+      fractionAnswerInputShape = 'number';
+    }
+
+    problemEl.innerHTML = formatLinearEquationDisplayHtml(problem);
   } else {
   problemEl.textContent = formatProblemText(problem);
   }
+
+  updateLinearEquationAnswerFormUi(problem);
+  updateLinearEquationActionsUi(problem);
 
   if (isMultiModeExercise()) {
     setAnswerInputModeForProblem(problem);
   }
 
   updateFractionAnswerShapeUi();
+
+  if (problem.type === 'linear-equation') {
+    answerShapeToggleBtn.hidden = problem.solutionType !== 'unique' || problem.answerKind !== 'fraction';
+  }
 
   const canAnswer = isMultiModeExercise()
     ? canAnswerProblem(problem)
@@ -10029,6 +10945,7 @@ function showProblem(problem) {
       || isPowersExerciseMode()
       || isSqrtExerciseMode()
       || isPowersSqrtCombinedExerciseMode()
+      || isLinearEquationExerciseMode()
       || getSelectedOperations().length > 0);
   setFormEnabled(canAnswer);
 
@@ -10054,6 +10971,25 @@ function queueRetry(problem) {
     item.givenDen = problem.givenDen;
     item.answerNum = problem.answerNum;
     item.answerDen = problem.answerDen;
+  } else if (problem.type === 'linear-equation') {
+    item.type = 'linear-equation';
+    item.variant = problem.variant;
+    item.k = problem.k;
+    item.l = problem.l;
+    item.a = problem.a;
+    item.b = problem.b;
+    item.displayLeft = problem.displayLeft;
+    item.displayRight = problem.displayRight;
+    item.leftInner = problem.leftInner ?? null;
+    item.leftExtra = problem.leftExtra ?? null;
+    item.rightInner = problem.rightInner ?? null;
+    item.rightExtra = problem.rightExtra ?? null;
+    item.solutionType = problem.solutionType;
+    item.answerKind = problem.answerKind;
+    item.answer = problem.answer;
+    item.answerNum = problem.answerNum;
+    item.answerDen = problem.answerDen;
+    item.answerNegative = problem.answerNegative;
   } else if (problem.type === 'fraction-add') {
     item.type = 'fraction-add';
     item.terms = problem.terms.map((term) => ({ ...term }));
@@ -10193,6 +11129,10 @@ function pickNextProblem() {
         level: dueRetry.level,
         isRetry: true,
       };
+    }
+
+    if (dueRetry.type === 'linear-equation') {
+      return linearEquationProblemFromRetry(dueRetry);
     }
 
     if (dueRetry.type === 'fraction-add') {
@@ -10437,6 +11377,16 @@ function updateTitle() {
       return;
     }
 
+    if (hasBasicFormOnlySelection()) {
+      appTitleEl.textContent = FRACTION_APP_TITLE;
+      return;
+    }
+
+    if (hasLinearEquationOnlySelection()) {
+      appTitleEl.textContent = LINEAR_EQUATION_APP_TITLE;
+      return;
+    }
+
     appTitleEl.textContent = APP_TITLE;
     return;
   }
@@ -10464,6 +11414,11 @@ function updateTitle() {
     || activeExerciseMode === 'fraction-divide'
     || activeExerciseMode === 'fraction-compound') {
     appTitleEl.textContent = FRACTION_APP_TITLE;
+    return;
+  }
+
+  if (activeExerciseMode === 'linear-equation') {
+    appTitleEl.textContent = LINEAR_EQUATION_APP_TITLE;
     return;
   }
 
@@ -10607,6 +11562,7 @@ function showExerciseScreen() {
     setAnswerInputMode(activeExerciseMode);
   }
   updateTitle();
+  updateExerciseStatsUi();
   newProblem();
 }
 
@@ -10626,28 +11582,40 @@ function showAnalysisScreen() {
   updateTitle();
 }
 
-function handleOperationSelectionChange() {
+function handleExclusiveModeSelectionChange(event) {
+  const radio = event.currentTarget;
+
+  if (radio.dataset.wasChecked === 'true') {
+    radio.checked = false;
+    radio.dataset.wasChecked = 'false';
+    event.preventDefault();
+  } else {
+    exclusiveModeRadios.forEach((item) => {
+      item.dataset.wasChecked = 'false';
+    });
+    radio.dataset.wasChecked = 'true';
+    clearCombinableModeSelection();
+  }
+
   showSetupFeedback('');
   updateStartButton();
   updateTitle();
+}
+
+function handleOperationSelectionChange() {
+  handleCombinableModeSelectionChange();
 }
 
 function handleFractionModeSelectionChange() {
-  showSetupFeedback('');
-  updateStartButton();
-  updateTitle();
+  handleCombinableModeSelectionChange();
 }
 
 function handleIntegerModeSelectionChange() {
-  showSetupFeedback('');
-  updateStartButton();
-  updateTitle();
+  handleCombinableModeSelectionChange();
 }
 
 function handlePowersModeSelectionChange() {
-  showSetupFeedback('');
-  updateStartButton();
-  updateTitle();
+  handleCombinableModeSelectionChange();
 }
 
 primaryActionBtn.addEventListener('click', () => {
@@ -10915,6 +11883,26 @@ formEl.addEventListener('submit', (event) => {
     return;
   }
 
+  if (currentProblem?.type === 'linear-equation') {
+    const userAnswer = getLinearEquationUserAnswer(currentProblem);
+    if (userAnswer === null) {
+      showAnswerValidationFeedback();
+      return;
+    }
+
+    const { isCorrect } = evaluateLinearEquationAnswer(currentProblem, userAnswer);
+
+    if (isCorrect) {
+      handleCorrectAnswer();
+    } else {
+      handleWrongAnswer();
+    }
+
+    recordSessionAnswer(userAnswer, isCorrect);
+    finishAnswerReview(isCorrect);
+    return;
+  }
+
   if (getSelectedOperations().length === 0) {
     return;
   }
@@ -11055,6 +12043,20 @@ integerModeCheckboxes.forEach((checkbox) => {
 
 powersModeCheckboxes.forEach((checkbox) => {
   checkbox.addEventListener('change', handlePowersModeSelectionChange);
+});
+
+exclusiveModeRadios.forEach((radio) => {
+  radio.addEventListener('click', handleExclusiveModeSelectionChange);
+});
+
+linearEquationActionButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    if (button.disabled || !isLinearEquationProblem(currentProblem)) {
+      return;
+    }
+
+    setLinearEquationSpecialAnswer(button.dataset.linearEquationAnswer);
+  });
 });
 
 (async () => {

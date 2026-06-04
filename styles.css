@@ -37,18 +37,48 @@ body {
 }
 
 .app:has(#setup-screen:not([hidden])) {
-  max-width: 720px;
+  max-width: 960px;
 }
 
-.setup-panels {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+.setup-layout {
+  display: flex;
   gap: 16px;
+  align-items: stretch;
   margin-bottom: 24px;
   text-align: left;
 }
 
+.setup-panels {
+  flex: 1 1 0;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  text-align: left;
+}
+
+.operation-picker--exclusive {
+  flex: 0 0 220px;
+  margin-bottom: 0;
+}
+
+.operation-picker__hint {
+  margin: 8px 0 0;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: #666;
+  font-weight: 400;
+}
+
 @media (max-width: 640px) {
+  .setup-layout {
+    flex-direction: column;
+  }
+
+  .operation-picker--exclusive {
+    flex: 1 1 auto;
+  }
+
   .setup-panels {
     grid-template-columns: 1fr;
   }
@@ -158,12 +188,6 @@ body {
   margin-bottom: 40px;
 }
 
-.problem-level {
-  font-size: 0.875rem;
-  color: #666;
-  margin-bottom: 8px;
-}
-
 .problem {
   font-size: clamp(1.75rem, 6vw, 2.5rem);
   font-weight: 600;
@@ -177,6 +201,19 @@ body {
   align-items: center;
   justify-content: center;
   gap: 0.35em;
+}
+
+.problem-expression--linear-equation {
+  white-space: nowrap;
+  flex-wrap: nowrap;
+  max-width: none;
+}
+
+.problem:has(.problem-expression--linear-equation) {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  text-align: center;
 }
 
 .problem-expression__equals {
@@ -542,7 +579,34 @@ body {
 
 .answer-form__fields {
   display: flex;
+  align-items: center;
   justify-content: center;
+  gap: 10px;
+}
+
+.answer-form__variable-prefix {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #222;
+  white-space: nowrap;
+}
+
+.answer-form--linear-equation .answer-form__decimal-wrap,
+.answer-form--linear-equation .answer-form__fraction-wrap {
+  flex: 0 0 auto;
+}
+
+.answer-form--linear-equation .answer-form__input {
+  width: 90px;
+  min-width: 90px;
+  max-width: 90px;
+  padding: 12px 8px;
+}
+
+.answer-form--linear-equation .answer-form__input--special-answer {
+  width: 210px;
+  min-width: 210px;
+  max-width: 210px;
 }
 
 .answer-form__shape-toggle {
@@ -718,6 +782,23 @@ body {
   margin-top: 16px;
 }
 
+.linear-equation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.linear-equation-actions__btn {
+  margin-top: 0;
+  flex: 1 1 180px;
+}
+
+.linear-equation-actions__btn.is-selected {
+  background: #333;
+  color: #fff;
+}
+
 .feedback {
   min-height: 1.5rem;
   margin-top: 24px;
@@ -758,6 +839,38 @@ body {
 
 .exercise-actions .btn--back {
   margin-top: 0;
+}
+
+.exercise-stats {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 10;
+  text-align: right;
+  font-size: 0.875rem;
+  line-height: 1.35;
+  color: #666;
+}
+
+.exercise-stats__total {
+  margin: 0;
+  font-weight: 600;
+  color: #333;
+}
+
+.exercise-stats__detail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0 0;
+}
+
+.exercise-stats__correct {
+  color: #1a7f37;
+}
+
+.exercise-stats__wrong {
+  color: #cf222e;
 }
 
 .screen--wide {
