@@ -124,6 +124,8 @@ let currentProblem = null;
 let sessionResults = [];
 let sessionSelectedModes = [];
 let activeExerciseModePool = [];
+let shuffledExerciseModeDeck = [];
+let lastPickedExerciseMode = null;
 let currentAnswerInputMode = null;
 let viewingSharedAnalysis = false;
 let activeFractionInputEl = null;
@@ -3176,6 +3178,27 @@ function pickRandomItem(items) {
   return items[Math.floor(Math.random() * items.length)];
 }
 
+function shuffleArray(items) {
+  const result = [...items];
+
+  for (let i = result.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+
+  return result;
+}
+
+function refillExerciseModeDeck() {
+  shuffledExerciseModeDeck = shuffleArray(activeExerciseModePool);
+
+  if (lastPickedExerciseMode != null
+    && shuffledExerciseModeDeck.length > 1
+    && shuffledExerciseModeDeck[0] === lastPickedExerciseMode) {
+    shuffledExerciseModeDeck.push(shuffledExerciseModeDeck.shift());
+  }
+}
+
 function buildPureOperatorPairs(operations) {
   return operations.map((operation) => [operation, operation]);
 }
@@ -5933,7 +5956,13 @@ function createProblemForExerciseMode(mode, level) {
 
 function pickExerciseModeForNextProblem() {
   if (activeExerciseMode === 'multi-mode') {
-    return pickRandomItem(activeExerciseModePool);
+    if (shuffledExerciseModeDeck.length === 0) {
+      refillExerciseModeDeck();
+    }
+
+    const mode = shuffledExerciseModeDeck.shift();
+    lastPickedExerciseMode = mode;
+    return mode;
   }
 
   return activeExerciseMode;
@@ -7094,6 +7123,21 @@ function clearAnswerInputs() {
   clearAnswerFieldHighlight();
 }
 
+function shouldUseKeypadOnlyAnswerInput() {
+  return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+}
+
+function applyAnswerInputKeyboardSuppression() {
+  const suppressNativeKeyboard = shouldUseKeypadOnlyAnswerInput();
+
+  [inputEl, answerNumeratorEl, answerDenominatorEl].forEach((input) => {
+    input.readOnly = suppressNativeKeyboard;
+    if (suppressNativeKeyboard) {
+      input.inputMode = 'none';
+    }
+  });
+}
+
 function focusAnswerInput() {
   if (isNumberAnswerInputShape()) {
     inputEl.focus();
@@ -7154,6 +7198,7 @@ function updateFractionAnswerShapeUi() {
     inputEl.placeholder = '';
     inputEl.inputMode = 'numeric';
     updateMathKeypadKeys();
+    applyAnswerInputKeyboardSuppression();
     return;
   }
 
@@ -7165,6 +7210,7 @@ function updateFractionAnswerShapeUi() {
       setAnswerWrapVisible(fractionAnswerWrapEl, true);
       inputEl.required = false;
       updateMathKeypadKeys();
+      applyAnswerInputKeyboardSuppression();
       return;
     }
 
@@ -7173,6 +7219,7 @@ function updateFractionAnswerShapeUi() {
       setAnswerWrapVisible(fractionAnswerWrapEl, true);
       inputEl.required = false;
       updateMathKeypadKeys();
+      applyAnswerInputKeyboardSuppression();
       return;
     }
 
@@ -7182,6 +7229,7 @@ function updateFractionAnswerShapeUi() {
     inputEl.placeholder = '';
     inputEl.inputMode = 'decimal';
     updateMathKeypadKeys();
+    applyAnswerInputKeyboardSuppression();
     return;
   }
 
@@ -7193,6 +7241,7 @@ function updateFractionAnswerShapeUi() {
     inputEl.placeholder = '';
     inputEl.inputMode = 'decimal';
     updateMathKeypadKeys();
+    applyAnswerInputKeyboardSuppression();
     return;
   }
 
@@ -7211,12 +7260,14 @@ function updateFractionAnswerShapeUi() {
   if (useFractionShape) {
     inputEl.placeholder = '';
     updateMathKeypadKeys();
+    applyAnswerInputKeyboardSuppression();
     return;
   }
 
   inputEl.placeholder = '';
   inputEl.inputMode = 'decimal';
   updateMathKeypadKeys();
+  applyAnswerInputKeyboardSuppression();
 }
 
 function toggleFractionAnswerShape() {
@@ -7830,6 +7881,8 @@ function resetProgress() {
   retryQueue = [];
   currentProblem = null;
   fractionAnswerInputShape = 'fraction';
+  shuffledExerciseModeDeck = [];
+  lastPickedExerciseMode = null;
   resetSession();
 }
 

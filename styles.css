@@ -417,6 +417,11 @@ body {
   border-color: #333;
 }
 
+.answer-form__input[readonly],
+.answer-form__fraction-input[readonly] {
+  cursor: default;
+}
+
 .answer-form__input--correct,
 .answer-form__fraction-input--correct {
   background: #dafbe1;
