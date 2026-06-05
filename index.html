@@ -141,6 +141,14 @@
               <input type="radio" name="exclusive-mode" value="fraction-compare">
               Porovnávání zlomků
             </label>
+            <label class="operation-picker__option">
+              <input type="radio" name="exclusive-mode" value="fraction-zlomek">
+              Zlomek
+            </label>
+            <label class="operation-picker__option">
+              <input type="radio" name="exclusive-mode" value="fraction-expand-reduce">
+              Rozšiřování a krácení
+            </label>
           </div>
         </fieldset>
 
@@ -165,6 +173,10 @@
               <input type="radio" name="exclusive-mode" value="decimal-compare">
               Porovnávání desetinných čísel
             </label>
+            <label class="operation-picker__option">
+              <input type="radio" name="exclusive-mode" value="decimal-fraction-convert">
+              Desetinná čísla a zlomky
+            </label>
           </div>
         </fieldset>
 
@@ -178,6 +190,28 @@
             <label class="operation-picker__option">
               <input type="radio" name="exclusive-mode" value="non-integer-compare">
               Porovnávání necelých čísel
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset class="operation-picker" id="exclusive-unit-picker">
+          <legend class="operation-picker__legend">Převody jednotek</legend>
+          <div class="operation-picker__options operation-picker__options--single">
+            <label class="operation-picker__option">
+              <input type="radio" name="exclusive-mode" value="length-convert">
+              Délka
+            </label>
+            <label class="operation-picker__option">
+              <input type="radio" name="exclusive-mode" value="weight-convert">
+              Hmotnost
+            </label>
+            <label class="operation-picker__option">
+              <input type="radio" name="exclusive-mode" value="area-convert">
+              Obsah
+            </label>
+            <label class="operation-picker__option">
+              <input type="radio" name="exclusive-mode" value="volume-convert">
+              Objem
             </label>
           </div>
         </fieldset>

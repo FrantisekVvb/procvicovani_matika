@@ -151,6 +151,83 @@ const DECIMAL_COMPARE_MAX_LEVEL = 5;
 const DECIMAL_COMPARE_SAME_WHOLE_RATE = 0.65;
 const DECIMAL_COMPARE_EQUAL_RATE = 0.15;
 const DECIMAL_COMPARE_APP_TITLE = 'Porovnávání desetinných čísel';
+const DECIMAL_FRACTION_CONVERT_MAX_LEVEL = 1;
+const DECIMAL_FRACTION_CONVERT_APP_TITLE = 'Desetinná čísla a zlomky';
+const DECIMAL_FRACTION_CONVERT_DENOMINATORS_COMMON = [10, 100, 1000];
+const DECIMAL_FRACTION_CONVERT_DENOMINATORS_SPECIAL = [2, 4, 5, 25, 50];
+const DECIMAL_FRACTION_CONVERT_SPECIAL_DEN_RATE = 0.2;
+const DECIMAL_FRACTION_CONVERT_MAX_DECIMAL_PLACES = 3;
+const DECIMAL_FRACTION_CONVERT_ANSWER_MAX = 1000;
+const LENGTH_CONVERT_MAX_LEVEL = 5;
+const LENGTH_CONVERT_APP_TITLE = 'Délka';
+const LENGTH_UNIT_ORDER = ['mm', 'cm', 'dm', 'm', 'km'];
+const LENGTH_UNIT_TO_MM = {
+  mm: 1,
+  cm: 10,
+  dm: 100,
+  m: 1000,
+  km: 1000000,
+};
+const LENGTH_CONVERT_ANSWER_MAX = 999999;
+const WEIGHT_CONVERT_MAX_LEVEL = 5;
+const WEIGHT_CONVERT_APP_TITLE = 'Hmotnost';
+const WEIGHT_UNIT_ORDER = ['mg', 'g', 'dag', 'kg', 't'];
+const WEIGHT_UNIT_TO_MG = {
+  mg: 1,
+  g: 1000,
+  dag: 10000,
+  kg: 1000000,
+  t: 1000000000,
+};
+const WEIGHT_CONVERT_ANSWER_MAX = 999999;
+const AREA_CONVERT_MAX_LEVEL = 5;
+const AREA_CONVERT_APP_TITLE = 'Obsah';
+const AREA_UNIT_ORDER = ['mm2', 'cm2', 'dm2', 'm2', 'km2', 'a', 'ha'];
+const AREA_UNIT_LABELS = {
+  mm2: 'mm²',
+  cm2: 'cm²',
+  dm2: 'dm²',
+  m2: 'm²',
+  km2: 'km²',
+  a: 'a',
+  ha: 'ha',
+};
+const AREA_UNIT_TO_MM2 = {
+  mm2: 1,
+  cm2: 100,
+  dm2: 10000,
+  m2: 1000000,
+  km2: 1000000000000,
+  a: 100000000,
+  ha: 10000000000,
+};
+const AREA_CONVERT_ANSWER_MAX = 999999;
+const VOLUME_CONVERT_MAX_LEVEL = 5;
+const VOLUME_CONVERT_APP_TITLE = 'Objem';
+const VOLUME_UNIT_ORDER = ['mm3', 'cm3', 'dm3', 'm3', 'ml', 'cl', 'dl', 'l', 'hl'];
+const VOLUME_UNIT_LABELS = {
+  mm3: 'mm³',
+  cm3: 'cm³',
+  dm3: 'dm³',
+  m3: 'm³',
+  ml: 'ml',
+  cl: 'cl',
+  dl: 'dl',
+  l: 'l',
+  hl: 'hl',
+};
+const VOLUME_UNIT_TO_MM3 = {
+  mm3: 1,
+  cm3: 1000,
+  dm3: 1000000,
+  m3: 1000000000,
+  ml: 1000,
+  cl: 10000,
+  dl: 100000,
+  l: 1000000,
+  hl: 100000000,
+};
+const VOLUME_CONVERT_ANSWER_MAX = 999999;
 const INTEGER_COMPARE_MAX_LEVEL = 4;
 const INTEGER_COMPARE_VALUE_MIN = -99;
 const INTEGER_COMPARE_VALUE_MAX = 99;
@@ -166,6 +243,19 @@ const FRACTION_COMPARE_MAX_LEVEL = 5;
 const FRACTION_COMPARE_EQUAL_RATE = 0.15;
 const FRACTION_COMPARE_ORDER_LCM_MAX = 48;
 const FRACTION_COMPARE_APP_TITLE = 'Porovnávání zlomků';
+const FRACTION_ZLOMEK_MAX_LEVEL = 1;
+const FRACTION_ZLOMEK_APP_TITLE = 'Zlomek';
+const FRACTION_EXPAND_REDUCE_MAX_LEVEL = 5;
+const FRACTION_EXPAND_REDUCE_APP_TITLE = 'Rozšiřování a krácení';
+const FRACTION_EXPAND_REDUCE_VALUE_MAX = 20;
+const FRACTION_EXPAND_REDUCE_DEN_MAX = 24;
+const FRACTION_EXPAND_REDUCE_MULTIPLIER_PAIRS_NON_DIVISIBLE = [
+  [2, 3],
+  [3, 4],
+  [2, 5],
+  [3, 5],
+  [4, 5],
+];
 const FRACTION_COMPARE_ORDER_MULTIPLIER_SETS = {
   2: [
     [1, 2],
@@ -303,6 +393,10 @@ function hasDecimalCompareMode() {
   return getSelectedExclusiveMode() === 'decimal-compare';
 }
 
+function hasDecimalFractionConvertMode() {
+  return getSelectedExclusiveMode() === 'decimal-fraction-convert';
+}
+
 function hasIntegerCompareMode() {
   return getSelectedExclusiveMode() === 'integer-compare';
 }
@@ -313,6 +407,30 @@ function hasNonIntegerCompareMode() {
 
 function hasFractionCompareMode() {
   return getSelectedExclusiveMode() === 'fraction-compare';
+}
+
+function hasFractionZlomekMode() {
+  return getSelectedExclusiveMode() === 'fraction-zlomek';
+}
+
+function hasFractionExpandReduceMode() {
+  return getSelectedExclusiveMode() === 'fraction-expand-reduce';
+}
+
+function hasLengthConvertMode() {
+  return getSelectedExclusiveMode() === 'length-convert';
+}
+
+function hasWeightConvertMode() {
+  return getSelectedExclusiveMode() === 'weight-convert';
+}
+
+function hasAreaConvertMode() {
+  return getSelectedExclusiveMode() === 'area-convert';
+}
+
+function hasVolumeConvertMode() {
+  return getSelectedExclusiveMode() === 'volume-convert';
 }
 
 function isLinearEquationExerciseMode() {
@@ -327,6 +445,10 @@ function isDecimalCompareExerciseMode() {
   return activeExerciseMode === 'decimal-compare';
 }
 
+function isDecimalFractionConvertExerciseMode() {
+  return activeExerciseMode === 'decimal-fraction-convert';
+}
+
 function isIntegerCompareExerciseMode() {
   return activeExerciseMode === 'integer-compare';
 }
@@ -337,6 +459,30 @@ function isNonIntegerCompareExerciseMode() {
 
 function isFractionCompareExerciseMode() {
   return activeExerciseMode === 'fraction-compare';
+}
+
+function isFractionZlomekExerciseMode() {
+  return activeExerciseMode === 'fraction-zlomek';
+}
+
+function isFractionExpandReduceExerciseMode() {
+  return activeExerciseMode === 'fraction-expand-reduce';
+}
+
+function isLengthConvertExerciseMode() {
+  return activeExerciseMode === 'length-convert';
+}
+
+function isWeightConvertExerciseMode() {
+  return activeExerciseMode === 'weight-convert';
+}
+
+function isAreaConvertExerciseMode() {
+  return activeExerciseMode === 'area-convert';
+}
+
+function isVolumeConvertExerciseMode() {
+  return activeExerciseMode === 'volume-convert';
 }
 
 function isCompareExerciseMode() {
@@ -473,6 +619,17 @@ function hasDecimalCompareOnlySelection() {
     && !hasNonIntegerSqrtMode();
 }
 
+function hasDecimalFractionConvertOnlySelection() {
+  return hasDecimalFractionConvertMode()
+    && getSelectedOperations().length === 0
+    && getSelectedFractionModes().length === 0
+    && getSelectedIntegerModes().length === 0
+    && !hasPowersMode()
+    && !hasSqrtMode()
+    && !hasNonIntegerPowersMode()
+    && !hasNonIntegerSqrtMode();
+}
+
 function hasIntegerCompareOnlySelection() {
   return hasIntegerCompareMode()
     && getSelectedOperations().length === 0
@@ -497,6 +654,72 @@ function hasNonIntegerCompareOnlySelection() {
 
 function hasFractionCompareOnlySelection() {
   return hasFractionCompareMode()
+    && getSelectedOperations().length === 0
+    && getSelectedFractionModes().length === 0
+    && getSelectedIntegerModes().length === 0
+    && !hasPowersMode()
+    && !hasSqrtMode()
+    && !hasNonIntegerPowersMode()
+    && !hasNonIntegerSqrtMode();
+}
+
+function hasFractionZlomekOnlySelection() {
+  return hasFractionZlomekMode()
+    && getSelectedOperations().length === 0
+    && getSelectedFractionModes().length === 0
+    && getSelectedIntegerModes().length === 0
+    && !hasPowersMode()
+    && !hasSqrtMode()
+    && !hasNonIntegerPowersMode()
+    && !hasNonIntegerSqrtMode();
+}
+
+function hasFractionExpandReduceOnlySelection() {
+  return hasFractionExpandReduceMode()
+    && getSelectedOperations().length === 0
+    && getSelectedFractionModes().length === 0
+    && getSelectedIntegerModes().length === 0
+    && !hasPowersMode()
+    && !hasSqrtMode()
+    && !hasNonIntegerPowersMode()
+    && !hasNonIntegerSqrtMode();
+}
+
+function hasLengthConvertOnlySelection() {
+  return hasLengthConvertMode()
+    && getSelectedOperations().length === 0
+    && getSelectedFractionModes().length === 0
+    && getSelectedIntegerModes().length === 0
+    && !hasPowersMode()
+    && !hasSqrtMode()
+    && !hasNonIntegerPowersMode()
+    && !hasNonIntegerSqrtMode();
+}
+
+function hasWeightConvertOnlySelection() {
+  return hasWeightConvertMode()
+    && getSelectedOperations().length === 0
+    && getSelectedFractionModes().length === 0
+    && getSelectedIntegerModes().length === 0
+    && !hasPowersMode()
+    && !hasSqrtMode()
+    && !hasNonIntegerPowersMode()
+    && !hasNonIntegerSqrtMode();
+}
+
+function hasAreaConvertOnlySelection() {
+  return hasAreaConvertMode()
+    && getSelectedOperations().length === 0
+    && getSelectedFractionModes().length === 0
+    && getSelectedIntegerModes().length === 0
+    && !hasPowersMode()
+    && !hasSqrtMode()
+    && !hasNonIntegerPowersMode()
+    && !hasNonIntegerSqrtMode();
+}
+
+function hasVolumeConvertOnlySelection() {
+  return hasVolumeConvertMode()
     && getSelectedOperations().length === 0
     && getSelectedFractionModes().length === 0
     && getSelectedIntegerModes().length === 0
@@ -848,6 +1071,10 @@ function getFractionAnswerMaxValue() {
     return FRACTION_ADD_ANSWER_MAX;
   }
 
+  if (currentProblem?.type === 'decimal-fraction-convert') {
+    return DECIMAL_FRACTION_CONVERT_ANSWER_MAX;
+  }
+
   return BASIC_FORM_MAX_BY_LEVEL[3];
 }
 
@@ -1158,7 +1385,14 @@ function isFractionExerciseMode() {
     && activeExerciseMode !== 'decimal-compare'
     && activeExerciseMode !== 'integer-compare'
     && activeExerciseMode !== 'non-integer-compare'
-    && activeExerciseMode !== 'fraction-compare';
+    && activeExerciseMode !== 'fraction-compare'
+    && activeExerciseMode !== 'fraction-zlomek'
+    && activeExerciseMode !== 'fraction-expand-reduce'
+    && activeExerciseMode !== 'decimal-fraction-convert'
+    && activeExerciseMode !== 'length-convert'
+    && activeExerciseMode !== 'weight-convert'
+    && activeExerciseMode !== 'area-convert'
+    && activeExerciseMode !== 'volume-convert';
 }
 
 function isNonIntegerAnswerInputMode() {
@@ -1304,6 +1538,34 @@ function getExerciseModeForProblem(problem) {
     return 'fraction-compare';
   }
 
+  if (problem?.type === 'fraction-zlomek') {
+    return 'fraction-zlomek';
+  }
+
+  if (problem?.type === 'fraction-expand-reduce') {
+    return 'fraction-expand-reduce';
+  }
+
+  if (problem?.type === 'decimal-fraction-convert') {
+    return 'decimal-fraction-convert';
+  }
+
+  if (problem?.type === 'length-convert') {
+    return 'length-convert';
+  }
+
+  if (problem?.type === 'weight-convert') {
+    return 'weight-convert';
+  }
+
+  if (problem?.type === 'area-convert') {
+    return 'area-convert';
+  }
+
+  if (problem?.type === 'volume-convert') {
+    return 'volume-convert';
+  }
+
   if (problem?.type?.startsWith('fraction-')) {
     return problem.type;
   }
@@ -1369,6 +1631,13 @@ function canAnswerProblem(problem) {
     || problem?.type === 'non-integer-sqrt'
     || isLinearEquationProblem(problem)
     || isCompareProblem(problem)
+    || isFractionZlomekProblem(problem)
+    || isFractionExpandReduceProblem(problem)
+    || isDecimalFractionConvertProblem(problem)
+    || isLengthConvertProblem(problem)
+    || isWeightConvertProblem(problem)
+    || isAreaConvertProblem(problem)
+    || isVolumeConvertProblem(problem)
     || Boolean(problem?.operands);
 }
 
@@ -1474,6 +1743,18 @@ function fractionAnswersEquivalent(userFraction, correctFraction) {
 function shouldRequireBasicFormAnswer() {
   if (currentProblem?.type === 'basic-form') {
     return true;
+  }
+
+  if (currentProblem?.type === 'fraction-zlomek') {
+    return false;
+  }
+
+  if (currentProblem?.type === 'fraction-expand-reduce') {
+    return false;
+  }
+
+  if (currentProblem?.type === 'decimal-fraction-convert') {
+    return false;
   }
 
   return requireBasicFormCheckbox?.checked ?? false;
@@ -4635,6 +4916,2449 @@ function createFractionCompareProblem(level) {
   return createFractionCompareOrderProblem(displayLevel, 4);
 }
 
+function isFractionZlomekProblem(problem) {
+  return problem?.type === 'fraction-zlomek';
+}
+
+function getCzechCountNounForm(count, forms) {
+  const mod100 = count % 100;
+
+  if (mod100 >= 11 && mod100 <= 14) {
+    return forms[2];
+  }
+
+  if (count === 1) {
+    return forms[0];
+  }
+
+  if (count >= 2 && count <= 4) {
+    return forms[1];
+  }
+
+  return forms[2];
+}
+
+function formatCzechNounCount(count, forms) {
+  return `${count} ${getCzechCountNounForm(count, forms)}`;
+}
+
+function getCzechHourAccusativeForm(count) {
+  const mod100 = count % 100;
+
+  if (mod100 >= 11 && mod100 <= 14) {
+    return 'hodin';
+  }
+
+  if (count === 1) {
+    return 'hodinu';
+  }
+
+  if (count >= 2 && count <= 4) {
+    return 'hodiny';
+  }
+
+  return 'hodin';
+}
+
+function formatCzechHourAccusativeCount(count) {
+  return `${count} ${getCzechHourAccusativeForm(count)}`;
+}
+
+const FRACTION_ZLOMEK_WEEKEND_SCENARIOS = [
+  (sat, sun) => `O víkendu hraješ v sobotu ${sat} a v neděli ${sun} počítačové hry. Jakou část celkového času hraní připadá na neděli? Zapiš zlomkem.`,
+  (sat, sun) => `O víkendu čteš v sobotu ${sat} a v neděli ${sun}. Jakou část celkového času čtení připadá na neděli? Zapiš zlomkem.`,
+  (sat, sun) => `O víkendu sleduješ televizi v sobotu ${sat} a v neděli ${sun}. Jakou část celkového času u televize připadá na neděli? Zapiš zlomkem.`,
+  (sat, sun) => `O víkendu hraješ fotbal v sobotu ${sat} a v neděli ${sun}. Jakou část celkového času stráveného hraním fotbalu připadá na neděli? Zapiš zlomkem.`,
+  (sat, sun) => `O víkendu pomáháš doma v sobotu ${sat} a v neděli ${sun}. Jakou část celkového času stráveného pomocí doma připadá na neděli? Zapiš zlomkem.`,
+];
+
+function formatCzechWeekendHoursPrompt(saturdayHours, sundayHours) {
+  const saturdayText = formatCzechHourAccusativeCount(saturdayHours);
+  const sundayText = formatCzechHourAccusativeCount(sundayHours);
+
+  return pickRandomItem(FRACTION_ZLOMEK_WEEKEND_SCENARIOS)(saturdayText, sundayText);
+}
+
+function formatCzechMeziPeople(count) {
+  const mod100 = count % 100;
+  const mod10 = count % 10;
+
+  if (count === 1) {
+    return '1 člověka';
+  }
+
+  if (mod100 >= 11 && mod100 <= 14) {
+    return `${count} lidí`;
+  }
+
+  if (mod10 >= 2 && mod10 <= 4) {
+    return `${count} lidi`;
+  }
+
+  return `${count} lidí`;
+}
+
+function usesCzechNominativePluralCount(count) {
+  return count >= 2 && count <= 4;
+}
+
+function formatCzechFeminineAdjectiveNounCount(count, adjectiveStem, nounForms) {
+  const mod100 = count % 100;
+  let adjective;
+  let noun;
+
+  if (mod100 >= 11 && mod100 <= 14) {
+    adjective = `${adjectiveStem}ých`;
+    noun = nounForms[2];
+  } else if (count === 1) {
+    adjective = `${adjectiveStem}á`;
+    noun = nounForms[0];
+  } else if (count >= 2 && count <= 4) {
+    adjective = `${adjectiveStem}é`;
+    noun = nounForms[1];
+  } else {
+    adjective = `${adjectiveStem}ých`;
+    noun = nounForms[2];
+  }
+
+  return `${count} ${adjective} ${noun}`;
+}
+
+function formatCzechTwoColorBallPhrase(count1, adjectiveStem1, count2, adjectiveStem2) {
+  const nounForms = ['kulička', 'kuličky', 'kuliček'];
+
+  return `${formatCzechFeminineAdjectiveNounCount(count1, adjectiveStem1, nounForms)} a ${formatCzechFeminineAdjectiveNounCount(count2, adjectiveStem2, nounForms)}`;
+}
+
+function formatCzechColoredBallsPrompt(container, count1, adjectiveStem1, count2, adjectiveStem2, askedColorLabel) {
+  const verb = usesCzechNominativePluralCount(count1) && usesCzechNominativePluralCount(count2)
+    ? 'jsou'
+    : 'je';
+
+  return `${container} ${verb} ${formatCzechTwoColorBallPhrase(count1, adjectiveStem1, count2, adjectiveStem2)}. Jakou část tvoří ${askedColorLabel}? Zapiš zlomkem.`;
+}
+
+const FRACTION_ZLOMEK_SHARING_NOUNS = [
+  { forms: ['chléb', 'chleby', 'chlebů'] },
+  { forms: ['jablko', 'jablka', 'jablek'] },
+  { forms: ['koláč', 'koláče', 'koláčů'] },
+  { forms: ['rohlík', 'rohlíky', 'rohlíků'] },
+  { forms: ['pomeranč', 'pomeranče', 'pomerančů'] },
+];
+
+function buildFractionZlomekProblem({
+  displayLevel,
+  variant,
+  prompt,
+  answerKind,
+  answerNum = null,
+  answerDen = null,
+  answer = null,
+  promptNum = null,
+  promptDen = null,
+  quantity = null,
+  partValue = null,
+  unitValue = null,
+  unitMeasure = null,
+  unitLabel = null,
+}) {
+  return {
+    type: 'fraction-zlomek',
+    variant,
+    level: displayLevel,
+    prompt,
+    answerKind,
+    answerNum,
+    answerDen,
+    answer,
+    promptNum,
+    promptDen,
+    quantity,
+    partValue,
+    unitValue,
+    unitMeasure,
+    unitLabel,
+    isRetry: false,
+  };
+}
+
+function createFractionZlomekPartProblem(displayLevel) {
+  const maxTotal = displayLevel <= 2 ? 20 : 40;
+  const total = randomWhole(6, maxTotal);
+  const part = randomWhole(1, total - 1);
+  const other = total - part;
+
+  const prompts = [
+    formatCzechColoredBallsPrompt('V sáčku', other, 'bíl', part, 'oranžov', 'oranžové kuličky'),
+    `Ve třídě je ${formatCzechNounCount(total, ['žák', 'žáci', 'žáků'])}. ${part} z nich ${part === 1 ? 'je chlapec' : 'jsou chlapci'}. Jakou část tvoří chlapci? Zapiš zlomkem.`,
+    formatCzechColoredBallsPrompt('V krabici', other, 'červen', part, 'modr', 'modré kuličky'),
+    formatCzechWeekendHoursPrompt(other, part),
+  ];
+
+  return buildFractionZlomekProblem({
+    displayLevel,
+    variant: 'part',
+    prompt: pickRandomItem(prompts),
+    answerKind: 'fraction',
+    answerNum: part,
+    answerDen: total,
+  });
+}
+
+function createFractionZlomekOfNumberProblem(displayLevel) {
+  const denMax = displayLevel <= 2 ? 6 : displayLevel <= 4 ? 10 : 12;
+  const den = randomWhole(2, denMax);
+  const num = randomWhole(1, den - 1);
+  const multiplier = randomWhole(2, displayLevel <= 3 ? 8 : 12);
+  const quantity = den * multiplier;
+  const answer = num * multiplier;
+
+  return buildFractionZlomekProblem({
+    displayLevel,
+    variant: 'of-number',
+    prompt: `Kolik je ${num}/${den} z ${quantity}?`,
+    promptNum: num,
+    promptDen: den,
+    quantity,
+    answerKind: 'number',
+    answer,
+  });
+}
+
+function createFractionZlomekUnitProblem(displayLevel) {
+  const unitType = pickRandomItem(['cm-m', 'min-hour', 'min-lesson']);
+
+  if (unitType === 'cm-m') {
+    const cm = randomWhole(1, 19) * 5;
+
+    return buildFractionZlomekProblem({
+      displayLevel,
+      variant: 'unit',
+      prompt: `${cm} cm = ?/${100} m. Doplň čitatele zlomku.`,
+      promptDen: 100,
+      unitValue: cm,
+      unitMeasure: 'cm',
+      unitLabel: 'm',
+      answerKind: 'number',
+      answer: cm,
+    });
+  }
+
+  if (unitType === 'min-hour') {
+    const minutes = randomWhole(1, 11) * 5;
+
+    return buildFractionZlomekProblem({
+      displayLevel,
+      variant: 'unit',
+      prompt: `${minutes} min = ?/${60} h. Doplň čitatele zlomku.`,
+      promptDen: 60,
+      unitValue: minutes,
+      unitMeasure: 'min',
+      unitLabel: 'h',
+      answerKind: 'number',
+      answer: minutes,
+    });
+  }
+
+  const minutes = randomWhole(1, 8) * 5;
+
+  return buildFractionZlomekProblem({
+    displayLevel,
+    variant: 'unit',
+    prompt: `${minutes} min = ?/${45} vyučovací hodiny. Doplň čitatele zlomku.`,
+    promptDen: 45,
+    unitValue: minutes,
+    unitMeasure: 'min',
+    unitLabel: 'vyučovací hodiny',
+    answerKind: 'number',
+    answer: minutes,
+  });
+}
+
+function createFractionZlomekFindWholeProblem(displayLevel) {
+  const den = randomWhole(2, displayLevel <= 3 ? 6 : 8);
+  const num = randomWhole(1, den - 1);
+  const whole = randomWhole(2, displayLevel <= 3 ? 12 : 20) * den;
+  const part = (whole * num) / den;
+
+  return buildFractionZlomekProblem({
+    displayLevel,
+    variant: 'find-whole',
+    prompt: `Na tyči bylo natřeno ${part} cm, což je ${num}/${den} celé délky. Jak dlouhá je celá tyč v cm?`,
+    promptNum: num,
+    promptDen: den,
+    partValue: part,
+    answerKind: 'number',
+    answer: whole,
+  });
+}
+
+function createFractionZlomekSharingProblem(displayLevel) {
+  const people = randomWhole(2, displayLevel <= 3 ? 6 : 9);
+  const items = randomWhole(people, displayLevel <= 3 ? 12 : 18);
+  const noun = pickRandomItem(FRACTION_ZLOMEK_SHARING_NOUNS);
+
+  return buildFractionZlomekProblem({
+    displayLevel,
+    variant: 'sharing',
+    prompt: `${formatCzechNounCount(items, noun.forms)} se rozdělí rovným dílem mezi ${formatCzechMeziPeople(people)}. Kolik dostane jeden? Zapiš zlomkem.`,
+    answerKind: 'fraction',
+    answerNum: items,
+    answerDen: people,
+  });
+}
+
+function createFractionZlomekRemainingPartProblem(displayLevel) {
+  const total = pickRandomItem([12, 24]);
+  const eaten = randomWhole(1, total - 1);
+  const remaining = total - eaten;
+
+  return buildFractionZlomekProblem({
+    displayLevel,
+    variant: 'remaining',
+    prompt: `Čokoláda má ${formatCzechNounCount(total, ['čtvereček', 'čtverečky', 'čtverečků'])}. Snězeno jich bylo ${formatCzechNounCount(eaten, ['čtvereček', 'čtverečky', 'čtverečků'])}. Jaká část čokolády zůstala? Zapiš zlomkem.`,
+    answerKind: 'fraction',
+    answerNum: remaining,
+    answerDen: total,
+  });
+}
+
+function createFractionZlomekEqualsWholeProblem(displayLevel) {
+  const whole = randomWhole(2, displayLevel <= 4 ? 8 : 12);
+  const den = randomWhole(2, 8);
+  const num = whole * den;
+
+  return buildFractionZlomekProblem({
+    displayLevel,
+    variant: 'equals-whole',
+    prompt: `Kolik je ${num}/${den}?`,
+    promptNum: num,
+    promptDen: den,
+    answerKind: 'number',
+    answer: whole,
+  });
+}
+
+function createFractionZlomekProblem(_level) {
+  const displayLevel = 1;
+
+  return pickRandomItem([
+    () => createFractionZlomekPartProblem(displayLevel),
+    () => createFractionZlomekOfNumberProblem(displayLevel),
+    () => createFractionZlomekUnitProblem(displayLevel),
+    () => createFractionZlomekFindWholeProblem(displayLevel),
+    () => createFractionZlomekSharingProblem(displayLevel),
+    () => createFractionZlomekRemainingPartProblem(displayLevel),
+    () => createFractionZlomekEqualsWholeProblem(displayLevel),
+  ])();
+}
+
+function fractionZlomekProblemFromRetry(dueRetry) {
+  return {
+    type: 'fraction-zlomek',
+    variant: dueRetry.variant,
+    level: dueRetry.level,
+    prompt: dueRetry.prompt,
+    answerKind: dueRetry.answerKind,
+    answerNum: dueRetry.answerNum,
+    answerDen: dueRetry.answerDen,
+    answer: dueRetry.answer,
+    promptNum: dueRetry.promptNum ?? null,
+    promptDen: dueRetry.promptDen ?? null,
+    quantity: dueRetry.quantity ?? null,
+    partValue: dueRetry.partValue ?? null,
+    unitValue: dueRetry.unitValue ?? null,
+    unitMeasure: dueRetry.unitMeasure ?? null,
+    unitLabel: dueRetry.unitLabel ?? null,
+    isRetry: true,
+  };
+}
+
+function formatFractionZlomekProblemText(problem) {
+  return problem.prompt;
+}
+
+function formatFractionZlomekPromptContentHtml(problem) {
+  if (problem.variant === 'of-number') {
+    return `Kolik je ${formatSingleFractionHtml(problem.promptNum, problem.promptDen)} z ${escapeHtml(problem.quantity)}?`;
+  }
+
+  if (problem.variant === 'unit') {
+    return `${escapeHtml(problem.unitValue)} ${escapeHtml(problem.unitMeasure)} = ${formatUnknownNumeratorFractionHtml(problem.promptDen)} ${escapeHtml(problem.unitLabel)}. Doplň čitatele zlomku.`;
+  }
+
+  if (problem.variant === 'find-whole') {
+    return `Na tyči bylo natřeno ${escapeHtml(problem.partValue)} cm, což je ${formatSingleFractionHtml(problem.promptNum, problem.promptDen)} celé délky. Jak dlouhá je celá tyč v cm?`;
+  }
+
+  if (problem.variant === 'equals-whole') {
+    return `Kolik je ${formatSingleFractionHtml(problem.promptNum, problem.promptDen)}?`;
+  }
+
+  return escapeHtml(problem.prompt);
+}
+
+function formatFractionZlomekDisplayHtml(problem) {
+  return `<p class="problem-prompt">${formatFractionZlomekPromptContentHtml(problem)}</p>`;
+}
+
+function formatFractionZlomekSessionAnswer(userAnswer, problem) {
+  if (problem.answerKind === 'number') {
+    return formatIntegerAnswer(userAnswer);
+  }
+
+  return formatFraction(userAnswer.num, userAnswer.den);
+}
+
+function formatFractionZlomekCorrectAnswer(problem) {
+  if (problem.answerKind === 'number') {
+    return formatIntegerAnswer(problem.answer);
+  }
+
+  return formatFraction(problem.answerNum, problem.answerDen);
+}
+
+function getFractionUserAnswerFallback() {
+  if (isNumberAnswerInputShape()) {
+    const value = parseAnswer(inputEl.value);
+    if (value !== null && Number.isInteger(value)) {
+      return { num: value, den: 1 };
+    }
+  }
+
+  const numText = answerNumeratorEl.value.trim();
+  if (/^\d+$/.test(numText) && answerDenominatorEl.value.trim() === '') {
+    return { num: Number(numText), den: 1 };
+  }
+
+  return null;
+}
+
+function getFractionZlomekUserAnswer(problem) {
+  if (problem.answerKind === 'number') {
+    const value = parseAnswer(inputEl.value);
+    return value !== null && Number.isInteger(value) ? value : null;
+  }
+
+  return getFractionAnswerFromInputs() ?? getFractionUserAnswerFallback();
+}
+
+function evaluateFractionZlomekAnswer(problem, userAnswer) {
+  if (problem.answerKind === 'number') {
+    return {
+      isCorrect: userAnswer === problem.answer,
+      feedbackMessage: userAnswer === problem.answer ? 'Správně!' : 'Špatně.',
+    };
+  }
+
+  const correctFraction = {
+    num: problem.answerNum,
+    den: problem.answerDen,
+  };
+
+  if (fractionAnswersMatch(userAnswer, correctFraction)
+    || fractionAnswersEquivalent(userAnswer, correctFraction)) {
+    return {
+      isCorrect: true,
+      feedbackMessage: 'Správně!',
+    };
+  }
+
+  return {
+    isCorrect: false,
+    feedbackMessage: 'Špatně.',
+  };
+}
+
+function isFractionExpandReduceProblem(problem) {
+  return problem?.type === 'fraction-expand-reduce';
+}
+
+function buildFractionExpandReduceProblem({
+  level,
+  leftNum,
+  leftDen,
+  rightNum,
+  rightDen,
+  unknownPosition,
+  answer,
+}) {
+  return {
+    type: 'fraction-expand-reduce',
+    level,
+    leftNum,
+    leftDen,
+    rightNum,
+    rightDen,
+    unknownPosition,
+    answer,
+    isRetry: false,
+  };
+}
+
+function isIntegerMultipleOf(a, b) {
+  if (a <= 0 || b <= 0) {
+    return false;
+  }
+
+  const larger = Math.max(a, b);
+  const smaller = Math.min(a, b);
+  return larger % smaller === 0;
+}
+
+function expandReduceFractionsHaveCorrespondingMultiple(leftNum, leftDen, rightNum, rightDen) {
+  return isIntegerMultipleOf(leftNum, rightNum)
+    || isIntegerMultipleOf(leftDen, rightDen);
+}
+
+function getFractionExpandReduceLevelConfig(difficultyLevel) {
+  const displayLevel = difficultyLevel + 1;
+
+  if (displayLevel === 1) {
+    return {
+      displayLevel,
+      rNumMax: 3,
+      rDenMax: 6,
+      multiplierPairs: [[1, 2], [1, 3], [2, 4]],
+      unknownVariant: 'denominator',
+      requireMultiple: true,
+    };
+  }
+
+  if (displayLevel === 2) {
+    return {
+      displayLevel,
+      rNumMax: 3,
+      rDenMax: 6,
+      multiplierPairs: [[1, 2], [1, 3], [2, 4]],
+      unknownVariant: 'numerator',
+      requireMultiple: true,
+    };
+  }
+
+  if (displayLevel === 3) {
+    return {
+      displayLevel,
+      rNumMax: 4,
+      rDenMax: 8,
+      multiplierPairs: [[1, 2], [1, 3], [1, 4], [2, 4], [2, 6]],
+      unknownVariant: 'any',
+      requireMultiple: true,
+    };
+  }
+
+  if (displayLevel === 4) {
+    return {
+      displayLevel,
+      rNumMax: 5,
+      rDenMax: 8,
+      multiplierPairs: [[1, 3], [1, 4], [2, 4], [2, 6], [2, 8], [3, 6]],
+      unknownVariant: 'any',
+      requireMultiple: true,
+    };
+  }
+
+  return {
+    displayLevel,
+    rNumMax: 5,
+    rDenMax: 8,
+    multiplierPairs: FRACTION_EXPAND_REDUCE_MULTIPLIER_PAIRS_NON_DIVISIBLE,
+    unknownVariant: 'any',
+    requireMultiple: false,
+  };
+}
+
+function pickExpandReduceUnknownPosition(unknownVariant) {
+  if (unknownVariant === 'denominator') {
+    return pickRandomItem(['left-den', 'right-den']);
+  }
+
+  if (unknownVariant === 'numerator') {
+    return pickRandomItem(['left-num', 'right-num']);
+  }
+
+  return pickRandomItem(['left-num', 'right-num', 'left-den', 'right-den']);
+}
+
+function pickExpandReduceMultipliers(multiplierPairs) {
+  const [m1, m2] = pickRandomItem(multiplierPairs);
+  return Math.random() < 0.5 ? [m1, m2] : [m2, m1];
+}
+
+function getFractionExpandReduceFallbackProblem(displayLevel) {
+  const fallbacks = {
+    1: {
+      leftNum: 1,
+      leftDen: 4,
+      rightNum: 2,
+      rightDen: 8,
+      unknownPosition: 'left-den',
+      answer: 4,
+    },
+    2: {
+      leftNum: 1,
+      leftDen: 4,
+      rightNum: 2,
+      rightDen: 8,
+      unknownPosition: 'right-num',
+      answer: 2,
+    },
+    3: {
+      leftNum: 1,
+      leftDen: 4,
+      rightNum: 2,
+      rightDen: 8,
+      unknownPosition: 'left-num',
+      answer: 1,
+    },
+    4: {
+      leftNum: 2,
+      leftDen: 6,
+      rightNum: 4,
+      rightDen: 12,
+      unknownPosition: 'right-den',
+      answer: 12,
+    },
+    5: {
+      leftNum: 2,
+      leftDen: 8,
+      rightNum: 3,
+      rightDen: 12,
+      unknownPosition: 'left-num',
+      answer: 2,
+    },
+  };
+
+  return fallbacks[displayLevel] ?? fallbacks[1];
+}
+
+function createFractionExpandReduceProblem(difficultyLevel) {
+  const config = getFractionExpandReduceLevelConfig(difficultyLevel);
+
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    const rNum = randomWhole(1, config.rNumMax);
+    const rDen = randomWhole(rNum + 1, config.rDenMax);
+
+    if (gcd(rNum, rDen) !== 1) {
+      continue;
+    }
+
+    const [m1, m2] = pickExpandReduceMultipliers(config.multiplierPairs);
+    const leftNum = rNum * m1;
+    const leftDen = rDen * m1;
+    const rightNum = rNum * m2;
+    const rightDen = rDen * m2;
+
+    if (leftNum > FRACTION_EXPAND_REDUCE_VALUE_MAX
+      || rightNum > FRACTION_EXPAND_REDUCE_VALUE_MAX
+      || leftDen > FRACTION_EXPAND_REDUCE_DEN_MAX
+      || rightDen > FRACTION_EXPAND_REDUCE_DEN_MAX) {
+      continue;
+    }
+
+    if (leftNum === rightNum && leftDen === rightDen) {
+      continue;
+    }
+
+    const hasMultiple = expandReduceFractionsHaveCorrespondingMultiple(
+      leftNum,
+      leftDen,
+      rightNum,
+      rightDen,
+    );
+
+    if (config.requireMultiple && !hasMultiple) {
+      continue;
+    }
+
+    if (!config.requireMultiple && hasMultiple) {
+      continue;
+    }
+
+    const unknownPosition = pickExpandReduceUnknownPosition(config.unknownVariant);
+    const answer = unknownPosition === 'left-num'
+      ? leftNum
+      : unknownPosition === 'right-num'
+        ? rightNum
+        : unknownPosition === 'left-den'
+          ? leftDen
+          : rightDen;
+
+    return buildFractionExpandReduceProblem({
+      level: config.displayLevel,
+      leftNum,
+      leftDen,
+      rightNum,
+      rightDen,
+      unknownPosition,
+      answer,
+    });
+  }
+
+  const fallback = getFractionExpandReduceFallbackProblem(config.displayLevel);
+
+  return buildFractionExpandReduceProblem({
+    level: config.displayLevel,
+    ...fallback,
+  });
+}
+
+function fractionExpandReduceProblemFromRetry(dueRetry) {
+  return {
+    type: 'fraction-expand-reduce',
+    level: dueRetry.level,
+    leftNum: dueRetry.leftNum,
+    leftDen: dueRetry.leftDen,
+    rightNum: dueRetry.rightNum,
+    rightDen: dueRetry.rightDen,
+    unknownPosition: dueRetry.unknownPosition,
+    answer: dueRetry.answer,
+    isRetry: true,
+  };
+}
+
+function formatExpandReduceSideFractionHtml(num, den, unknownPosition, side) {
+  if (unknownPosition === `${side}-num`) {
+    return formatUnknownNumeratorFractionHtml(den);
+  }
+
+  if (unknownPosition === `${side}-den`) {
+    return formatUnknownDenominatorFractionHtml(num);
+  }
+
+  return formatSingleFractionHtml(num, den);
+}
+
+function formatFractionExpandReduceProblemText(problem) {
+  const leftText = problem.unknownPosition === 'left-num'
+    ? `?/${problem.leftDen}`
+    : problem.unknownPosition === 'left-den'
+      ? `${problem.leftNum}/?`
+      : `${problem.leftNum}/${problem.leftDen}`;
+  const rightText = problem.unknownPosition === 'right-num'
+    ? `?/${problem.rightDen}`
+    : problem.unknownPosition === 'right-den'
+      ? `${problem.rightNum}/?`
+      : `${problem.rightNum}/${problem.rightDen}`;
+
+  return `${leftText} = ${rightText}`;
+}
+
+function formatFractionExpandReduceDisplayHtml(problem) {
+  const left = formatExpandReduceSideFractionHtml(
+    problem.leftNum,
+    problem.leftDen,
+    problem.unknownPosition,
+    'left',
+  );
+  const right = formatExpandReduceSideFractionHtml(
+    problem.rightNum,
+    problem.rightDen,
+    problem.unknownPosition,
+    'right',
+  );
+
+  return `<span class="problem-expression">${left}<span class="problem-expression__operator">=</span>${right}</span>`;
+}
+
+function evaluateFractionExpandReduceAnswer(problem, userAnswer) {
+  return {
+    isCorrect: userAnswer === problem.answer,
+    feedbackMessage: userAnswer === problem.answer ? 'Správně!' : 'Špatně.',
+  };
+}
+
+function isDecimalFractionConvertProblem(problem) {
+  return problem?.type === 'decimal-fraction-convert';
+}
+
+function pickDecimalFractionConvertDenominator() {
+  if (Math.random() < DECIMAL_FRACTION_CONVERT_SPECIAL_DEN_RATE) {
+    return pickRandomItem(DECIMAL_FRACTION_CONVERT_DENOMINATORS_SPECIAL);
+  }
+
+  return pickRandomItem(DECIMAL_FRACTION_CONVERT_DENOMINATORS_COMMON);
+}
+
+function getExactDecimalPlaces(value, maxPlaces) {
+  for (let places = 0; places <= maxPlaces; places += 1) {
+    if (valueFitsDecimalPlaces(value, places)) {
+      return places;
+    }
+  }
+
+  return null;
+}
+
+function buildDecimalFractionConvertProblem({
+  level,
+  direction,
+  num,
+  den,
+  decimalValue,
+  decimalPlaces,
+}) {
+  return {
+    type: 'decimal-fraction-convert',
+    level,
+    direction,
+    num,
+    den,
+    decimalValue,
+    decimalPlaces,
+    answerKind: direction === 'decimal-to-fraction' ? 'fraction' : 'decimal',
+    answerNum: num,
+    answerDen: den,
+    answer: decimalValue,
+    answerDecimals: decimalPlaces,
+    isRetry: false,
+  };
+}
+
+function createDecimalFractionConvertProblem(_level) {
+  for (let attempt = 0; attempt < 160; attempt += 1) {
+    const den = pickDecimalFractionConvertDenominator();
+    const numMax = Math.min(den * 9, DECIMAL_FRACTION_CONVERT_ANSWER_MAX);
+    const num = randomWhole(1, numMax);
+
+    if (gcd(num, den) !== 1) {
+      continue;
+    }
+
+    const decimalValue = num / den;
+    const decimalPlaces = getExactDecimalPlaces(
+      decimalValue,
+      DECIMAL_FRACTION_CONVERT_MAX_DECIMAL_PLACES,
+    );
+
+    if (decimalPlaces === null) {
+      continue;
+    }
+
+    const direction = Math.random() < 0.5
+      ? 'decimal-to-fraction'
+      : 'fraction-to-decimal';
+
+    return buildDecimalFractionConvertProblem({
+      level: 1,
+      direction,
+      num,
+      den,
+      decimalValue,
+      decimalPlaces,
+    });
+  }
+
+  return buildDecimalFractionConvertProblem({
+    level: 1,
+    direction: 'decimal-to-fraction',
+    num: 3,
+    den: 10,
+    decimalValue: 0.3,
+    decimalPlaces: 1,
+  });
+}
+
+function decimalFractionConvertProblemFromRetry(dueRetry) {
+  return {
+    type: 'decimal-fraction-convert',
+    level: dueRetry.level,
+    direction: dueRetry.direction,
+    num: dueRetry.num,
+    den: dueRetry.den,
+    decimalValue: dueRetry.decimalValue,
+    decimalPlaces: dueRetry.decimalPlaces,
+    answerKind: dueRetry.answerKind,
+    answerNum: dueRetry.answerNum,
+    answerDen: dueRetry.answerDen,
+    answer: dueRetry.answer,
+    answerDecimals: dueRetry.answerDecimals,
+    isRetry: true,
+  };
+}
+
+function formatDecimalFractionConvertProblemText(problem) {
+  if (problem.direction === 'decimal-to-fraction') {
+    return `${formatDecimal(problem.decimalValue, problem.decimalPlaces)} =`;
+  }
+
+  return `${problem.num}/${problem.den} =`;
+}
+
+function formatDecimalFractionConvertDisplayHtml(problem) {
+  if (problem.direction === 'decimal-to-fraction') {
+    return `<span class="problem-expression"><span class="problem-expression__term">${escapeHtml(formatDecimal(problem.decimalValue, problem.decimalPlaces))}</span><span class="problem-expression__equals">=</span></span>`;
+  }
+
+  return `<span class="problem-expression">${formatSingleFractionHtml(problem.num, problem.den)}<span class="problem-expression__equals">=</span></span>`;
+}
+
+function evaluateDecimalFractionConvertAnswer(problem, userAnswer) {
+  if (problem.answerKind === 'fraction') {
+    const isCorrect = userAnswer.num * problem.answerDen === problem.answerNum * userAnswer.den;
+
+    return {
+      isCorrect,
+      feedbackMessage: isCorrect ? 'Správně!' : 'Špatně.',
+    };
+  }
+
+  const isCorrect = answersMatch(userAnswer, problem.answer, problem.answerDecimals);
+
+  return {
+    isCorrect,
+    feedbackMessage: isCorrect ? 'Správně!' : 'Špatně.',
+  };
+}
+
+function isLengthConvertProblem(problem) {
+  return problem?.type === 'length-convert';
+}
+
+function isLengthConvertOrderProblem(problem) {
+  return isLengthConvertProblem(problem) && problem.variant === 'order';
+}
+
+function isWeightConvertProblem(problem) {
+  return problem?.type === 'weight-convert';
+}
+
+function isWeightConvertOrderProblem(problem) {
+  return isWeightConvertProblem(problem) && problem.variant === 'order';
+}
+
+function isAreaConvertProblem(problem) {
+  return problem?.type === 'area-convert';
+}
+
+function isAreaConvertOrderProblem(problem) {
+  return isAreaConvertProblem(problem) && problem.variant === 'order';
+}
+
+function isVolumeConvertProblem(problem) {
+  return problem?.type === 'volume-convert';
+}
+
+function isVolumeConvertOrderProblem(problem) {
+  return isVolumeConvertProblem(problem) && problem.variant === 'order';
+}
+
+function isUnitConvertOrderProblem(problem) {
+  return isLengthConvertOrderProblem(problem)
+    || isWeightConvertOrderProblem(problem)
+    || isAreaConvertOrderProblem(problem)
+    || isVolumeConvertOrderProblem(problem);
+}
+
+function usesCompareSortOrderUi(problem) {
+  return (isCompareProblem(problem) && problem.variant === 'order')
+    || isUnitConvertOrderProblem(problem);
+}
+
+function lengthToMillimeters(value, unit) {
+  return value * LENGTH_UNIT_TO_MM[unit];
+}
+
+function convertLengthValue(value, fromUnit, toUnit) {
+  return lengthToMillimeters(value, fromUnit) / LENGTH_UNIT_TO_MM[toUnit];
+}
+
+function formatLengthWithUnit(value, unit, decimals = null) {
+  return `${formatLengthValue(value, decimals)} ${unit}`;
+}
+
+function getLengthValueDecimals(value, maxDecimals = 3) {
+  if (Number.isInteger(value)) {
+    return 0;
+  }
+
+  for (let decimals = 1; decimals <= maxDecimals; decimals += 1) {
+    if (valueFitsDecimalPlaces(value, decimals)) {
+      return decimals;
+    }
+  }
+
+  return maxDecimals;
+}
+
+function formatLengthValue(value, decimals = null) {
+  const resolvedDecimals = decimals ?? getLengthValueDecimals(value);
+
+  if (resolvedDecimals === 0) {
+    return String(value);
+  }
+
+  return formatDecimal(value, resolvedDecimals);
+}
+
+function getLengthConvertDecimalPlaces(displayLevel) {
+  if (displayLevel === 1) {
+    return Math.random() < 0.45 ? 1 : 0;
+  }
+
+  if (displayLevel === 2) {
+    return pickRandomItem([0, 0, 1, 1]);
+  }
+
+  if (displayLevel === 3) {
+    return pickRandomItem([0, 1, 1, 2]);
+  }
+
+  return pickRandomItem([0, 1, 2, 2, 3]);
+}
+
+function pickLengthConvertValue(minValue, maxValue, decimals) {
+  if (decimals === 0) {
+    return randomWhole(minValue, maxValue);
+  }
+
+  return randomDecimal(minValue, maxValue, decimals);
+}
+
+function getLengthMillimeterKey(value, unit) {
+  return toScaled(lengthToMillimeters(value, unit), 3);
+}
+
+function getLengthConvertValueRange(displayLevel) {
+  if (displayLevel === 1) {
+    return [1, 12];
+  }
+
+  if (displayLevel === 2) {
+    return [1, 50];
+  }
+
+  if (displayLevel === 3) {
+    return [1, 80];
+  }
+
+  return [1, 150];
+}
+
+function getLengthConvertUnitPairs(displayLevel) {
+  const pairs = [];
+
+  for (let i = 0; i < LENGTH_UNIT_ORDER.length - 1; i += 1) {
+    pairs.push(
+      [LENGTH_UNIT_ORDER[i], LENGTH_UNIT_ORDER[i + 1]],
+      [LENGTH_UNIT_ORDER[i + 1], LENGTH_UNIT_ORDER[i]],
+    );
+  }
+
+  if (displayLevel >= 3) {
+    for (let i = 0; i < LENGTH_UNIT_ORDER.length - 2; i += 1) {
+      pairs.push(
+        [LENGTH_UNIT_ORDER[i], LENGTH_UNIT_ORDER[i + 2]],
+        [LENGTH_UNIT_ORDER[i + 2], LENGTH_UNIT_ORDER[i]],
+      );
+    }
+  }
+
+  if (displayLevel >= 4) {
+    for (let i = 0; i < LENGTH_UNIT_ORDER.length; i += 1) {
+      for (let j = 0; j < LENGTH_UNIT_ORDER.length; j += 1) {
+        if (i !== j) {
+          pairs.push([LENGTH_UNIT_ORDER[i], LENGTH_UNIT_ORDER[j]]);
+        }
+      }
+    }
+  }
+
+  return pairs;
+}
+
+function getLengthSortedIndices(operands) {
+  return operands
+    .map((operand, index) => ({
+      index,
+      value: lengthToMillimeters(operand.value, operand.unit),
+    }))
+    .sort((a, b) => a.value - b.value)
+    .map((item) => item.index);
+}
+
+function buildLengthConvertProblem({
+  level,
+  variant,
+  fromValue = null,
+  fromUnit = null,
+  toUnit = null,
+  fromValueDecimals = null,
+  answer = null,
+  answerDecimals = null,
+  operands = null,
+  correctOrder = null,
+  displayOrder = null,
+}) {
+  return {
+    type: 'length-convert',
+    variant,
+    level,
+    fromValue,
+    fromUnit,
+    toUnit,
+    fromValueDecimals,
+    answer,
+    answerDecimals,
+    operands,
+    correctOrder,
+    displayOrder,
+    isRetry: false,
+  };
+}
+
+function createLengthConvertConvertProblem(displayLevel) {
+  const pairs = getLengthConvertUnitPairs(displayLevel);
+  const [minValue, maxValue] = getLengthConvertValueRange(displayLevel);
+
+  for (let attempt = 0; attempt < 160; attempt += 1) {
+    const [fromUnit, toUnit] = pickRandomItem(pairs);
+    const fromValueDecimals = getLengthConvertDecimalPlaces(displayLevel);
+    const fromValue = pickLengthConvertValue(minValue, maxValue, fromValueDecimals);
+    const answerRaw = convertLengthValue(fromValue, fromUnit, toUnit);
+    const answerDecimals = getExactDecimalPlaces(answerRaw, 3);
+
+    if (answerRaw <= 0 || answerDecimals === null || answerRaw > LENGTH_CONVERT_ANSWER_MAX) {
+      continue;
+    }
+
+    const answer = fromScaled(toScaled(answerRaw, answerDecimals), answerDecimals);
+
+    return buildLengthConvertProblem({
+      level: displayLevel,
+      variant: 'convert',
+      fromValue,
+      fromUnit,
+      toUnit,
+      fromValueDecimals,
+      answer,
+      answerDecimals,
+    });
+  }
+
+  return buildLengthConvertProblem({
+    level: displayLevel,
+    variant: 'convert',
+    fromValue: 2.5,
+    fromUnit: 'cm',
+    toUnit: 'mm',
+    fromValueDecimals: 1,
+    answer: 25,
+    answerDecimals: 0,
+  });
+}
+
+function pickLengthConvertOrderOperand(unit) {
+  const maxValue = unit === 'km' ? 5 : unit === 'm' ? 90 : unit === 'dm' ? 120 : 250;
+  const decimals = pickRandomItem([0, 0, 1, 1, 2]);
+
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const value = pickLengthConvertValue(1, maxValue, decimals);
+    const resolvedDecimals = getLengthValueDecimals(value, 2);
+
+    if (value <= 0) {
+      continue;
+    }
+
+    return {
+      value: fromScaled(toScaled(value, resolvedDecimals), resolvedDecimals),
+      unit,
+      decimals: resolvedDecimals,
+    };
+  }
+
+  return {
+    value: randomWhole(1, Math.min(maxValue, 20)),
+    unit,
+    decimals: 0,
+  };
+}
+
+function createLengthConvertOrderProblem(displayLevel) {
+  for (let attempt = 0; attempt < 160; attempt += 1) {
+    const units = shuffleArray([...LENGTH_UNIT_ORDER]).slice(0, 4);
+    const operands = [];
+    const usedMillimeters = new Set();
+
+    let valid = true;
+
+    units.forEach((unit) => {
+      let operand = null;
+
+      for (let innerAttempt = 0; innerAttempt < 40; innerAttempt += 1) {
+        const candidate = pickLengthConvertOrderOperand(unit);
+        const millimeterKey = getLengthMillimeterKey(candidate.value, candidate.unit);
+
+        if (!usedMillimeters.has(millimeterKey)) {
+          usedMillimeters.add(millimeterKey);
+          operand = candidate;
+          break;
+        }
+      }
+
+      if (!operand) {
+        valid = false;
+      } else {
+        operands.push(operand);
+      }
+    });
+
+    if (!valid || operands.length !== 4) {
+      continue;
+    }
+
+    let displayOrder = shuffleIndices(operands.length);
+    const correctOrder = getLengthSortedIndices(operands);
+
+    while (displayOrder.every((value, index) => value === correctOrder[index])) {
+      displayOrder = shuffleIndices(operands.length);
+    }
+
+    return buildLengthConvertProblem({
+      level: displayLevel,
+      variant: 'order',
+      operands,
+      correctOrder,
+      displayOrder,
+    });
+  }
+
+  return buildLengthConvertProblem({
+    level: displayLevel,
+    variant: 'order',
+    operands: [
+      { value: 5, unit: 'cm', decimals: 0 },
+      { value: 2.5, unit: 'dm', decimals: 1 },
+      { value: 3.5, unit: 'mm', decimals: 1 },
+      { value: 1.2, unit: 'm', decimals: 1 },
+    ],
+    correctOrder: [2, 0, 1, 3],
+    displayOrder: [0, 2, 1, 3],
+  });
+}
+
+function createLengthConvertProblem(level) {
+  const displayLevel = level + 1;
+
+  if (displayLevel <= 4) {
+    return createLengthConvertConvertProblem(displayLevel);
+  }
+
+  return createLengthConvertOrderProblem(displayLevel);
+}
+
+function lengthConvertProblemFromRetry(dueRetry) {
+  const problem = buildLengthConvertProblem({
+    level: dueRetry.level,
+    variant: dueRetry.variant,
+    fromValue: dueRetry.fromValue ?? null,
+    fromUnit: dueRetry.fromUnit ?? null,
+    toUnit: dueRetry.toUnit ?? null,
+    fromValueDecimals: dueRetry.fromValueDecimals ?? null,
+    answer: dueRetry.answer ?? null,
+    answerDecimals: dueRetry.answerDecimals ?? null,
+    operands: dueRetry.operands ? dueRetry.operands.map((operand) => ({ ...operand })) : null,
+    correctOrder: dueRetry.correctOrder ? [...dueRetry.correctOrder] : null,
+  });
+
+  if (dueRetry.variant === 'order') {
+    problem.displayOrder = dueRetry.displayOrder
+      ? [...dueRetry.displayOrder]
+      : shuffleIndices(problem.operands.length);
+  }
+
+  problem.isRetry = true;
+  return problem;
+}
+
+function formatLengthConvertOperandText(operand) {
+  return formatLengthWithUnit(operand.value, operand.unit, operand.decimals);
+}
+
+function formatLengthConvertOrderListText(problem, order) {
+  return order
+    .map((operandIndex) => formatLengthConvertOperandText(problem.operands[operandIndex]))
+    .join(' < ');
+}
+
+function formatLengthConvertProblemText(problem) {
+  if (problem.variant === 'order') {
+    const order = problem.displayOrder ?? shuffleIndices(problem.operands.length);
+    return `Uspořádej: ${formatLengthConvertOrderListText(problem, order)}`;
+  }
+
+  return `${formatLengthWithUnit(problem.fromValue, problem.fromUnit, problem.fromValueDecimals)} = ? ${problem.toUnit}`;
+}
+
+function formatLengthConvertDisplayHtml(problem) {
+  if (problem.variant === 'order') {
+    return '<span class="problem-expression problem-expression--decimal-compare">Uspořádej délky od nejmenší po největší</span>';
+  }
+
+  return `<span class="problem-expression"><span class="problem-expression__term">${escapeHtml(formatLengthWithUnit(problem.fromValue, problem.fromUnit, problem.fromValueDecimals))}</span><span class="problem-expression__equals">=</span><span class="problem-expression__term">? ${escapeHtml(problem.toUnit)}</span></span>`;
+}
+
+function evaluateLengthConvertAnswer(problem, userAnswer) {
+  if (problem.variant === 'convert') {
+    const isCorrect = answersMatch(userAnswer, problem.answer, problem.answerDecimals);
+
+    return {
+      isCorrect,
+      feedbackMessage: isCorrect ? 'Správně!' : 'Špatně.',
+    };
+  }
+
+  const isCorrect = userAnswer?.kind === 'order'
+    && userAnswer.order.every((value, index) => value === problem.correctOrder[index]);
+
+  return {
+    isCorrect,
+    feedbackMessage: isCorrect ? 'Správně!' : 'Špatně.',
+  };
+}
+
+function getLengthConvertUserAnswer(problem) {
+  if (problem.variant === 'convert') {
+    return parseAnswer(inputEl.value);
+  }
+
+  if (!Array.isArray(decimalCompareSortOrder) || decimalCompareSortOrder.length !== problem.operands.length) {
+    return null;
+  }
+
+  return { kind: 'order', order: [...decimalCompareSortOrder] };
+}
+
+function weightToMilligrams(value, unit) {
+  return value * WEIGHT_UNIT_TO_MG[unit];
+}
+
+function convertWeightValue(value, fromUnit, toUnit) {
+  return weightToMilligrams(value, fromUnit) / WEIGHT_UNIT_TO_MG[toUnit];
+}
+
+function formatWeightWithUnit(value, unit, decimals = null) {
+  return `${formatWeightValue(value, decimals)} ${unit}`;
+}
+
+function getWeightValueDecimals(value, maxDecimals = 3) {
+  if (Number.isInteger(value)) {
+    return 0;
+  }
+
+  for (let decimals = 1; decimals <= maxDecimals; decimals += 1) {
+    if (valueFitsDecimalPlaces(value, decimals)) {
+      return decimals;
+    }
+  }
+
+  return maxDecimals;
+}
+
+function formatWeightValue(value, decimals = null) {
+  const resolvedDecimals = decimals ?? getWeightValueDecimals(value);
+
+  if (resolvedDecimals === 0) {
+    return String(value);
+  }
+
+  return formatDecimal(value, resolvedDecimals);
+}
+
+function getWeightConvertDecimalPlaces(displayLevel) {
+  if (displayLevel === 1) {
+    return Math.random() < 0.45 ? 1 : 0;
+  }
+
+  if (displayLevel === 2) {
+    return pickRandomItem([0, 0, 1, 1]);
+  }
+
+  if (displayLevel === 3) {
+    return pickRandomItem([0, 1, 1, 2]);
+  }
+
+  return pickRandomItem([0, 1, 2, 2, 3]);
+}
+
+function pickWeightConvertValue(minValue, maxValue, decimals) {
+  if (decimals === 0) {
+    return randomWhole(minValue, maxValue);
+  }
+
+  return randomDecimal(minValue, maxValue, decimals);
+}
+
+function getWeightMilligramKey(value, unit) {
+  return toScaled(weightToMilligrams(value, unit), 3);
+}
+
+function getWeightConvertValueRange(displayLevel) {
+  if (displayLevel === 1) {
+    return [1, 12];
+  }
+
+  if (displayLevel === 2) {
+    return [1, 50];
+  }
+
+  if (displayLevel === 3) {
+    return [1, 80];
+  }
+
+  return [1, 150];
+}
+
+function getWeightConvertUnitPairs(displayLevel) {
+  const pairs = [];
+
+  for (let i = 0; i < WEIGHT_UNIT_ORDER.length - 1; i += 1) {
+    pairs.push(
+      [WEIGHT_UNIT_ORDER[i], WEIGHT_UNIT_ORDER[i + 1]],
+      [WEIGHT_UNIT_ORDER[i + 1], WEIGHT_UNIT_ORDER[i]],
+    );
+  }
+
+  if (displayLevel >= 3) {
+    for (let i = 0; i < WEIGHT_UNIT_ORDER.length - 2; i += 1) {
+      pairs.push(
+        [WEIGHT_UNIT_ORDER[i], WEIGHT_UNIT_ORDER[i + 2]],
+        [WEIGHT_UNIT_ORDER[i + 2], WEIGHT_UNIT_ORDER[i]],
+      );
+    }
+  }
+
+  if (displayLevel >= 4) {
+    for (let i = 0; i < WEIGHT_UNIT_ORDER.length; i += 1) {
+      for (let j = 0; j < WEIGHT_UNIT_ORDER.length; j += 1) {
+        if (i !== j) {
+          pairs.push([WEIGHT_UNIT_ORDER[i], WEIGHT_UNIT_ORDER[j]]);
+        }
+      }
+    }
+  }
+
+  return pairs;
+}
+
+function getWeightSortedIndices(operands) {
+  return operands
+    .map((operand, index) => ({
+      index,
+      value: weightToMilligrams(operand.value, operand.unit),
+    }))
+    .sort((a, b) => a.value - b.value)
+    .map((item) => item.index);
+}
+
+function buildWeightConvertProblem({
+  level,
+  variant,
+  fromValue = null,
+  fromUnit = null,
+  toUnit = null,
+  fromValueDecimals = null,
+  answer = null,
+  answerDecimals = null,
+  operands = null,
+  correctOrder = null,
+  displayOrder = null,
+}) {
+  return {
+    type: 'weight-convert',
+    variant,
+    level,
+    fromValue,
+    fromUnit,
+    toUnit,
+    fromValueDecimals,
+    answer,
+    answerDecimals,
+    operands,
+    correctOrder,
+    displayOrder,
+    isRetry: false,
+  };
+}
+
+function createWeightConvertConvertProblem(displayLevel) {
+  const pairs = getWeightConvertUnitPairs(displayLevel);
+  const [minValue, maxValue] = getWeightConvertValueRange(displayLevel);
+
+  for (let attempt = 0; attempt < 160; attempt += 1) {
+    const [fromUnit, toUnit] = pickRandomItem(pairs);
+    const fromValueDecimals = getWeightConvertDecimalPlaces(displayLevel);
+    const fromValue = pickWeightConvertValue(minValue, maxValue, fromValueDecimals);
+    const answerRaw = convertWeightValue(fromValue, fromUnit, toUnit);
+    const answerDecimals = getExactDecimalPlaces(answerRaw, 3);
+
+    if (answerRaw <= 0 || answerDecimals === null || answerRaw > WEIGHT_CONVERT_ANSWER_MAX) {
+      continue;
+    }
+
+    const answer = fromScaled(toScaled(answerRaw, answerDecimals), answerDecimals);
+
+    return buildWeightConvertProblem({
+      level: displayLevel,
+      variant: 'convert',
+      fromValue,
+      fromUnit,
+      toUnit,
+      fromValueDecimals,
+      answer,
+      answerDecimals,
+    });
+  }
+
+  return buildWeightConvertProblem({
+    level: displayLevel,
+    variant: 'convert',
+    fromValue: 2.5,
+    fromUnit: 'g',
+    toUnit: 'mg',
+    fromValueDecimals: 1,
+    answer: 2500,
+    answerDecimals: 0,
+  });
+}
+
+function pickWeightConvertOrderOperand(unit) {
+  const maxValue = unit === 't' ? 5 : unit === 'kg' ? 90 : unit === 'dag' ? 120 : 250;
+  const decimals = pickRandomItem([0, 0, 1, 1, 2]);
+
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const value = pickWeightConvertValue(1, maxValue, decimals);
+    const resolvedDecimals = getWeightValueDecimals(value, 2);
+
+    if (value <= 0) {
+      continue;
+    }
+
+    return {
+      value: fromScaled(toScaled(value, resolvedDecimals), resolvedDecimals),
+      unit,
+      decimals: resolvedDecimals,
+    };
+  }
+
+  return {
+    value: randomWhole(1, Math.min(maxValue, 20)),
+    unit,
+    decimals: 0,
+  };
+}
+
+function createWeightConvertOrderProblem(displayLevel) {
+  for (let attempt = 0; attempt < 160; attempt += 1) {
+    const units = shuffleArray([...WEIGHT_UNIT_ORDER]).slice(0, 4);
+    const operands = [];
+    const usedMilligrams = new Set();
+
+    let valid = true;
+
+    units.forEach((unit) => {
+      let operand = null;
+
+      for (let innerAttempt = 0; innerAttempt < 40; innerAttempt += 1) {
+        const candidate = pickWeightConvertOrderOperand(unit);
+        const milligramKey = getWeightMilligramKey(candidate.value, candidate.unit);
+
+        if (!usedMilligrams.has(milligramKey)) {
+          usedMilligrams.add(milligramKey);
+          operand = candidate;
+          break;
+        }
+      }
+
+      if (!operand) {
+        valid = false;
+      } else {
+        operands.push(operand);
+      }
+    });
+
+    if (!valid || operands.length !== 4) {
+      continue;
+    }
+
+    let displayOrder = shuffleIndices(operands.length);
+    const correctOrder = getWeightSortedIndices(operands);
+
+    while (displayOrder.every((value, index) => value === correctOrder[index])) {
+      displayOrder = shuffleIndices(operands.length);
+    }
+
+    return buildWeightConvertProblem({
+      level: displayLevel,
+      variant: 'order',
+      operands,
+      correctOrder,
+      displayOrder,
+    });
+  }
+
+  return buildWeightConvertProblem({
+    level: displayLevel,
+    variant: 'order',
+    operands: [
+      { value: 500, unit: 'mg', decimals: 0 },
+      { value: 2.5, unit: 'g', decimals: 1 },
+      { value: 3, unit: 'dag', decimals: 0 },
+      { value: 1.2, unit: 'kg', decimals: 1 },
+    ],
+    correctOrder: [0, 1, 2, 3],
+    displayOrder: [1, 0, 2, 3],
+  });
+}
+
+function createWeightConvertProblem(level) {
+  const displayLevel = level + 1;
+
+  if (displayLevel <= 4) {
+    return createWeightConvertConvertProblem(displayLevel);
+  }
+
+  return createWeightConvertOrderProblem(displayLevel);
+}
+
+function weightConvertProblemFromRetry(dueRetry) {
+  const problem = buildWeightConvertProblem({
+    level: dueRetry.level,
+    variant: dueRetry.variant,
+    fromValue: dueRetry.fromValue ?? null,
+    fromUnit: dueRetry.fromUnit ?? null,
+    toUnit: dueRetry.toUnit ?? null,
+    fromValueDecimals: dueRetry.fromValueDecimals ?? null,
+    answer: dueRetry.answer ?? null,
+    answerDecimals: dueRetry.answerDecimals ?? null,
+    operands: dueRetry.operands ? dueRetry.operands.map((operand) => ({ ...operand })) : null,
+    correctOrder: dueRetry.correctOrder ? [...dueRetry.correctOrder] : null,
+  });
+
+  if (dueRetry.variant === 'order') {
+    problem.displayOrder = dueRetry.displayOrder
+      ? [...dueRetry.displayOrder]
+      : shuffleIndices(problem.operands.length);
+  }
+
+  problem.isRetry = true;
+  return problem;
+}
+
+function formatWeightConvertOperandText(operand) {
+  return formatWeightWithUnit(operand.value, operand.unit, operand.decimals);
+}
+
+function formatWeightConvertOrderListText(problem, order) {
+  return order
+    .map((operandIndex) => formatWeightConvertOperandText(problem.operands[operandIndex]))
+    .join(' < ');
+}
+
+function formatWeightConvertProblemText(problem) {
+  if (problem.variant === 'order') {
+    const order = problem.displayOrder ?? shuffleIndices(problem.operands.length);
+    return `Uspořádej: ${formatWeightConvertOrderListText(problem, order)}`;
+  }
+
+  return `${formatWeightWithUnit(problem.fromValue, problem.fromUnit, problem.fromValueDecimals)} = ? ${problem.toUnit}`;
+}
+
+function formatWeightConvertDisplayHtml(problem) {
+  if (problem.variant === 'order') {
+    return '<span class="problem-expression problem-expression--decimal-compare">Uspořádej hmotnosti od nejmenší po největší</span>';
+  }
+
+  return `<span class="problem-expression"><span class="problem-expression__term">${escapeHtml(formatWeightWithUnit(problem.fromValue, problem.fromUnit, problem.fromValueDecimals))}</span><span class="problem-expression__equals">=</span><span class="problem-expression__term">? ${escapeHtml(problem.toUnit)}</span></span>`;
+}
+
+function evaluateWeightConvertAnswer(problem, userAnswer) {
+  if (problem.variant === 'convert') {
+    const isCorrect = answersMatch(userAnswer, problem.answer, problem.answerDecimals);
+
+    return {
+      isCorrect,
+      feedbackMessage: isCorrect ? 'Správně!' : 'Špatně.',
+    };
+  }
+
+  const isCorrect = userAnswer?.kind === 'order'
+    && userAnswer.order.every((value, index) => value === problem.correctOrder[index]);
+
+  return {
+    isCorrect,
+    feedbackMessage: isCorrect ? 'Správně!' : 'Špatně.',
+  };
+}
+
+function getWeightConvertUserAnswer(problem) {
+  if (problem.variant === 'convert') {
+    return parseAnswer(inputEl.value);
+  }
+
+  if (!Array.isArray(decimalCompareSortOrder) || decimalCompareSortOrder.length !== problem.operands.length) {
+    return null;
+  }
+
+  return { kind: 'order', order: [...decimalCompareSortOrder] };
+}
+
+function formatAreaUnit(unit) {
+  return AREA_UNIT_LABELS[unit] ?? unit;
+}
+
+function areaToSquareMillimeters(value, unit) {
+  return value * AREA_UNIT_TO_MM2[unit];
+}
+
+function convertAreaValue(value, fromUnit, toUnit) {
+  return areaToSquareMillimeters(value, fromUnit) / AREA_UNIT_TO_MM2[toUnit];
+}
+
+function formatAreaWithUnit(value, unit, decimals = null) {
+  return `${formatAreaValue(value, decimals)} ${formatAreaUnit(unit)}`;
+}
+
+function getAreaValueDecimals(value, maxDecimals = 3) {
+  if (Number.isInteger(value)) {
+    return 0;
+  }
+
+  for (let decimals = 1; decimals <= maxDecimals; decimals += 1) {
+    if (valueFitsDecimalPlaces(value, decimals)) {
+      return decimals;
+    }
+  }
+
+  return maxDecimals;
+}
+
+function formatAreaValue(value, decimals = null) {
+  const resolvedDecimals = decimals ?? getAreaValueDecimals(value);
+
+  if (resolvedDecimals === 0) {
+    return String(value);
+  }
+
+  return formatDecimal(value, resolvedDecimals);
+}
+
+function getAreaConvertDecimalPlaces(displayLevel) {
+  if (displayLevel === 1) {
+    return Math.random() < 0.45 ? 1 : 0;
+  }
+
+  if (displayLevel === 2) {
+    return pickRandomItem([0, 0, 1, 1]);
+  }
+
+  if (displayLevel === 3) {
+    return pickRandomItem([0, 1, 1, 2]);
+  }
+
+  return pickRandomItem([0, 1, 2, 2, 3]);
+}
+
+function pickAreaConvertValue(minValue, maxValue, decimals) {
+  if (decimals === 0) {
+    return randomWhole(minValue, maxValue);
+  }
+
+  return randomDecimal(minValue, maxValue, decimals);
+}
+
+function getAreaSquareMillimeterKey(value, unit) {
+  return toScaled(areaToSquareMillimeters(value, unit), 3);
+}
+
+function getAreaConvertValueRange(displayLevel) {
+  if (displayLevel === 1) {
+    return [1, 12];
+  }
+
+  if (displayLevel === 2) {
+    return [1, 50];
+  }
+
+  if (displayLevel === 3) {
+    return [1, 80];
+  }
+
+  return [1, 150];
+}
+
+function getAreaConvertUnitPairs(displayLevel) {
+  const pairs = [];
+
+  for (let i = 0; i < AREA_UNIT_ORDER.length - 1; i += 1) {
+    pairs.push(
+      [AREA_UNIT_ORDER[i], AREA_UNIT_ORDER[i + 1]],
+      [AREA_UNIT_ORDER[i + 1], AREA_UNIT_ORDER[i]],
+    );
+  }
+
+  if (displayLevel >= 3) {
+    for (let i = 0; i < AREA_UNIT_ORDER.length - 2; i += 1) {
+      pairs.push(
+        [AREA_UNIT_ORDER[i], AREA_UNIT_ORDER[i + 2]],
+        [AREA_UNIT_ORDER[i + 2], AREA_UNIT_ORDER[i]],
+      );
+    }
+  }
+
+  if (displayLevel >= 4) {
+    for (let i = 0; i < AREA_UNIT_ORDER.length; i += 1) {
+      for (let j = 0; j < AREA_UNIT_ORDER.length; j += 1) {
+        if (i !== j) {
+          pairs.push([AREA_UNIT_ORDER[i], AREA_UNIT_ORDER[j]]);
+        }
+      }
+    }
+  }
+
+  return pairs;
+}
+
+function getAreaSortedIndices(operands) {
+  return operands
+    .map((operand, index) => ({
+      index,
+      value: areaToSquareMillimeters(operand.value, operand.unit),
+    }))
+    .sort((a, b) => a.value - b.value)
+    .map((item) => item.index);
+}
+
+function buildAreaConvertProblem({
+  level,
+  variant,
+  fromValue = null,
+  fromUnit = null,
+  toUnit = null,
+  fromValueDecimals = null,
+  answer = null,
+  answerDecimals = null,
+  operands = null,
+  correctOrder = null,
+  displayOrder = null,
+}) {
+  return {
+    type: 'area-convert',
+    variant,
+    level,
+    fromValue,
+    fromUnit,
+    toUnit,
+    fromValueDecimals,
+    answer,
+    answerDecimals,
+    operands,
+    correctOrder,
+    displayOrder,
+    isRetry: false,
+  };
+}
+
+function createAreaConvertConvertProblem(displayLevel) {
+  const pairs = getAreaConvertUnitPairs(displayLevel);
+  const [minValue, maxValue] = getAreaConvertValueRange(displayLevel);
+
+  for (let attempt = 0; attempt < 160; attempt += 1) {
+    const [fromUnit, toUnit] = pickRandomItem(pairs);
+    const fromValueDecimals = getAreaConvertDecimalPlaces(displayLevel);
+    const fromValue = pickAreaConvertValue(minValue, maxValue, fromValueDecimals);
+    const answerRaw = convertAreaValue(fromValue, fromUnit, toUnit);
+    const answerDecimals = getExactDecimalPlaces(answerRaw, 3);
+
+    if (answerRaw <= 0 || answerDecimals === null || answerRaw > AREA_CONVERT_ANSWER_MAX) {
+      continue;
+    }
+
+    const answer = fromScaled(toScaled(answerRaw, answerDecimals), answerDecimals);
+
+    return buildAreaConvertProblem({
+      level: displayLevel,
+      variant: 'convert',
+      fromValue,
+      fromUnit,
+      toUnit,
+      fromValueDecimals,
+      answer,
+      answerDecimals,
+    });
+  }
+
+  return buildAreaConvertProblem({
+    level: displayLevel,
+    variant: 'convert',
+    fromValue: 2.5,
+    fromUnit: 'cm2',
+    toUnit: 'mm2',
+    fromValueDecimals: 1,
+    answer: 250,
+    answerDecimals: 0,
+  });
+}
+
+function pickAreaConvertOrderOperand(unit) {
+  const maxValue = unit === 'ha' ? 5 : unit === 'a' ? 50 : unit === 'km2' ? 3 : unit === 'm2' ? 90 : unit === 'dm2' ? 120 : 250;
+  const decimals = pickRandomItem([0, 0, 1, 1, 2]);
+
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const value = pickAreaConvertValue(1, maxValue, decimals);
+    const resolvedDecimals = getAreaValueDecimals(value, 2);
+
+    if (value <= 0) {
+      continue;
+    }
+
+    return {
+      value: fromScaled(toScaled(value, resolvedDecimals), resolvedDecimals),
+      unit,
+      decimals: resolvedDecimals,
+    };
+  }
+
+  return {
+    value: randomWhole(1, Math.min(maxValue, 20)),
+    unit,
+    decimals: 0,
+  };
+}
+
+function createAreaConvertOrderProblem(displayLevel) {
+  for (let attempt = 0; attempt < 160; attempt += 1) {
+    const units = shuffleArray([...AREA_UNIT_ORDER]).slice(0, 4);
+    const operands = [];
+    const usedSquareMillimeters = new Set();
+
+    let valid = true;
+
+    units.forEach((unit) => {
+      let operand = null;
+
+      for (let innerAttempt = 0; innerAttempt < 40; innerAttempt += 1) {
+        const candidate = pickAreaConvertOrderOperand(unit);
+        const squareMillimeterKey = getAreaSquareMillimeterKey(candidate.value, candidate.unit);
+
+        if (!usedSquareMillimeters.has(squareMillimeterKey)) {
+          usedSquareMillimeters.add(squareMillimeterKey);
+          operand = candidate;
+          break;
+        }
+      }
+
+      if (!operand) {
+        valid = false;
+      } else {
+        operands.push(operand);
+      }
+    });
+
+    if (!valid || operands.length !== 4) {
+      continue;
+    }
+
+    let displayOrder = shuffleIndices(operands.length);
+    const correctOrder = getAreaSortedIndices(operands);
+
+    while (displayOrder.every((value, index) => value === correctOrder[index])) {
+      displayOrder = shuffleIndices(operands.length);
+    }
+
+    return buildAreaConvertProblem({
+      level: displayLevel,
+      variant: 'order',
+      operands,
+      correctOrder,
+      displayOrder,
+    });
+  }
+
+  return buildAreaConvertProblem({
+    level: displayLevel,
+    variant: 'order',
+    operands: [
+      { value: 500, unit: 'mm2', decimals: 0 },
+      { value: 2.5, unit: 'cm2', decimals: 1 },
+      { value: 3, unit: 'dm2', decimals: 0 },
+      { value: 1.2, unit: 'm2', decimals: 1 },
+    ],
+    correctOrder: [1, 0, 2, 3],
+    displayOrder: [0, 2, 1, 3],
+  });
+}
+
+function createAreaConvertProblem(level) {
+  const displayLevel = level + 1;
+
+  if (displayLevel <= 4) {
+    return createAreaConvertConvertProblem(displayLevel);
+  }
+
+  return createAreaConvertOrderProblem(displayLevel);
+}
+
+function areaConvertProblemFromRetry(dueRetry) {
+  const problem = buildAreaConvertProblem({
+    level: dueRetry.level,
+    variant: dueRetry.variant,
+    fromValue: dueRetry.fromValue ?? null,
+    fromUnit: dueRetry.fromUnit ?? null,
+    toUnit: dueRetry.toUnit ?? null,
+    fromValueDecimals: dueRetry.fromValueDecimals ?? null,
+    answer: dueRetry.answer ?? null,
+    answerDecimals: dueRetry.answerDecimals ?? null,
+    operands: dueRetry.operands ? dueRetry.operands.map((operand) => ({ ...operand })) : null,
+    correctOrder: dueRetry.correctOrder ? [...dueRetry.correctOrder] : null,
+  });
+
+  if (dueRetry.variant === 'order') {
+    problem.displayOrder = dueRetry.displayOrder
+      ? [...dueRetry.displayOrder]
+      : shuffleIndices(problem.operands.length);
+  }
+
+  problem.isRetry = true;
+  return problem;
+}
+
+function formatAreaConvertOperandText(operand) {
+  return formatAreaWithUnit(operand.value, operand.unit, operand.decimals);
+}
+
+function formatAreaConvertOrderListText(problem, order) {
+  return order
+    .map((operandIndex) => formatAreaConvertOperandText(problem.operands[operandIndex]))
+    .join(' < ');
+}
+
+function formatAreaConvertProblemText(problem) {
+  if (problem.variant === 'order') {
+    const order = problem.displayOrder ?? shuffleIndices(problem.operands.length);
+    return `Uspořádej: ${formatAreaConvertOrderListText(problem, order)}`;
+  }
+
+  return `${formatAreaWithUnit(problem.fromValue, problem.fromUnit, problem.fromValueDecimals)} = ? ${formatAreaUnit(problem.toUnit)}`;
+}
+
+function formatAreaConvertDisplayHtml(problem) {
+  if (problem.variant === 'order') {
+    return '<span class="problem-expression problem-expression--decimal-compare">Uspořádej obsahy od nejmenšího po největší</span>';
+  }
+
+  return `<span class="problem-expression"><span class="problem-expression__term">${escapeHtml(formatAreaWithUnit(problem.fromValue, problem.fromUnit, problem.fromValueDecimals))}</span><span class="problem-expression__equals">=</span><span class="problem-expression__term">? ${escapeHtml(formatAreaUnit(problem.toUnit))}</span></span>`;
+}
+
+function evaluateAreaConvertAnswer(problem, userAnswer) {
+  if (problem.variant === 'convert') {
+    const isCorrect = answersMatch(userAnswer, problem.answer, problem.answerDecimals);
+
+    return {
+      isCorrect,
+      feedbackMessage: isCorrect ? 'Správně!' : 'Špatně.',
+    };
+  }
+
+  const isCorrect = userAnswer?.kind === 'order'
+    && userAnswer.order.every((value, index) => value === problem.correctOrder[index]);
+
+  return {
+    isCorrect,
+    feedbackMessage: isCorrect ? 'Správně!' : 'Špatně.',
+  };
+}
+
+function getAreaConvertUserAnswer(problem) {
+  if (problem.variant === 'convert') {
+    return parseAnswer(inputEl.value);
+  }
+
+  if (!Array.isArray(decimalCompareSortOrder) || decimalCompareSortOrder.length !== problem.operands.length) {
+    return null;
+  }
+
+  return { kind: 'order', order: [...decimalCompareSortOrder] };
+}
+
+function formatVolumeUnit(unit) {
+  return VOLUME_UNIT_LABELS[unit] ?? unit;
+}
+
+function volumeToCubicMillimeters(value, unit) {
+  return value * VOLUME_UNIT_TO_MM3[unit];
+}
+
+function convertVolumeValue(value, fromUnit, toUnit) {
+  return volumeToCubicMillimeters(value, fromUnit) / VOLUME_UNIT_TO_MM3[toUnit];
+}
+
+function formatVolumeWithUnit(value, unit, decimals = null) {
+  return `${formatVolumeValue(value, decimals)} ${formatVolumeUnit(unit)}`;
+}
+
+function getVolumeValueDecimals(value, maxDecimals = 3) {
+  if (Number.isInteger(value)) {
+    return 0;
+  }
+
+  for (let decimals = 1; decimals <= maxDecimals; decimals += 1) {
+    if (valueFitsDecimalPlaces(value, decimals)) {
+      return decimals;
+    }
+  }
+
+  return maxDecimals;
+}
+
+function formatVolumeValue(value, decimals = null) {
+  const resolvedDecimals = decimals ?? getVolumeValueDecimals(value);
+
+  if (resolvedDecimals === 0) {
+    return String(value);
+  }
+
+  return formatDecimal(value, resolvedDecimals);
+}
+
+function getVolumeConvertDecimalPlaces(displayLevel) {
+  if (displayLevel === 1) {
+    return Math.random() < 0.45 ? 1 : 0;
+  }
+
+  if (displayLevel === 2) {
+    return pickRandomItem([0, 0, 1, 1]);
+  }
+
+  if (displayLevel === 3) {
+    return pickRandomItem([0, 1, 1, 2]);
+  }
+
+  return pickRandomItem([0, 1, 2, 2, 3]);
+}
+
+function pickVolumeConvertValue(minValue, maxValue, decimals) {
+  if (decimals === 0) {
+    return randomWhole(minValue, maxValue);
+  }
+
+  return randomDecimal(minValue, maxValue, decimals);
+}
+
+function getVolumeCubicMillimeterKey(value, unit) {
+  return toScaled(volumeToCubicMillimeters(value, unit), 3);
+}
+
+function getVolumeConvertValueRange(displayLevel) {
+  if (displayLevel === 1) {
+    return [1, 12];
+  }
+
+  if (displayLevel === 2) {
+    return [1, 50];
+  }
+
+  if (displayLevel === 3) {
+    return [1, 80];
+  }
+
+  return [1, 150];
+}
+
+function getVolumeConvertUnitPairs(displayLevel) {
+  const pairs = [];
+
+  for (let i = 0; i < VOLUME_UNIT_ORDER.length - 1; i += 1) {
+    pairs.push(
+      [VOLUME_UNIT_ORDER[i], VOLUME_UNIT_ORDER[i + 1]],
+      [VOLUME_UNIT_ORDER[i + 1], VOLUME_UNIT_ORDER[i]],
+    );
+  }
+
+  if (displayLevel >= 3) {
+    for (let i = 0; i < VOLUME_UNIT_ORDER.length - 2; i += 1) {
+      pairs.push(
+        [VOLUME_UNIT_ORDER[i], VOLUME_UNIT_ORDER[i + 2]],
+        [VOLUME_UNIT_ORDER[i + 2], VOLUME_UNIT_ORDER[i]],
+      );
+    }
+  }
+
+  if (displayLevel >= 4) {
+    for (let i = 0; i < VOLUME_UNIT_ORDER.length; i += 1) {
+      for (let j = 0; j < VOLUME_UNIT_ORDER.length; j += 1) {
+        if (i !== j) {
+          pairs.push([VOLUME_UNIT_ORDER[i], VOLUME_UNIT_ORDER[j]]);
+        }
+      }
+    }
+  }
+
+  return pairs;
+}
+
+function getVolumeSortedIndices(operands) {
+  return operands
+    .map((operand, index) => ({
+      index,
+      value: volumeToCubicMillimeters(operand.value, operand.unit),
+    }))
+    .sort((a, b) => a.value - b.value)
+    .map((item) => item.index);
+}
+
+function buildVolumeConvertProblem({
+  level,
+  variant,
+  fromValue = null,
+  fromUnit = null,
+  toUnit = null,
+  fromValueDecimals = null,
+  answer = null,
+  answerDecimals = null,
+  operands = null,
+  correctOrder = null,
+  displayOrder = null,
+}) {
+  return {
+    type: 'volume-convert',
+    variant,
+    level,
+    fromValue,
+    fromUnit,
+    toUnit,
+    fromValueDecimals,
+    answer,
+    answerDecimals,
+    operands,
+    correctOrder,
+    displayOrder,
+    isRetry: false,
+  };
+}
+
+function createVolumeConvertConvertProblem(displayLevel) {
+  const pairs = getVolumeConvertUnitPairs(displayLevel);
+  const [minValue, maxValue] = getVolumeConvertValueRange(displayLevel);
+
+  for (let attempt = 0; attempt < 160; attempt += 1) {
+    const [fromUnit, toUnit] = pickRandomItem(pairs);
+    const fromValueDecimals = getVolumeConvertDecimalPlaces(displayLevel);
+    const fromValue = pickVolumeConvertValue(minValue, maxValue, fromValueDecimals);
+    const answerRaw = convertVolumeValue(fromValue, fromUnit, toUnit);
+    const answerDecimals = getExactDecimalPlaces(answerRaw, 3);
+
+    if (answerRaw <= 0 || answerDecimals === null || answerRaw > VOLUME_CONVERT_ANSWER_MAX) {
+      continue;
+    }
+
+    const answer = fromScaled(toScaled(answerRaw, answerDecimals), answerDecimals);
+
+    return buildVolumeConvertProblem({
+      level: displayLevel,
+      variant: 'convert',
+      fromValue,
+      fromUnit,
+      toUnit,
+      fromValueDecimals,
+      answer,
+      answerDecimals,
+    });
+  }
+
+  return buildVolumeConvertProblem({
+    level: displayLevel,
+    variant: 'convert',
+    fromValue: 2.5,
+    fromUnit: 'cm3',
+    toUnit: 'mm3',
+    fromValueDecimals: 1,
+    answer: 2500,
+    answerDecimals: 0,
+  });
+}
+
+function pickVolumeConvertOrderOperand(unit) {
+  const maxValue = unit === 'hl' ? 5 : unit === 'l' || unit === 'dm3' ? 50 : unit === 'm3' ? 3 : unit === 'dl' ? 90 : unit === 'cl' ? 120 : 250;
+  const decimals = pickRandomItem([0, 0, 1, 1, 2]);
+
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const value = pickVolumeConvertValue(1, maxValue, decimals);
+    const resolvedDecimals = getVolumeValueDecimals(value, 2);
+
+    if (value <= 0) {
+      continue;
+    }
+
+    return {
+      value: fromScaled(toScaled(value, resolvedDecimals), resolvedDecimals),
+      unit,
+      decimals: resolvedDecimals,
+    };
+  }
+
+  return {
+    value: randomWhole(1, Math.min(maxValue, 20)),
+    unit,
+    decimals: 0,
+  };
+}
+
+function createVolumeConvertOrderProblem(displayLevel) {
+  for (let attempt = 0; attempt < 160; attempt += 1) {
+    const units = shuffleArray([...VOLUME_UNIT_ORDER]).slice(0, 4);
+    const operands = [];
+    const usedCubicMillimeters = new Set();
+
+    let valid = true;
+
+    units.forEach((unit) => {
+      let operand = null;
+
+      for (let innerAttempt = 0; innerAttempt < 40; innerAttempt += 1) {
+        const candidate = pickVolumeConvertOrderOperand(unit);
+        const cubicMillimeterKey = getVolumeCubicMillimeterKey(candidate.value, candidate.unit);
+
+        if (!usedCubicMillimeters.has(cubicMillimeterKey)) {
+          usedCubicMillimeters.add(cubicMillimeterKey);
+          operand = candidate;
+          break;
+        }
+      }
+
+      if (!operand) {
+        valid = false;
+      } else {
+        operands.push(operand);
+      }
+    });
+
+    if (!valid || operands.length !== 4) {
+      continue;
+    }
+
+    let displayOrder = shuffleIndices(operands.length);
+    const correctOrder = getVolumeSortedIndices(operands);
+
+    while (displayOrder.every((value, index) => value === correctOrder[index])) {
+      displayOrder = shuffleIndices(operands.length);
+    }
+
+    return buildVolumeConvertProblem({
+      level: displayLevel,
+      variant: 'order',
+      operands,
+      correctOrder,
+      displayOrder,
+    });
+  }
+
+  return buildVolumeConvertProblem({
+    level: displayLevel,
+    variant: 'order',
+    operands: [
+      { value: 500, unit: 'mm3', decimals: 0 },
+      { value: 2.5, unit: 'cm3', decimals: 1 },
+      { value: 3, unit: 'dl', decimals: 0 },
+      { value: 1.2, unit: 'l', decimals: 1 },
+    ],
+    correctOrder: [0, 1, 2, 3],
+    displayOrder: [1, 0, 2, 3],
+  });
+}
+
+function createVolumeConvertProblem(level) {
+  const displayLevel = level + 1;
+
+  if (displayLevel <= 4) {
+    return createVolumeConvertConvertProblem(displayLevel);
+  }
+
+  return createVolumeConvertOrderProblem(displayLevel);
+}
+
+function volumeConvertProblemFromRetry(dueRetry) {
+  const problem = buildVolumeConvertProblem({
+    level: dueRetry.level,
+    variant: dueRetry.variant,
+    fromValue: dueRetry.fromValue ?? null,
+    fromUnit: dueRetry.fromUnit ?? null,
+    toUnit: dueRetry.toUnit ?? null,
+    fromValueDecimals: dueRetry.fromValueDecimals ?? null,
+    answer: dueRetry.answer ?? null,
+    answerDecimals: dueRetry.answerDecimals ?? null,
+    operands: dueRetry.operands ? dueRetry.operands.map((operand) => ({ ...operand })) : null,
+    correctOrder: dueRetry.correctOrder ? [...dueRetry.correctOrder] : null,
+  });
+
+  if (dueRetry.variant === 'order') {
+    problem.displayOrder = dueRetry.displayOrder
+      ? [...dueRetry.displayOrder]
+      : shuffleIndices(problem.operands.length);
+  }
+
+  problem.isRetry = true;
+  return problem;
+}
+
+function formatVolumeConvertOperandText(operand) {
+  return formatVolumeWithUnit(operand.value, operand.unit, operand.decimals);
+}
+
+function formatVolumeConvertOrderListText(problem, order) {
+  return order
+    .map((operandIndex) => formatVolumeConvertOperandText(problem.operands[operandIndex]))
+    .join(' < ');
+}
+
+function formatVolumeConvertProblemText(problem) {
+  if (problem.variant === 'order') {
+    const order = problem.displayOrder ?? shuffleIndices(problem.operands.length);
+    return `Uspořádej: ${formatVolumeConvertOrderListText(problem, order)}`;
+  }
+
+  return `${formatVolumeWithUnit(problem.fromValue, problem.fromUnit, problem.fromValueDecimals)} = ? ${formatVolumeUnit(problem.toUnit)}`;
+}
+
+function formatVolumeConvertDisplayHtml(problem) {
+  if (problem.variant === 'order') {
+    return '<span class="problem-expression problem-expression--decimal-compare">Uspořádej objemy od nejmenšího po největší</span>';
+  }
+
+  return `<span class="problem-expression"><span class="problem-expression__term">${escapeHtml(formatVolumeWithUnit(problem.fromValue, problem.fromUnit, problem.fromValueDecimals))}</span><span class="problem-expression__equals">=</span><span class="problem-expression__term">? ${escapeHtml(formatVolumeUnit(problem.toUnit))}</span></span>`;
+}
+
+function evaluateVolumeConvertAnswer(problem, userAnswer) {
+  if (problem.variant === 'convert') {
+    const isCorrect = answersMatch(userAnswer, problem.answer, problem.answerDecimals);
+
+    return {
+      isCorrect,
+      feedbackMessage: isCorrect ? 'Správně!' : 'Špatně.',
+    };
+  }
+
+  const isCorrect = userAnswer?.kind === 'order'
+    && userAnswer.order.every((value, index) => value === problem.correctOrder[index]);
+
+  return {
+    isCorrect,
+    feedbackMessage: isCorrect ? 'Správně!' : 'Špatně.',
+  };
+}
+
+function getVolumeConvertUserAnswer(problem) {
+  if (problem.variant === 'convert') {
+    return parseAnswer(inputEl.value);
+  }
+
+  if (!Array.isArray(decimalCompareSortOrder) || decimalCompareSortOrder.length !== problem.operands.length) {
+    return null;
+  }
+
+  return { kind: 'order', order: [...decimalCompareSortOrder] };
+}
+
 function nonIntegerCompareProblemFromRetry(dueRetry) {
   const problem = buildNonIntegerCompareProblem({
     displayLevel: dueRetry.level,
@@ -4832,7 +7556,7 @@ function setDecimalCompareSignReviewHighlight(isCorrect) {
 }
 
 function setDecimalCompareOrderReviewHighlight() {
-  if (!isCompareProblem(currentProblem) || currentProblem.variant !== 'order') {
+  if (!usesCompareSortOrderUi(currentProblem)) {
     return;
   }
 
@@ -4935,6 +7659,14 @@ function renderDecimalCompareSortList(problem, { interactive = true, review = fa
 
     if (isNonIntegerCompareProblem(problem) || isFractionCompareProblem(problem)) {
       value.innerHTML = formatCompareOperandHtml(problem, problem.operands[operandIndex]);
+    } else if (isLengthConvertProblem(problem)) {
+      value.textContent = formatLengthConvertOperandText(problem.operands[operandIndex]);
+    } else if (isWeightConvertProblem(problem)) {
+      value.textContent = formatWeightConvertOperandText(problem.operands[operandIndex]);
+    } else if (isAreaConvertProblem(problem)) {
+      value.textContent = formatAreaConvertOperandText(problem.operands[operandIndex]);
+    } else if (isVolumeConvertProblem(problem)) {
+      value.textContent = formatVolumeConvertOperandText(problem.operands[operandIndex]);
     } else {
       value.textContent = formatCompareOperand(problem, problem.operands[operandIndex]);
     }
@@ -5010,9 +7742,11 @@ function handleDecimalCompareSortDrop(event) {
 
 function updateDecimalCompareAnswerUi(problem) {
   const isCompare = isCompareProblem(problem);
+  const usesSortOrder = usesCompareSortOrderUi(problem);
+  const hidesAnswerForm = isCompare || isUnitConvertOrderProblem(problem);
 
-  formEl.classList.toggle('answer-form--hidden', isCompare);
-  answerShapeToggleBtn.hidden = isCompare;
+  formEl.classList.toggle('answer-form--hidden', hidesAnswerForm);
+  updateAnswerShapeToggleVisibility(problem);
 
   if (linearEquationActionsEl) {
     linearEquationActionsEl.hidden = isCompare || !isLinearEquationProblem(problem) || problem?.level < 2;
@@ -5023,7 +7757,18 @@ function updateDecimalCompareAnswerUi(problem) {
   }
 
   if (decimalCompareSortEl) {
-    decimalCompareSortEl.hidden = !isCompare || problem?.variant !== 'order';
+    decimalCompareSortEl.hidden = !usesSortOrder;
+  }
+
+  if (!isCompare && !isUnitConvertOrderProblem(problem)) {
+    clearDecimalCompareSelectedSign();
+    return;
+  }
+
+  if (isUnitConvertOrderProblem(problem)) {
+    clearDecimalCompareSelectedSign();
+    renderDecimalCompareSortList(problem);
+    return;
   }
 
   if (!isCompare) {
@@ -7087,6 +9832,34 @@ function getMaxDifficultyLevelForMode(mode) {
 
   if (mode === 'fraction-compare') {
     return FRACTION_COMPARE_MAX_LEVEL;
+  }
+
+  if (mode === 'fraction-zlomek') {
+    return FRACTION_ZLOMEK_MAX_LEVEL;
+  }
+
+  if (mode === 'fraction-expand-reduce') {
+    return FRACTION_EXPAND_REDUCE_MAX_LEVEL;
+  }
+
+  if (mode === 'decimal-fraction-convert') {
+    return DECIMAL_FRACTION_CONVERT_MAX_LEVEL;
+  }
+
+  if (mode === 'length-convert') {
+    return LENGTH_CONVERT_MAX_LEVEL;
+  }
+
+  if (mode === 'weight-convert') {
+    return WEIGHT_CONVERT_MAX_LEVEL;
+  }
+
+  if (mode === 'area-convert') {
+    return AREA_CONVERT_MAX_LEVEL;
+  }
+
+  if (mode === 'volume-convert') {
+    return VOLUME_CONVERT_MAX_LEVEL;
   }
 
   if (mode === 'integer-add-subtract') {
@@ -11880,6 +14653,34 @@ function createProblemForExerciseMode(mode, level) {
     return createFractionCompareProblem(level);
   }
 
+  if (mode === 'fraction-zlomek') {
+    return createFractionZlomekProblem(level);
+  }
+
+  if (mode === 'fraction-expand-reduce') {
+    return createFractionExpandReduceProblem(level);
+  }
+
+  if (mode === 'decimal-fraction-convert') {
+    return createDecimalFractionConvertProblem(level);
+  }
+
+  if (mode === 'length-convert') {
+    return createLengthConvertProblem(level);
+  }
+
+  if (mode === 'weight-convert') {
+    return createWeightConvertProblem(level);
+  }
+
+  if (mode === 'area-convert') {
+    return createAreaConvertProblem(level);
+  }
+
+  if (mode === 'volume-convert') {
+    return createVolumeConvertProblem(level);
+  }
+
   if (mode === 'integer-add-subtract') {
     return createIntegerAddSubtractProblem(level);
   }
@@ -12108,6 +14909,14 @@ function formatSingleFractionHtml(num, den, isNegative = false) {
   }
 
   return `<span class="fraction fraction--signed" aria-label="${escapeHtml(ariaPrefix)}${escapeHtml(displayNum)}/${escapeHtml(displayDen)}"><span class="fraction__num">${escapeHtml(displayNum)}</span><span class="fraction__bar-row"><span class="fraction__sign" aria-hidden="true">−</span><span class="fraction__bar" aria-hidden="true"></span></span><span class="fraction__den">${escapeHtml(displayDen)}</span></span>`;
+}
+
+function formatUnknownNumeratorFractionHtml(den) {
+  return `<span class="fraction" aria-label="?/${escapeHtml(den)}"><span class="fraction__num">?</span><span class="fraction__bar" aria-hidden="true"></span><span class="fraction__den">${escapeHtml(den)}</span></span>`;
+}
+
+function formatUnknownDenominatorFractionHtml(num) {
+  return `<span class="fraction" aria-label="${escapeHtml(num)}/?"><span class="fraction__num">${escapeHtml(num)}</span><span class="fraction__bar" aria-hidden="true"></span><span class="fraction__den">?</span></span>`;
 }
 
 function formatFractionDisplayHtml(num, den) {
@@ -12581,6 +15390,34 @@ function formatProblemText(problem) {
     return formatCompareProblemText(problem);
   }
 
+  if (problem.type === 'fraction-zlomek') {
+    return formatFractionZlomekProblemText(problem);
+  }
+
+  if (problem.type === 'fraction-expand-reduce') {
+    return formatFractionExpandReduceProblemText(problem);
+  }
+
+  if (problem.type === 'decimal-fraction-convert') {
+    return formatDecimalFractionConvertProblemText(problem);
+  }
+
+  if (problem.type === 'length-convert') {
+    return formatLengthConvertProblemText(problem);
+  }
+
+  if (problem.type === 'weight-convert') {
+    return formatWeightConvertProblemText(problem);
+  }
+
+  if (problem.type === 'area-convert') {
+    return formatAreaConvertProblemText(problem);
+  }
+
+  if (problem.type === 'volume-convert') {
+    return formatVolumeConvertProblemText(problem);
+  }
+
   if (problem.type === 'fraction-add') {
     return formatFractionAddProblemText(problem);
   }
@@ -12710,6 +15547,34 @@ function formatProblemDisplayHtml(problem) {
     return formatCompareDisplayHtml(problem);
   }
 
+  if (problem.type === 'fraction-zlomek') {
+    return formatFractionZlomekDisplayHtml(problem);
+  }
+
+  if (problem.type === 'fraction-expand-reduce') {
+    return formatFractionExpandReduceDisplayHtml(problem);
+  }
+
+  if (problem.type === 'decimal-fraction-convert') {
+    return formatDecimalFractionConvertDisplayHtml(problem);
+  }
+
+  if (problem.type === 'length-convert') {
+    return formatLengthConvertDisplayHtml(problem);
+  }
+
+  if (problem.type === 'weight-convert') {
+    return formatWeightConvertDisplayHtml(problem);
+  }
+
+  if (problem.type === 'area-convert') {
+    return formatAreaConvertDisplayHtml(problem);
+  }
+
+  if (problem.type === 'volume-convert') {
+    return formatVolumeConvertDisplayHtml(problem);
+  }
+
   return `<span class="problem-expression problem-expression--plain">${escapeHtml(formatProblemText(problem))}</span>`;
 }
 
@@ -12772,6 +15637,114 @@ function recordSessionAnswer(userAnswer, isCorrect) {
     sessionResults.push(createSessionResultEntry(
       formatCompareSessionAnswer(currentProblem, userAnswer),
       formatCompareCorrectAnswer(currentProblem),
+      isCorrect,
+    ));
+    return;
+  }
+
+  if (isFractionZlomekProblem(currentProblem)) {
+    sessionResults.push(createSessionResultEntry(
+      formatFractionZlomekSessionAnswer(userAnswer, currentProblem),
+      formatFractionZlomekCorrectAnswer(currentProblem),
+      isCorrect,
+    ));
+    return;
+  }
+
+  if (isFractionExpandReduceProblem(currentProblem)) {
+    sessionResults.push(createSessionResultEntry(
+      formatIntegerAnswer(userAnswer),
+      formatIntegerAnswer(currentProblem.answer),
+      isCorrect,
+    ));
+    return;
+  }
+
+  if (isDecimalFractionConvertProblem(currentProblem)) {
+    if (currentProblem.answerKind === 'fraction') {
+      sessionResults.push(createSessionResultEntry(
+        formatFraction(userAnswer.num, userAnswer.den),
+        formatFraction(currentProblem.answerNum, currentProblem.answerDen),
+        isCorrect,
+      ));
+      return;
+    }
+
+    sessionResults.push(createSessionResultEntry(
+      formatDecimal(userAnswer, currentProblem.answerDecimals),
+      formatDecimal(currentProblem.answer, currentProblem.answerDecimals),
+      isCorrect,
+    ));
+    return;
+  }
+
+  if (isLengthConvertProblem(currentProblem)) {
+    if (currentProblem.variant === 'convert') {
+      sessionResults.push(createSessionResultEntry(
+        formatDecimal(userAnswer, currentProblem.answerDecimals),
+        formatDecimal(currentProblem.answer, currentProblem.answerDecimals),
+        isCorrect,
+      ));
+      return;
+    }
+
+    sessionResults.push(createSessionResultEntry(
+      formatLengthConvertOrderListText(currentProblem, userAnswer.order),
+      formatLengthConvertOrderListText(currentProblem, currentProblem.correctOrder),
+      isCorrect,
+    ));
+    return;
+  }
+
+  if (isWeightConvertProblem(currentProblem)) {
+    if (currentProblem.variant === 'convert') {
+      sessionResults.push(createSessionResultEntry(
+        formatDecimal(userAnswer, currentProblem.answerDecimals),
+        formatDecimal(currentProblem.answer, currentProblem.answerDecimals),
+        isCorrect,
+      ));
+      return;
+    }
+
+    sessionResults.push(createSessionResultEntry(
+      formatWeightConvertOrderListText(currentProblem, userAnswer.order),
+      formatWeightConvertOrderListText(currentProblem, currentProblem.correctOrder),
+      isCorrect,
+    ));
+    return;
+  }
+
+  if (isAreaConvertProblem(currentProblem)) {
+    if (currentProblem.variant === 'convert') {
+      sessionResults.push(createSessionResultEntry(
+        formatDecimal(userAnswer, currentProblem.answerDecimals),
+        formatDecimal(currentProblem.answer, currentProblem.answerDecimals),
+        isCorrect,
+      ));
+      return;
+    }
+
+    sessionResults.push(createSessionResultEntry(
+      formatAreaConvertOrderListText(currentProblem, userAnswer.order),
+      formatAreaConvertOrderListText(currentProblem, currentProblem.correctOrder),
+      isCorrect,
+    ));
+    return;
+  }
+
+  if (isVolumeConvertProblem(currentProblem)) {
+    if (currentProblem.variant === 'convert') {
+      sessionResults.push(createSessionResultEntry(
+        formatDecimal(userAnswer, currentProblem.answerDecimals),
+        formatDecimal(currentProblem.answer, currentProblem.answerDecimals),
+        isCorrect,
+      ));
+      return;
+    }
+
+    sessionResults.push(createSessionResultEntry(
+      formatVolumeConvertOrderListText(currentProblem, userAnswer.order),
+      formatVolumeConvertOrderListText(currentProblem, currentProblem.correctOrder),
       isCorrect,
     ));
     return;
@@ -13571,6 +16544,14 @@ function finishAnswerReview(isCorrect) {
     setDecimalCompareSignReviewHighlight(isCorrect);
   } else if (isCompareProblem(currentProblem) && currentProblem.variant === 'order') {
     setDecimalCompareOrderReviewHighlight();
+  } else if (isLengthConvertOrderProblem(currentProblem)) {
+    setDecimalCompareOrderReviewHighlight();
+  } else if (isWeightConvertOrderProblem(currentProblem)) {
+    setDecimalCompareOrderReviewHighlight();
+  } else if (isAreaConvertOrderProblem(currentProblem)) {
+    setDecimalCompareOrderReviewHighlight();
+  } else if (isVolumeConvertOrderProblem(currentProblem)) {
+    setDecimalCompareOrderReviewHighlight();
   } else {
     setAnswerFieldHighlight(isCorrect ? 'correct' : 'wrong');
   }
@@ -13735,10 +16716,65 @@ function toggleNegativeSignInInput(target) {
   target.focus();
 }
 
+function updateAnswerShapeToggleVisibility(problem = currentProblem) {
+  if (!problem) {
+    answerShapeToggleBtn.hidden = false;
+    return;
+  }
+
+  if (isCompareProblem(problem)) {
+    answerShapeToggleBtn.hidden = true;
+    return;
+  }
+
+  if (problem.type === 'fraction-zlomek'
+    || problem.type === 'fraction-expand-reduce') {
+    answerShapeToggleBtn.hidden = true;
+    return;
+  }
+
+  if (problem.type === 'decimal-fraction-convert') {
+    answerShapeToggleBtn.hidden = true;
+    return;
+  }
+
+  if (problem.type === 'length-convert') {
+    answerShapeToggleBtn.hidden = true;
+    return;
+  }
+
+  if (problem.type === 'weight-convert') {
+    answerShapeToggleBtn.hidden = true;
+    return;
+  }
+
+  if (problem.type === 'area-convert') {
+    answerShapeToggleBtn.hidden = true;
+    return;
+  }
+
+  if (problem.type === 'volume-convert') {
+    answerShapeToggleBtn.hidden = true;
+    return;
+  }
+
+  if (problem.type === 'linear-equation') {
+    answerShapeToggleBtn.hidden = problem.solutionType !== 'unique';
+    return;
+  }
+
+  if (problem.type === 'linear-equation-fraction') {
+    answerShapeToggleBtn.hidden = problem.solutionType !== 'unique';
+    return;
+  }
+
+  answerShapeToggleBtn.hidden = false;
+}
+
 function updateFractionAnswerShapeUi() {
   const useFractionShape = fractionAnswerInputShape === 'fraction';
 
-  answerShapeToggleBtn.hidden = false;
+  updateAnswerShapeToggleVisibility();
   setAnswerWrapVisible(decimalAnswerWrapEl, !useFractionShape);
   setAnswerWrapVisible(fractionAnswerWrapEl, useFractionShape);
   inputEl.required = !useFractionShape;
@@ -13760,7 +16796,7 @@ function updateFractionAnswerShapeUi() {
 }
 
 function toggleFractionAnswerShape() {
-  if (answerShapeToggleBtn.disabled) {
+  if (answerShapeToggleBtn.disabled || answerShapeToggleBtn.hidden) {
     return;
   }
 
@@ -13807,6 +16843,46 @@ function setAnswerInputMode(mode) {
     || mode === 'integer-compare'
     || mode === 'non-integer-compare'
     || mode === 'fraction-compare') {
+    fractionAnswerInputShape = 'number';
+    updateFractionAnswerShapeUi();
+    return;
+  }
+
+  if (mode === 'fraction-zlomek') {
+    updateFractionAnswerShapeUi();
+    return;
+  }
+
+  if (mode === 'fraction-expand-reduce') {
+    fractionAnswerInputShape = 'number';
+    updateFractionAnswerShapeUi();
+    return;
+  }
+
+  if (mode === 'decimal-fraction-convert') {
+    updateFractionAnswerShapeUi();
+    return;
+  }
+
+  if (mode === 'length-convert') {
+    fractionAnswerInputShape = 'number';
+    updateFractionAnswerShapeUi();
+    return;
+  }
+
+  if (mode === 'weight-convert') {
+    fractionAnswerInputShape = 'number';
+    updateFractionAnswerShapeUi();
+    return;
+  }
+
+  if (mode === 'area-convert') {
+    fractionAnswerInputShape = 'number';
+    updateFractionAnswerShapeUi();
+    return;
+  }
+
+  if (mode === 'volume-convert') {
     fractionAnswerInputShape = 'number';
     updateFractionAnswerShapeUi();
     return;
@@ -13936,6 +17012,12 @@ function handleKeypadClick(event) {
 
 function showProblem(problem) {
   currentProblem = problem;
+  appEl.classList.toggle('app--decimal-fraction-convert', problem.type === 'decimal-fraction-convert');
+  appEl.classList.toggle('app--length-convert', problem.type === 'length-convert');
+  appEl.classList.toggle('app--weight-convert', problem.type === 'weight-convert');
+  appEl.classList.toggle('app--area-convert', problem.type === 'area-convert');
+  appEl.classList.toggle('app--volume-convert', problem.type === 'volume-convert');
+  appEl.classList.toggle('app--fraction-expand-reduce', problem.type === 'fraction-expand-reduce');
 
   if (problem.type === 'basic-form') {
     const maxInputLength = String(getBasicFormMaxValue(getInternalDisplayLevel(problem))).length;
@@ -14030,6 +17112,38 @@ function showProblem(problem) {
 
     fractionAnswerInputShape = 'number';
     problemEl.innerHTML = formatLinearEquationFractionDisplayHtml(problem);
+  } else if (problem.type === 'fraction-zlomek') {
+    if (problem.answerKind === 'fraction') {
+      const maxInputLength = String(FRACTION_ADD_ANSWER_MAX).length;
+      answerNumeratorEl.maxLength = maxInputLength;
+      answerDenominatorEl.maxLength = maxInputLength;
+      fractionAnswerInputShape = 'fraction';
+    } else {
+      fractionAnswerInputShape = 'number';
+    }
+
+    problemEl.innerHTML = formatFractionZlomekDisplayHtml(problem);
+  } else if (problem.type === 'fraction-expand-reduce') {
+    fractionAnswerInputShape = 'number';
+    problemEl.innerHTML = formatFractionExpandReduceDisplayHtml(problem);
+  } else if (problem.type === 'decimal-fraction-convert') {
+    const maxInputLength = String(DECIMAL_FRACTION_CONVERT_ANSWER_MAX).length;
+    answerNumeratorEl.maxLength = maxInputLength;
+    answerDenominatorEl.maxLength = maxInputLength;
+    fractionAnswerInputShape = problem.answerKind === 'fraction' ? 'fraction' : 'number';
+    problemEl.innerHTML = formatDecimalFractionConvertDisplayHtml(problem);
+  } else if (problem.type === 'length-convert') {
+    fractionAnswerInputShape = 'number';
+    problemEl.innerHTML = formatLengthConvertDisplayHtml(problem);
+  } else if (problem.type === 'weight-convert') {
+    fractionAnswerInputShape = 'number';
+    problemEl.innerHTML = formatWeightConvertDisplayHtml(problem);
+  } else if (problem.type === 'area-convert') {
+    fractionAnswerInputShape = 'number';
+    problemEl.innerHTML = formatAreaConvertDisplayHtml(problem);
+  } else if (problem.type === 'volume-convert') {
+    fractionAnswerInputShape = 'number';
+    problemEl.innerHTML = formatVolumeConvertDisplayHtml(problem);
   } else if (isCompareProblem(problem) && problem.variant !== 'sign') {
     problemEl.innerHTML = formatCompareDisplayHtml(problem);
   } else if (!isCompareProblem(problem)) {
@@ -14045,14 +17159,6 @@ function showProblem(problem) {
 
   updateFractionAnswerShapeUi();
 
-  if (problem.type === 'linear-equation') {
-    answerShapeToggleBtn.hidden = problem.solutionType !== 'unique' || problem.answerKind !== 'fraction';
-  }
-
-  if (problem.type === 'linear-equation-fraction') {
-    answerShapeToggleBtn.hidden = problem.solutionType !== 'unique';
-  }
-
   const canAnswer = isMultiModeExercise()
     ? canAnswerProblem(problem)
     : (isFractionExerciseMode()
@@ -14066,12 +17172,31 @@ function showProblem(problem) {
       || isLinearEquationExerciseMode()
       || isLinearEquationFractionExerciseMode()
       || isCompareExerciseMode()
+      || isFractionZlomekExerciseMode()
+      || isFractionExpandReduceExerciseMode()
+      || isDecimalFractionConvertExerciseMode()
+      || isLengthConvertExerciseMode()
+      || isWeightConvertExerciseMode()
+      || isAreaConvertExerciseMode()
+      || isVolumeConvertExerciseMode()
       || getSelectedOperations().length > 0);
   setFormEnabled(canAnswer);
 
   if (canAnswer) {
     clearAnswerInputs();
     if (isCompareProblem(problem) && problem.variant === 'order') {
+      initDecimalCompareSortOrder(problem);
+    }
+    if (isLengthConvertOrderProblem(problem)) {
+      initDecimalCompareSortOrder(problem);
+    }
+    if (isWeightConvertOrderProblem(problem)) {
+      initDecimalCompareSortOrder(problem);
+    }
+    if (isAreaConvertOrderProblem(problem)) {
+      initDecimalCompareSortOrder(problem);
+    }
+    if (isVolumeConvertOrderProblem(problem)) {
       initDecimalCompareSortOrder(problem);
     }
     if (!isCompareProblem(problem)) {
@@ -14131,6 +17256,89 @@ function queueRetry(problem) {
     item.answerNum = problem.answerNum;
     item.answerDen = problem.answerDen;
     item.answerNegative = problem.answerNegative;
+  } else if (problem.type === 'fraction-zlomek') {
+    item.type = 'fraction-zlomek';
+    item.variant = problem.variant;
+    item.prompt = problem.prompt;
+    item.answerKind = problem.answerKind;
+    item.answerNum = problem.answerNum;
+    item.answerDen = problem.answerDen;
+    item.answer = problem.answer;
+    item.promptNum = problem.promptNum ?? null;
+    item.promptDen = problem.promptDen ?? null;
+    item.quantity = problem.quantity ?? null;
+    item.partValue = problem.partValue ?? null;
+    item.unitValue = problem.unitValue ?? null;
+    item.unitMeasure = problem.unitMeasure ?? null;
+    item.unitLabel = problem.unitLabel ?? null;
+  } else if (problem.type === 'fraction-expand-reduce') {
+    item.type = 'fraction-expand-reduce';
+    item.leftNum = problem.leftNum;
+    item.leftDen = problem.leftDen;
+    item.rightNum = problem.rightNum;
+    item.rightDen = problem.rightDen;
+    item.unknownPosition = problem.unknownPosition;
+    item.answer = problem.answer;
+  } else if (problem.type === 'decimal-fraction-convert') {
+    item.type = 'decimal-fraction-convert';
+    item.direction = problem.direction;
+    item.num = problem.num;
+    item.den = problem.den;
+    item.decimalValue = problem.decimalValue;
+    item.decimalPlaces = problem.decimalPlaces;
+    item.answerKind = problem.answerKind;
+    item.answerNum = problem.answerNum;
+    item.answerDen = problem.answerDen;
+    item.answer = problem.answer;
+    item.answerDecimals = problem.answerDecimals;
+  } else if (problem.type === 'length-convert') {
+    item.type = 'length-convert';
+    item.variant = problem.variant;
+    item.fromValue = problem.fromValue ?? null;
+    item.fromUnit = problem.fromUnit ?? null;
+    item.toUnit = problem.toUnit ?? null;
+    item.fromValueDecimals = problem.fromValueDecimals ?? null;
+    item.answer = problem.answer ?? null;
+    item.answerDecimals = problem.answerDecimals ?? null;
+    item.operands = problem.operands ? problem.operands.map((operand) => ({ ...operand })) : null;
+    item.correctOrder = problem.correctOrder ? [...problem.correctOrder] : null;
+    item.displayOrder = problem.displayOrder ? [...problem.displayOrder] : null;
+  } else if (problem.type === 'weight-convert') {
+    item.type = 'weight-convert';
+    item.variant = problem.variant;
+    item.fromValue = problem.fromValue ?? null;
+    item.fromUnit = problem.fromUnit ?? null;
+    item.toUnit = problem.toUnit ?? null;
+    item.fromValueDecimals = problem.fromValueDecimals ?? null;
+    item.answer = problem.answer ?? null;
+    item.answerDecimals = problem.answerDecimals ?? null;
+    item.operands = problem.operands ? problem.operands.map((operand) => ({ ...operand })) : null;
+    item.correctOrder = problem.correctOrder ? [...problem.correctOrder] : null;
+    item.displayOrder = problem.displayOrder ? [...problem.displayOrder] : null;
+  } else if (problem.type === 'area-convert') {
+    item.type = 'area-convert';
+    item.variant = problem.variant;
+    item.fromValue = problem.fromValue ?? null;
+    item.fromUnit = problem.fromUnit ?? null;
+    item.toUnit = problem.toUnit ?? null;
+    item.fromValueDecimals = problem.fromValueDecimals ?? null;
+    item.answer = problem.answer ?? null;
+    item.answerDecimals = problem.answerDecimals ?? null;
+    item.operands = problem.operands ? problem.operands.map((operand) => ({ ...operand })) : null;
+    item.correctOrder = problem.correctOrder ? [...problem.correctOrder] : null;
+    item.displayOrder = problem.displayOrder ? [...problem.displayOrder] : null;
+  } else if (problem.type === 'volume-convert') {
+    item.type = 'volume-convert';
+    item.variant = problem.variant;
+    item.fromValue = problem.fromValue ?? null;
+    item.fromUnit = problem.fromUnit ?? null;
+    item.toUnit = problem.toUnit ?? null;
+    item.fromValueDecimals = problem.fromValueDecimals ?? null;
+    item.answer = problem.answer ?? null;
+    item.answerDecimals = problem.answerDecimals ?? null;
+    item.operands = problem.operands ? problem.operands.map((operand) => ({ ...operand })) : null;
+    item.correctOrder = problem.correctOrder ? [...problem.correctOrder] : null;
+    item.displayOrder = problem.displayOrder ? [...problem.displayOrder] : null;
   } else if (isCompareProblem(problem)) {
     item.type = problem.type;
     item.variant = problem.variant;
@@ -14287,6 +17495,34 @@ function pickNextProblem() {
 
     if (dueRetry.type === 'linear-equation-fraction') {
       return linearEquationFractionProblemFromRetry(dueRetry);
+    }
+
+    if (dueRetry.type === 'fraction-zlomek') {
+      return fractionZlomekProblemFromRetry(dueRetry);
+    }
+
+    if (dueRetry.type === 'fraction-expand-reduce') {
+      return fractionExpandReduceProblemFromRetry(dueRetry);
+    }
+
+    if (dueRetry.type === 'decimal-fraction-convert') {
+      return decimalFractionConvertProblemFromRetry(dueRetry);
+    }
+
+    if (dueRetry.type === 'length-convert') {
+      return lengthConvertProblemFromRetry(dueRetry);
+    }
+
+    if (dueRetry.type === 'weight-convert') {
+      return weightConvertProblemFromRetry(dueRetry);
+    }
+
+    if (dueRetry.type === 'area-convert') {
+      return areaConvertProblemFromRetry(dueRetry);
+    }
+
+    if (dueRetry.type === 'volume-convert') {
+      return volumeConvertProblemFromRetry(dueRetry);
     }
 
     if (dueRetry.type === 'decimal-compare'
@@ -14558,6 +17794,11 @@ function updateTitle() {
       return;
     }
 
+    if (hasDecimalFractionConvertOnlySelection()) {
+      appTitleEl.textContent = DECIMAL_FRACTION_CONVERT_APP_TITLE;
+      return;
+    }
+
     if (hasIntegerCompareOnlySelection()) {
       appTitleEl.textContent = INTEGER_COMPARE_APP_TITLE;
       return;
@@ -14570,6 +17811,36 @@ function updateTitle() {
 
     if (hasFractionCompareOnlySelection()) {
       appTitleEl.textContent = FRACTION_COMPARE_APP_TITLE;
+      return;
+    }
+
+    if (hasFractionZlomekOnlySelection()) {
+      appTitleEl.textContent = FRACTION_ZLOMEK_APP_TITLE;
+      return;
+    }
+
+    if (hasFractionExpandReduceOnlySelection()) {
+      appTitleEl.textContent = FRACTION_EXPAND_REDUCE_APP_TITLE;
+      return;
+    }
+
+    if (hasLengthConvertOnlySelection()) {
+      appTitleEl.textContent = LENGTH_CONVERT_APP_TITLE;
+      return;
+    }
+
+    if (hasWeightConvertOnlySelection()) {
+      appTitleEl.textContent = WEIGHT_CONVERT_APP_TITLE;
+      return;
+    }
+
+    if (hasAreaConvertOnlySelection()) {
+      appTitleEl.textContent = AREA_CONVERT_APP_TITLE;
+      return;
+    }
+
+    if (hasVolumeConvertOnlySelection()) {
+      appTitleEl.textContent = VOLUME_CONVERT_APP_TITLE;
       return;
     }
 
@@ -14618,6 +17889,31 @@ function updateTitle() {
     return;
   }
 
+  if (activeExerciseMode === 'decimal-fraction-convert') {
+    appTitleEl.textContent = DECIMAL_FRACTION_CONVERT_APP_TITLE;
+    return;
+  }
+
+  if (activeExerciseMode === 'length-convert') {
+    appTitleEl.textContent = LENGTH_CONVERT_APP_TITLE;
+    return;
+  }
+
+  if (activeExerciseMode === 'weight-convert') {
+    appTitleEl.textContent = WEIGHT_CONVERT_APP_TITLE;
+    return;
+  }
+
+  if (activeExerciseMode === 'area-convert') {
+    appTitleEl.textContent = AREA_CONVERT_APP_TITLE;
+    return;
+  }
+
+  if (activeExerciseMode === 'volume-convert') {
+    appTitleEl.textContent = VOLUME_CONVERT_APP_TITLE;
+    return;
+  }
+
   if (activeExerciseMode === 'integer-compare') {
     appTitleEl.textContent = INTEGER_COMPARE_APP_TITLE;
     return;
@@ -14630,6 +17926,16 @@ function updateTitle() {
 
   if (activeExerciseMode === 'fraction-compare') {
     appTitleEl.textContent = FRACTION_COMPARE_APP_TITLE;
+    return;
+  }
+
+  if (activeExerciseMode === 'fraction-zlomek') {
+    appTitleEl.textContent = FRACTION_ZLOMEK_APP_TITLE;
+    return;
+  }
+
+  if (activeExerciseMode === 'fraction-expand-reduce') {
+    appTitleEl.textContent = FRACTION_EXPAND_REDUCE_APP_TITLE;
     return;
   }
 
@@ -14733,7 +18039,7 @@ function newProblem() {
 function showSetupScreen({ preserveAnalysisHash = false } = {}) {
   hideAllScreens();
   setupScreenEl.hidden = false;
-  appEl.classList.remove('app--wide', 'app--exercise');
+  appEl.classList.remove('app--wide', 'app--exercise', 'app--decimal-fraction-convert', 'app--length-convert', 'app--weight-convert', 'app--area-convert', 'app--volume-convert', 'app--fraction-expand-reduce');
   viewingSharedAnalysis = false;
   activeExerciseMode = null;
   currentAnswerInputMode = null;
@@ -14762,6 +18068,14 @@ function showExerciseScreen() {
   exerciseScreenEl.hidden = false;
   appEl.classList.remove('app--wide');
   appEl.classList.add('app--exercise');
+  if (resolvedMode === 'fraction-zlomek') {
+    appEl.classList.add('app--wide');
+  }
+
+  if (resolvedMode === 'fraction-expand-reduce') {
+    appEl.classList.remove('app--wide');
+  }
+
   resetProgress();
   sessionSelectedModes = selectedModes;
   activeExerciseModePool = resolvedMode === 'multi-mode'
@@ -14781,7 +18095,7 @@ function showExerciseScreen() {
 function showAnalysisScreen() {
   hideAllScreens();
   analysisScreenEl.hidden = false;
-  appEl.classList.remove('app--exercise');
+  appEl.classList.remove('app--exercise', 'app--decimal-fraction-convert', 'app--length-convert', 'app--weight-convert', 'app--area-convert', 'app--volume-convert', 'app--fraction-expand-reduce');
   appEl.classList.add('app--wide');
   renderAnalysis();
   if (location.hash.startsWith('#a=')) {
@@ -14895,7 +18209,7 @@ formEl.addEventListener('submit', (event) => {
       return;
     }
 
-    const userAnswer = getFractionAnswerFromInputs();
+    const userAnswer = getFractionAnswerFromInputs() ?? getFractionUserAnswerFallback();
     if (userAnswer === null) {
       showAnswerValidationFeedback();
       return;
@@ -15122,6 +18436,160 @@ formEl.addEventListener('submit', (event) => {
     }
 
     const { isCorrect } = evaluateLinearEquationAnswer(currentProblem, userAnswer);
+
+    if (isCorrect) {
+      handleCorrectAnswer();
+    } else {
+      handleWrongAnswer();
+    }
+
+    recordSessionAnswer(userAnswer, isCorrect);
+    finishAnswerReview(isCorrect);
+    return;
+  }
+
+  if (isFractionZlomekProblem(currentProblem)) {
+    const userAnswer = getFractionZlomekUserAnswer(currentProblem);
+
+    if (userAnswer === null) {
+      showAnswerValidationFeedback();
+      return;
+    }
+
+    const { isCorrect } = evaluateFractionZlomekAnswer(currentProblem, userAnswer);
+
+    if (isCorrect) {
+      handleCorrectAnswer();
+    } else {
+      handleWrongAnswer();
+    }
+
+    recordSessionAnswer(userAnswer, isCorrect);
+    finishAnswerReview(isCorrect);
+    return;
+  }
+
+  if (isFractionExpandReduceProblem(currentProblem)) {
+    const value = parseAnswer(inputEl.value);
+    const userAnswer = value !== null && Number.isInteger(value) ? value : null;
+
+    if (userAnswer === null) {
+      showAnswerValidationFeedback();
+      return;
+    }
+
+    const { isCorrect } = evaluateFractionExpandReduceAnswer(currentProblem, userAnswer);
+
+    if (isCorrect) {
+      handleCorrectAnswer();
+    } else {
+      handleWrongAnswer();
+    }
+
+    recordSessionAnswer(userAnswer, isCorrect);
+    finishAnswerReview(isCorrect);
+    return;
+  }
+
+  if (isDecimalFractionConvertProblem(currentProblem)) {
+    let userAnswer = null;
+
+    if (currentProblem.answerKind === 'fraction') {
+      userAnswer = getFractionAnswerFromInputs();
+    } else {
+      userAnswer = parseAnswer(inputEl.value);
+    }
+
+    if (userAnswer === null) {
+      showAnswerValidationFeedback();
+      return;
+    }
+
+    const { isCorrect } = evaluateDecimalFractionConvertAnswer(currentProblem, userAnswer);
+
+    if (isCorrect) {
+      handleCorrectAnswer();
+    } else {
+      handleWrongAnswer();
+    }
+
+    recordSessionAnswer(userAnswer, isCorrect);
+    finishAnswerReview(isCorrect);
+    return;
+  }
+
+  if (isLengthConvertProblem(currentProblem)) {
+    const userAnswer = getLengthConvertUserAnswer(currentProblem);
+
+    if (userAnswer === null) {
+      showAnswerValidationFeedback();
+      return;
+    }
+
+    const { isCorrect } = evaluateLengthConvertAnswer(currentProblem, userAnswer);
+
+    if (isCorrect) {
+      handleCorrectAnswer();
+    } else {
+      handleWrongAnswer();
+    }
+
+    recordSessionAnswer(userAnswer, isCorrect);
+    finishAnswerReview(isCorrect);
+    return;
+  }
+
+  if (isWeightConvertProblem(currentProblem)) {
+    const userAnswer = getWeightConvertUserAnswer(currentProblem);
+
+    if (userAnswer === null) {
+      showAnswerValidationFeedback();
+      return;
+    }
+
+    const { isCorrect } = evaluateWeightConvertAnswer(currentProblem, userAnswer);
+
+    if (isCorrect) {
+      handleCorrectAnswer();
+    } else {
+      handleWrongAnswer();
+    }
+
+    recordSessionAnswer(userAnswer, isCorrect);
+    finishAnswerReview(isCorrect);
+    return;
+  }
+
+  if (isAreaConvertProblem(currentProblem)) {
+    const userAnswer = getAreaConvertUserAnswer(currentProblem);
+
+    if (userAnswer === null) {
+      showAnswerValidationFeedback();
+      return;
+    }
+
+    const { isCorrect } = evaluateAreaConvertAnswer(currentProblem, userAnswer);
+
+    if (isCorrect) {
+      handleCorrectAnswer();
+    } else {
+      handleWrongAnswer();
+    }
+
+    recordSessionAnswer(userAnswer, isCorrect);
+    finishAnswerReview(isCorrect);
+    return;
+  }
+
+  if (isVolumeConvertProblem(currentProblem)) {
+    const userAnswer = getVolumeConvertUserAnswer(currentProblem);
+
+    if (userAnswer === null) {
+      showAnswerValidationFeedback();
+      return;
+    }
+
+    const { isCorrect } = evaluateVolumeConvertAnswer(currentProblem, userAnswer);
 
     if (isCorrect) {
       handleCorrectAnswer();
