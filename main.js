@@ -43,7 +43,11 @@ const operationCheckboxes = document.querySelectorAll('#decimal-operation-picker
 const integerModeCheckboxes = document.querySelectorAll('#integer-operation-picker input[type="checkbox"]');
 const powersModeCheckboxes = document.querySelectorAll('#powers-operation-picker input[type="checkbox"]');
 const fractionModeCheckboxes = document.querySelectorAll('#fraction-operation-picker input[type="checkbox"]');
-const exclusiveModeRadios = document.querySelectorAll('#exclusive-mode-picker input[type="radio"]');
+const setupCategoryRadios = document.querySelectorAll('#setup-category-picker input[type="radio"]');
+const combinableSetupPanelsEl = document.getElementById('combinable-setup-panels');
+const exclusiveSetupPanelsEl = document.getElementById('exclusive-setup-panels');
+const exclusiveModeRadios = document.querySelectorAll('#exclusive-setup-panels input[type="radio"]');
+const requireBasicFormOptionEl = document.getElementById('require-basic-form-option');
 const requireBasicFormCheckbox = document.getElementById('require-basic-form-checkbox');
 const linearEquationActionsEl = document.getElementById('linear-equation-actions');
 const linearEquationActionButtons = document.querySelectorAll('[data-linear-equation-answer]');
@@ -90,6 +94,7 @@ const INTEGER_APP_TITLE = 'Početní operace se zápornými čísly';
 const DECIMAL_FRACTION_COMBINED_APP_TITLE = 'Početní operace s desetinnými čísly a se zlomky';
 const POWERS_APP_TITLE = 'Počítání s mocninami a druhou odmocninou';
 const LINEAR_EQUATION_APP_TITLE = 'Lineární rovnice';
+const LINEAR_EQUATION_FRACTION_APP_TITLE = 'Lineární rovnice se zlomky';
 const LINEAR_EQUATION_NO_SOLUTION_LABEL = 'nemá řešení';
 const LINEAR_EQUATION_INFINITE_SOLUTION_LABEL = 'libovolné číslo';
 const POWER_MAX_LEVEL = 4;
@@ -135,11 +140,79 @@ const NON_INTEGER_ANSWER_MAX = 100;
 const BASIC_FORM_PRIMES = [2, 3, 5, 7];
 const FRACTION_BASIC_FORM_MAX_LEVEL = 2;
 const LINEAR_EQUATION_MAX_LEVEL = 3;
+const LINEAR_EQUATION_FRACTION_MAX_LEVEL = 6;
+const LINEAR_EQUATION_FRACTION_DEN_MAX = 6;
+const LINEAR_EQUATION_FRACTION_LEVEL6_COEF_MAX = 8;
+const LINEAR_EQUATION_FRACTION_CONST_MAX = 6;
+const LINEAR_EQUATION_FRACTION_UNIQUE_ANSWER_DEN_MAX = 4;
+const LINEAR_EQUATION_FRACTION_UNIQUE_ANSWER_NUM_MAX = 10;
 const LINEAR_EQUATION_COEF_MAX = 9;
 const DECIMAL_COMPARE_MAX_LEVEL = 5;
 const DECIMAL_COMPARE_SAME_WHOLE_RATE = 0.65;
 const DECIMAL_COMPARE_EQUAL_RATE = 0.15;
 const DECIMAL_COMPARE_APP_TITLE = 'Porovnávání desetinných čísel';
+const INTEGER_COMPARE_MAX_LEVEL = 4;
+const INTEGER_COMPARE_VALUE_MIN = -99;
+const INTEGER_COMPARE_VALUE_MAX = 99;
+const INTEGER_COMPARE_POSITIVE_MAX = 99;
+const INTEGER_COMPARE_BOTH_POSITIVE_RATE = 0.1;
+const INTEGER_COMPARE_MIXED_SIGN_RATE = 0.1;
+const INTEGER_COMPARE_NON_POSITIVE_ZERO_RATE = 0.2;
+const INTEGER_COMPARE_EQUAL_RATE = 0.15;
+const INTEGER_COMPARE_APP_TITLE = 'Porovnávání celých čísel';
+const NON_INTEGER_COMPARE_MAX_LEVEL = 6;
+const NON_INTEGER_COMPARE_APP_TITLE = 'Porovnávání necelých čísel';
+const FRACTION_COMPARE_MAX_LEVEL = 5;
+const FRACTION_COMPARE_EQUAL_RATE = 0.15;
+const FRACTION_COMPARE_ORDER_LCM_MAX = 48;
+const FRACTION_COMPARE_APP_TITLE = 'Porovnávání zlomků';
+const FRACTION_COMPARE_ORDER_MULTIPLIER_SETS = {
+  2: [
+    [1, 2],
+    [1, 3],
+    [2, 3],
+    [1, 4],
+    [2, 4],
+    [3, 4],
+  ],
+  3: [
+    [1, 2, 3],
+    [1, 2, 4],
+    [1, 3, 6],
+    [2, 3, 6],
+  ],
+  4: [
+    [1, 2, 3, 4],
+    [1, 2, 3, 6],
+    [1, 2, 4, 8],
+    [2, 3, 4, 6],
+  ],
+};
+const FRACTION_COMPARE_ORDER_DENOMINATOR_PRESETS = {
+  2: [
+    [2, 4],
+    [3, 5],
+    [3, 6],
+    [3, 9],
+    [5, 10],
+    [5, 15],
+  ],
+  3: [
+    [2, 4, 8],
+    [3, 5, 9],
+    [3, 6, 9],
+    [2, 3, 6],
+    [5, 10, 15],
+  ],
+  4: [
+    [2, 4, 6, 8],
+    [3, 5, 9, 15],
+    [2, 3, 6, 9],
+    [3, 4, 6, 12],
+    [5, 6, 10, 15],
+  ],
+};
+const FRACTION_COMPARE_ORDER_BASES = [2, 3, 5];
 const BASIC_FORM_MAX_BY_LEVEL = {
   1: 32,
   2: 56,
@@ -190,7 +263,25 @@ let decimalCompareSelectedSign = null;
 let decimalCompareSortOrder = [];
 let decimalCompareDragFromIndex = null;
 
+function getSelectedSetupCategory() {
+  const selected = [...setupCategoryRadios].find((radio) => radio.checked);
+
+  return selected?.value ?? null;
+}
+
+function isCombinableSetupCategory() {
+  return getSelectedSetupCategory() === 'combinable';
+}
+
+function isExclusiveSetupCategory() {
+  return getSelectedSetupCategory() === 'exclusive';
+}
+
 function getSelectedExclusiveMode() {
+  if (!isExclusiveSetupCategory()) {
+    return null;
+  }
+
   const selected = [...exclusiveModeRadios].find((radio) => radio.checked);
 
   return selected?.value ?? null;
@@ -204,16 +295,55 @@ function hasLinearEquationMode() {
   return getSelectedExclusiveMode() === 'linear-equation';
 }
 
+function hasLinearEquationFractionMode() {
+  return getSelectedExclusiveMode() === 'linear-equation-fraction';
+}
+
 function hasDecimalCompareMode() {
   return getSelectedExclusiveMode() === 'decimal-compare';
+}
+
+function hasIntegerCompareMode() {
+  return getSelectedExclusiveMode() === 'integer-compare';
+}
+
+function hasNonIntegerCompareMode() {
+  return getSelectedExclusiveMode() === 'non-integer-compare';
+}
+
+function hasFractionCompareMode() {
+  return getSelectedExclusiveMode() === 'fraction-compare';
 }
 
 function isLinearEquationExerciseMode() {
   return activeExerciseMode === 'linear-equation';
 }
 
+function isLinearEquationFractionExerciseMode() {
+  return activeExerciseMode === 'linear-equation-fraction';
+}
+
 function isDecimalCompareExerciseMode() {
   return activeExerciseMode === 'decimal-compare';
+}
+
+function isIntegerCompareExerciseMode() {
+  return activeExerciseMode === 'integer-compare';
+}
+
+function isNonIntegerCompareExerciseMode() {
+  return activeExerciseMode === 'non-integer-compare';
+}
+
+function isFractionCompareExerciseMode() {
+  return activeExerciseMode === 'fraction-compare';
+}
+
+function isCompareExerciseMode() {
+  return isDecimalCompareExerciseMode()
+    || isIntegerCompareExerciseMode()
+    || isNonIntegerCompareExerciseMode()
+    || isFractionCompareExerciseMode();
 }
 
 function getSelectedFractionModes() {
@@ -321,8 +451,52 @@ function hasLinearEquationOnlySelection() {
     && !hasNonIntegerSqrtMode();
 }
 
+function hasLinearEquationFractionOnlySelection() {
+  return hasLinearEquationFractionMode()
+    && getSelectedOperations().length === 0
+    && getSelectedFractionModes().length === 0
+    && getSelectedIntegerModes().length === 0
+    && !hasPowersMode()
+    && !hasSqrtMode()
+    && !hasNonIntegerPowersMode()
+    && !hasNonIntegerSqrtMode();
+}
+
 function hasDecimalCompareOnlySelection() {
   return hasDecimalCompareMode()
+    && getSelectedOperations().length === 0
+    && getSelectedFractionModes().length === 0
+    && getSelectedIntegerModes().length === 0
+    && !hasPowersMode()
+    && !hasSqrtMode()
+    && !hasNonIntegerPowersMode()
+    && !hasNonIntegerSqrtMode();
+}
+
+function hasIntegerCompareOnlySelection() {
+  return hasIntegerCompareMode()
+    && getSelectedOperations().length === 0
+    && getSelectedFractionModes().length === 0
+    && getSelectedIntegerModes().length === 0
+    && !hasPowersMode()
+    && !hasSqrtMode()
+    && !hasNonIntegerPowersMode()
+    && !hasNonIntegerSqrtMode();
+}
+
+function hasNonIntegerCompareOnlySelection() {
+  return hasNonIntegerCompareMode()
+    && getSelectedOperations().length === 0
+    && getSelectedFractionModes().length === 0
+    && getSelectedIntegerModes().length === 0
+    && !hasPowersMode()
+    && !hasSqrtMode()
+    && !hasNonIntegerPowersMode()
+    && !hasNonIntegerSqrtMode();
+}
+
+function hasFractionCompareOnlySelection() {
+  return hasFractionCompareMode()
     && getSelectedOperations().length === 0
     && getSelectedFractionModes().length === 0
     && getSelectedIntegerModes().length === 0
@@ -387,17 +561,18 @@ function hasPowersSqrtOnlySelection() {
 }
 
 function hasSetupSelection() {
-  return getSelectedOperations().length > 0
-    || getSelectedFractionModes().length > 0
-    || getSelectedIntegerModes().length > 0
-    || hasExclusiveModeSelection()
-    || hasPowersMode()
-    || hasSqrtMode()
-    || hasNonIntegerPowersMode()
-    || hasNonIntegerSqrtMode();
+  if (isExclusiveSetupCategory()) {
+    return hasExclusiveModeSelection();
+  }
+
+  return hasCombinableModeSelection();
 }
 
 function hasCombinableModeSelection() {
+  if (!isCombinableSetupCategory()) {
+    return false;
+  }
+
   return getSelectedOperations().length > 0
     || getSelectedFractionModes().length > 0
     || getSelectedIntegerModes().length > 0
@@ -429,11 +604,37 @@ function clearExclusiveModeSelection() {
   });
 }
 
-function handleCombinableModeSelectionChange() {
-  if (hasCombinableModeSelection()) {
-    clearExclusiveModeSelection();
+function updateSetupCategoryUi() {
+  const combinable = isCombinableSetupCategory();
+  const exclusive = isExclusiveSetupCategory();
+
+  if (combinableSetupPanelsEl) {
+    combinableSetupPanelsEl.hidden = !combinable;
   }
 
+  if (exclusiveSetupPanelsEl) {
+    exclusiveSetupPanelsEl.hidden = !exclusive;
+  }
+
+  if (requireBasicFormOptionEl) {
+    requireBasicFormOptionEl.hidden = !combinable;
+  }
+}
+
+function handleSetupCategoryChange() {
+  if (isCombinableSetupCategory()) {
+    clearExclusiveModeSelection();
+  } else if (isExclusiveSetupCategory()) {
+    clearCombinableModeSelection();
+  }
+
+  updateSetupCategoryUi();
+  showSetupFeedback('');
+  updateStartButton();
+  updateTitle();
+}
+
+function handleCombinableModeSelectionChange() {
   showSetupFeedback('');
   updateStartButton();
   updateTitle();
@@ -953,7 +1154,11 @@ function isFractionExerciseMode() {
     && activeExerciseMode !== 'sqrt'
     && activeExerciseMode !== 'powers-sqrt-combined'
     && activeExerciseMode !== 'linear-equation'
-    && activeExerciseMode !== 'decimal-compare';
+    && activeExerciseMode !== 'linear-equation-fraction'
+    && activeExerciseMode !== 'decimal-compare'
+    && activeExerciseMode !== 'integer-compare'
+    && activeExerciseMode !== 'non-integer-compare'
+    && activeExerciseMode !== 'fraction-compare';
 }
 
 function isNonIntegerAnswerInputMode() {
@@ -1079,8 +1284,24 @@ function getExerciseModeForProblem(problem) {
     return 'linear-equation';
   }
 
+  if (problem?.type === 'linear-equation-fraction') {
+    return 'linear-equation-fraction';
+  }
+
   if (problem?.type === 'decimal-compare') {
     return 'decimal-compare';
+  }
+
+  if (problem?.type === 'integer-compare') {
+    return 'integer-compare';
+  }
+
+  if (problem?.type === 'non-integer-compare') {
+    return 'non-integer-compare';
+  }
+
+  if (problem?.type === 'fraction-compare') {
+    return 'fraction-compare';
   }
 
   if (problem?.type?.startsWith('fraction-')) {
@@ -1147,7 +1368,7 @@ function canAnswerProblem(problem) {
     || problem?.type === 'non-integer-powers'
     || problem?.type === 'non-integer-sqrt'
     || isLinearEquationProblem(problem)
-    || isDecimalCompareProblem(problem)
+    || isCompareProblem(problem)
     || Boolean(problem?.operands);
 }
 
@@ -1944,8 +2165,1191 @@ function createLinearEquationProblem(difficultyLevel) {
   return createLinearEquationLevel4Problem(displayLevel);
 }
 
+function randomLinearFractionDenominator(max = LINEAR_EQUATION_FRACTION_DEN_MAX) {
+  return randomWhole(2, max);
+}
+
+function randomLinearFractionCoef(max = LINEAR_EQUATION_COEF_MAX) {
+  return randomWhole(1, max);
+}
+
+function randomLinearFractionSignedConstant() {
+  let value = randomWhole(-LINEAR_EQUATION_FRACTION_CONST_MAX, LINEAR_EQUATION_FRACTION_CONST_MAX);
+  if (value === 0) {
+    value = randomWhole(1, LINEAR_EQUATION_FRACTION_CONST_MAX) * (Math.random() < 0.5 ? 1 : -1);
+  }
+
+  return value;
+}
+
+function randomLinearFractionOpSign() {
+  return Math.random() < 0.5 ? 1 : -1;
+}
+
+function randomNiceLinearFractionTargetX(displayLevel) {
+  const preferInteger = displayLevel <= 4 || Math.random() < 0.72;
+
+  if (preferInteger) {
+    let value = randomWhole(-10, 10);
+    if (value === 0) {
+      value = randomWhole(1, 10) * (Math.random() < 0.5 ? 1 : -1);
+    }
+
+    return { num: value, den: 1 };
+  }
+
+  const den = randomWhole(2, LINEAR_EQUATION_FRACTION_UNIQUE_ANSWER_DEN_MAX);
+  let num = randomWhole(1, den - 1);
+  if (Math.random() < 0.4) {
+    num = -num;
+  }
+
+  const reduced = reduceFraction(Math.abs(num), den);
+  return {
+    num: num < 0 ? -reduced.num : reduced.num,
+    den: reduced.den,
+  };
+}
+
+function isNiceLinearFractionAnswer(answerNum, answerDen, displayLevel) {
+  if (answerDen > LINEAR_EQUATION_FRACTION_UNIQUE_ANSWER_DEN_MAX) {
+    return false;
+  }
+
+  if (answerNum > LINEAR_EQUATION_FRACTION_UNIQUE_ANSWER_NUM_MAX) {
+    return false;
+  }
+
+  if (displayLevel <= 2 && answerDen !== 1) {
+    return false;
+  }
+
+  if (displayLevel <= 4 && answerDen > 4) {
+    return false;
+  }
+
+  return true;
+}
+
+function targetXMatchesAnswer(targetX, answerNum, answerDen, answerNegative) {
+  const answerSignedNum = answerNegative ? -answerNum : answerNum;
+  return targetX.num * answerDen === answerSignedNum * targetX.den;
+}
+
+function evaluateLinearFractionExpressionAtTargetX(terms, targetX) {
+  const commonDen = terms.reduce((acc, term) => lcm(acc, term.b * targetX.den), 1);
+  let numerator = 0;
+
+  terms.forEach((term) => {
+    const mult = commonDen / (term.b * targetX.den);
+    numerator += term.sign * mult * (term.k * targetX.num + term.a * targetX.den);
+  });
+
+  return { num: numerator, den: commonDen };
+}
+
+function computeLevel3ConstantForTargetX(k, l, a, b, targetX) {
+  const num = targetX.num * (k * b - l * a);
+  const den = targetX.den * a * b;
+
+  if (num % den !== 0) {
+    return null;
+  }
+
+  const constant = num / den;
+  if (constant === 0 || Math.abs(constant) > LINEAR_EQUATION_FRACTION_CONST_MAX) {
+    return null;
+  }
+
+  return constant;
+}
+
+function computeLevel4RightConstantForTargetX(k, l, a, b, d, targetX) {
+  const num = d * k * targetX.num + d * a * targetX.den - b * l * targetX.num;
+  const den = targetX.den * b;
+
+  if (num % den !== 0) {
+    return null;
+  }
+
+  const constant = num / den;
+  if (Math.abs(constant) > LINEAR_EQUATION_FRACTION_CONST_MAX) {
+    return null;
+  }
+
+  return constant;
+}
+
+function computeRightConstantForTargetX(leftTerms, right, targetX) {
+  const lhs = evaluateLinearFractionExpressionAtTargetX(leftTerms, targetX);
+  const num = lhs.num * right.f * targetX.den - right.m * targetX.num * lhs.den;
+  const den = lhs.den * targetX.den;
+
+  if (num % den !== 0) {
+    return null;
+  }
+
+  const constant = num / den;
+  if (Math.abs(constant) > LINEAR_EQUATION_FRACTION_CONST_MAX) {
+    return null;
+  }
+
+  return constant;
+}
+
+function linearFractionValuesAreDistinct(values) {
+  const used = new Set();
+
+  for (const value of values) {
+    if (value == null) {
+      continue;
+    }
+
+    const key = Math.abs(value);
+    if (used.has(key)) {
+      return false;
+    }
+
+    used.add(key);
+  }
+
+  return true;
+}
+
+function randomLinearFractionCoefDistinct(max = LINEAR_EQUATION_COEF_MAX, exclude = []) {
+  const excludeSet = new Set(exclude.map(Math.abs));
+
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const value = randomLinearFractionCoef(max);
+    if (!excludeSet.has(value)) {
+      return value;
+    }
+  }
+
+  for (let value = 1; value <= max; value += 1) {
+    if (!excludeSet.has(value)) {
+      return value;
+    }
+  }
+
+  return 1;
+}
+
+function randomLinearFractionDenominatorDistinct(max = LINEAR_EQUATION_FRACTION_DEN_MAX, exclude = []) {
+  const excludeSet = new Set(exclude.map(Math.abs));
+
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const value = randomLinearFractionDenominator(max);
+    if (!excludeSet.has(value)) {
+      return value;
+    }
+  }
+
+  for (let value = 2; value <= max; value += 1) {
+    if (!excludeSet.has(value)) {
+      return value;
+    }
+  }
+
+  return 2;
+}
+
+function randomLinearFractionSignedConstantDistinct(exclude = []) {
+  const excludeSet = new Set(exclude.map(Math.abs));
+
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const value = randomLinearFractionSignedConstant();
+    if (!excludeSet.has(Math.abs(value))) {
+      return value;
+    }
+  }
+
+  for (let magnitude = 1; magnitude <= 9; magnitude += 1) {
+    if (!excludeSet.has(magnitude)) {
+      return magnitude * (Math.random() < 0.5 ? 1 : -1);
+    }
+  }
+
+  return 1;
+}
+
+function areLinearFractionProblemValuesDistinct(leftTerms, right) {
+  const values = [];
+
+  leftTerms.forEach((term) => {
+    values.push(term.k, term.a, term.b);
+  });
+
+  if (right) {
+    values.push(right.m, right.e, right.f);
+  }
+
+  return linearFractionValuesAreDistinct(values);
+}
+
+function buildDistinctLinearFractionLeftTerms(specs) {
+  const usedValues = [];
+  const terms = [];
+
+  for (const spec of specs) {
+    let term = null;
+
+    for (let attempt = 0; attempt < 80; attempt += 1) {
+      const candidate = {
+        k: randomLinearFractionCoef(spec.coefMax),
+        a: randomLinearFractionSignedConstant(),
+        b: randomLinearFractionDenominator(spec.denMax ?? LINEAR_EQUATION_FRACTION_DEN_MAX),
+        sign: spec.sign,
+      };
+
+      if (linearFractionValuesAreDistinct([...usedValues, candidate.k, candidate.a, candidate.b])) {
+        term = candidate;
+        usedValues.push(candidate.k, candidate.a, candidate.b);
+        break;
+      }
+    }
+
+    if (!term) {
+      return null;
+    }
+
+    terms.push(term);
+  }
+
+  return { terms, usedValues };
+}
+
+function buildDistinctLinearFractionRight(usedValues, coefMax = LINEAR_EQUATION_COEF_MAX) {
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    const right = {
+      m: randomLinearFractionCoef(coefMax),
+      e: randomLinearFractionSignedConstant(),
+      f: randomLinearFractionDenominator(),
+    };
+
+    if (linearFractionValuesAreDistinct([...usedValues, right.m, right.e, right.f])) {
+      return right;
+    }
+  }
+
+  return null;
+}
+
+function areLinearFractionDenominatorsDistinct(leftTerms, right) {
+  const denominators = [...leftTerms.map((term) => term.b)];
+
+  if (right) {
+    denominators.push(right.f);
+  }
+
+  return linearFractionValuesAreDistinct(denominators);
+}
+
+function buildLinearFractionLeftTermsRelaxed(specs) {
+  const usedDenominators = [];
+  const terms = [];
+
+  for (const spec of specs) {
+    let term = null;
+
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      const denominator = randomLinearFractionDenominator(spec.denMax ?? LINEAR_EQUATION_FRACTION_DEN_MAX);
+
+      if (usedDenominators.includes(denominator)) {
+        continue;
+      }
+
+      const useConstant = spec.allowConstant === true && Math.random() < 0.4;
+      term = {
+        k: randomLinearFractionCoef(spec.coefMax),
+        a: useConstant ? randomLinearFractionSignedConstant() : 0,
+        b: denominator,
+        sign: spec.sign,
+      };
+      usedDenominators.push(denominator);
+      break;
+    }
+
+    if (!term) {
+      return null;
+    }
+
+    terms.push(term);
+  }
+
+  return { terms, usedDenominators };
+}
+
+function buildLinearFractionRightRelaxed(usedDenominators, coefMax = LINEAR_EQUATION_COEF_MAX) {
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    const denominator = randomLinearFractionDenominator();
+
+    if (usedDenominators.includes(denominator)) {
+      continue;
+    }
+
+    return {
+      m: randomLinearFractionCoef(coefMax),
+      e: 0,
+      f: denominator,
+    };
+  }
+
+  return null;
+}
+
+function buildLinearEquationFractionProblemFromPreset(displayLevel, variant, preset) {
+  const built = buildLinearEquationFractionProblem({
+    level: displayLevel,
+    variant,
+    leftTerms: preset.leftTerms,
+    right: preset.right,
+    solutionType: 'unique',
+    displayLeft: preset.displayLeft ?? null,
+    displayRight: preset.displayRight ?? null,
+  });
+  setLinearFractionUniqueAnswer(built, preset.answerNum, preset.answerDen);
+  if (preset.answerNegative) {
+    built.answerNegative = true;
+  }
+
+  return built;
+}
+
+const LINEAR_EQUATION_FRACTION_LEVEL5_FALLBACKS = [
+  {
+    leftTerms: [
+      { k: 2, a: 1, b: 3, sign: 1 },
+      { k: 1, a: -2, b: 4, sign: -1 },
+    ],
+    right: { m: 2, e: 1, f: 5 },
+    answerNum: 3,
+    answerDen: 1,
+  },
+  {
+    leftTerms: [
+      { k: 3, a: 0, b: 2, sign: 1 },
+      { k: 1, a: 0, b: 5, sign: 1 },
+    ],
+    right: { m: 2, e: -1, f: 4 },
+    answerNum: 2,
+    answerDen: 1,
+  },
+  {
+    leftTerms: [
+      { k: 2, a: 0, b: 3, sign: 1 },
+      { k: 1, a: 0, b: 6, sign: -1 },
+    ],
+    right: { m: 1, e: 2, f: 5 },
+    answerNum: 4,
+    answerDen: 1,
+  },
+];
+
+const LINEAR_EQUATION_FRACTION_LEVEL6_FALLBACKS = [
+  {
+    leftTerms: [
+      { k: 2, a: 1, b: 3, sign: 1 },
+      { k: 1, a: -1, b: 4, sign: 1 },
+      { k: 1, a: 2, b: 5, sign: -1 },
+    ],
+    right: { m: 2, e: -1, f: 6 },
+    answerNum: 2,
+    answerDen: 1,
+  },
+  {
+    leftTerms: [
+      { k: 3, a: 0, b: 2, sign: 1 },
+      { k: 2, a: 0, b: 5, sign: 1 },
+      { k: 1, a: 0, b: 6, sign: -1 },
+    ],
+    right: { m: 2, e: 1, f: 4 },
+    answerNum: 3,
+    answerDen: 1,
+  },
+  {
+    leftTerms: [
+      { k: 2, a: 0, b: 3, sign: 1 },
+      { k: 1, a: 1, b: 4, sign: 1 },
+      { k: 2, a: 0, b: 5, sign: -1 },
+    ],
+    right: { m: 1, e: -2, f: 6 },
+    answerNum: 4,
+    answerDen: 1,
+  },
+];
+
+function createLinearEquationFractionLevel5Fallback(displayLevel) {
+  const preset = LINEAR_EQUATION_FRACTION_LEVEL5_FALLBACKS[
+    randomWhole(0, LINEAR_EQUATION_FRACTION_LEVEL5_FALLBACKS.length - 1)
+  ];
+  return buildLinearEquationFractionProblemFromPreset(displayLevel, 5, preset);
+}
+
+function createLinearEquationFractionLevel6Fallback(displayLevel) {
+  const preset = LINEAR_EQUATION_FRACTION_LEVEL6_FALLBACKS[
+    randomWhole(0, LINEAR_EQUATION_FRACTION_LEVEL6_FALLBACKS.length - 1)
+  ];
+  return buildLinearEquationFractionProblemFromPreset(displayLevel, 6, preset);
+}
+
+function tryCreateLinearEquationFractionMultiTermUnique(displayLevel, variant, termSpecs, coefMax) {
+  for (let attempt = 0; attempt < 1200; attempt += 1) {
+    const targetX = randomNiceLinearFractionTargetX(displayLevel);
+    const builtLeft = buildLinearFractionLeftTermsRelaxed(termSpecs);
+
+    if (!builtLeft) {
+      continue;
+    }
+
+    const right = buildLinearFractionRightRelaxed(builtLeft.usedDenominators, coefMax);
+
+    if (!right) {
+      continue;
+    }
+
+    const constant = computeRightConstantForTargetX(builtLeft.terms, right, targetX);
+
+    if (constant == null || constant === 0) {
+      continue;
+    }
+
+    const adjustedRight = { ...right, e: constant };
+
+    if (!areLinearFractionDenominatorsDistinct(builtLeft.terms, adjustedRight)) {
+      continue;
+    }
+
+    const built = buildLinearEquationFractionProblem({
+      level: displayLevel,
+      variant,
+      leftTerms: builtLeft.terms,
+      right: adjustedRight,
+      solutionType: 'unique',
+    });
+
+    if (!setLinearFractionUniqueAnswer(built, targetX.num, targetX.den)) {
+      continue;
+    }
+
+    if (!targetXMatchesAnswer(targetX, built.answerNum, built.answerDen, built.answerNegative)) {
+      continue;
+    }
+
+    if (!isNiceLinearFractionAnswer(built.answerNum, built.answerDen, displayLevel)) {
+      continue;
+    }
+
+    return built;
+  }
+
+  return null;
+}
+
+function formatLinearFractionNumeratorText(k, a) {
+  if (k === 0) {
+    return String(a);
+  }
+
+  if (a === 0) {
+    return k === 1 ? 'x' : `${k}x`;
+  }
+
+  const xPart = k === 1 ? 'x' : `${k}x`;
+  const inner = `${xPart}${formatLinearSignedConstantText(a)}`;
+  return `(${inner})`;
+}
+
+function formatLinearFractionTermText(term, isFirst) {
+  const frac = `${formatLinearFractionNumeratorText(term.k, term.a)}/${term.b}`;
+
+  if (isFirst) {
+    return term.sign < 0 ? `−${frac}` : frac;
+  }
+
+  return term.sign < 0 ? ` − ${frac}` : ` + ${frac}`;
+}
+
+function formatLinearFractionRightText(right) {
+  if (right.m === 0 && right.f === 1) {
+    return String(right.e);
+  }
+
+  return `${formatLinearFractionNumeratorText(right.m, right.e)}/${right.f}`;
+}
+
+function formatLinearFractionEquationText(leftTerms, right) {
+  const left = leftTerms.map((term, index) => formatLinearFractionTermText(term, index === 0)).join('');
+  return `${left} = ${formatLinearFractionRightText(right)}`;
+}
+
+function formatAlgebraicFractionHtml(k, a, den) {
+  const numText = formatLinearFractionNumeratorText(k, a);
+  const ariaLabel = `${numText}/${den}`;
+
+  return `<span class="fraction" aria-label="${escapeHtml(ariaLabel)}"><span class="fraction__num">${escapeHtml(numText)}</span><span class="fraction__bar" aria-hidden="true"></span><span class="fraction__den">${escapeHtml(String(den))}</span></span>`;
+}
+
+function formatLinearFractionTermHtml(term, isFirst) {
+  const fracHtml = formatAlgebraicFractionHtml(term.k, term.a, term.b);
+
+  if (isFirst) {
+    return term.sign < 0
+      ? `<span class="problem-expression__term">−</span>${fracHtml}`
+      : fracHtml;
+  }
+
+  const op = term.sign < 0 ? '−' : '+';
+  return `<span class="problem-expression__operator">${op}</span>${fracHtml}`;
+}
+
+function formatLinearFractionRightHtml(right) {
+  if (right.m === 0 && right.f === 1) {
+    return `<span class="problem-expression__term">${escapeHtml(String(right.e))}</span>`;
+  }
+
+  return formatAlgebraicFractionHtml(right.m, right.e, right.f);
+}
+
+function formatLinearFractionEquationHtml(leftTerms, right) {
+  const leftHtml = leftTerms.map((term, index) => formatLinearFractionTermHtml(term, index === 0)).join('');
+  const rightHtml = formatLinearFractionRightHtml(right);
+  return `<span class="problem-expression problem-expression--linear-equation">${leftHtml}<span class="problem-expression__equals">=</span>${rightHtml}</span>`;
+}
+
+function getLinearFractionEquationCoeffs(leftTerms, right) {
+  const dens = [...leftTerms.map((term) => Math.abs(term.b)), Math.abs(right.f)];
+  const L = dens.reduce((acc, den) => lcm(acc, den), 1);
+
+  let xCoeff = 0;
+  let constTerm = 0;
+
+  leftTerms.forEach((term) => {
+    const mult = (L / term.b) * term.sign;
+    xCoeff += mult * term.k;
+    constTerm += mult * term.a;
+  });
+
+  xCoeff -= (L / right.f) * right.m;
+  constTerm = (L / right.f) * right.e - constTerm;
+
+  return { xCoeff, constTerm };
+}
+
+function setLinearFractionUniqueAnswer(problem, numerator, denominator) {
+  if (denominator === 0) {
+    return false;
+  }
+
+  const negative = numerator * denominator < 0;
+  const reduced = reduceFraction(Math.abs(numerator), Math.abs(denominator));
+  problem.solutionType = 'unique';
+  problem.answerKind = 'fraction';
+  problem.answerNum = reduced.num;
+  problem.answerDen = reduced.den;
+  problem.answerNegative = negative;
+  return true;
+}
+
+function buildLinearEquationFractionProblem({
+  level,
+  variant,
+  leftTerms,
+  right,
+  solutionType,
+  answerKind = null,
+  answerNum = null,
+  answerDen = null,
+  answerNegative = false,
+  displayLeft = null,
+  displayRight = null,
+}) {
+  const resolvedDisplayLeft = displayLeft ?? leftTerms.map((term, index) => formatLinearFractionTermText(term, index === 0)).join('');
+  const resolvedDisplayRight = displayRight ?? formatLinearFractionRightText(right);
+
+  return {
+    type: 'linear-equation-fraction',
+    level,
+    variant,
+    leftTerms: leftTerms.map((term) => ({ ...term })),
+    right: { ...right },
+    displayLeft: resolvedDisplayLeft,
+    displayRight: resolvedDisplayRight,
+    solutionType,
+    answerKind: solutionType === 'unique' ? answerKind : null,
+    answerNum: solutionType === 'unique' ? answerNum : null,
+    answerDen: solutionType === 'unique' ? answerDen : null,
+    answerNegative: solutionType === 'unique' ? answerNegative : false,
+    isRetry: false,
+  };
+}
+
+function finalizeLinearEquationFractionProblem(problem, solutionType, leftTerms, right) {
+  const { xCoeff, constTerm } = getLinearFractionEquationCoeffs(leftTerms, right);
+
+  if (solutionType === 'none') {
+    if (xCoeff !== 0 || constTerm === 0) {
+      return null;
+    }
+
+    return buildLinearEquationFractionProblem({
+      level: problem.level,
+      variant: problem.variant,
+      leftTerms,
+      right,
+      solutionType: 'none',
+      displayLeft: problem.displayLeft,
+      displayRight: problem.displayRight,
+    });
+  }
+
+  if (solutionType === 'infinite') {
+    if (xCoeff !== 0 || constTerm !== 0) {
+      return null;
+    }
+
+    return buildLinearEquationFractionProblem({
+      level: problem.level,
+      variant: problem.variant,
+      leftTerms,
+      right,
+      solutionType: 'infinite',
+      displayLeft: problem.displayLeft,
+      displayRight: problem.displayRight,
+    });
+  }
+
+  if (xCoeff === 0) {
+    return null;
+  }
+
+  const answerNum = constTerm;
+  const answerDen = xCoeff;
+  const built = buildLinearEquationFractionProblem({
+    level: problem.level,
+    variant: problem.variant,
+    leftTerms,
+    right,
+    solutionType: 'unique',
+    displayLeft: problem.displayLeft,
+    displayRight: problem.displayRight,
+  });
+
+  if (!setLinearFractionUniqueAnswer(built, answerNum, answerDen)) {
+    return null;
+  }
+
+  if (!isNiceLinearFractionAnswer(built.answerNum, built.answerDen, problem.level)) {
+    return null;
+  }
+
+  return built;
+}
+
+function createLinearEquationFractionLevel1Problem(displayLevel) {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const targetX = randomNiceLinearFractionTargetX(displayLevel);
+    const a = randomLinearFractionDenominator();
+
+    if (targetX.num % a !== 0) {
+      continue;
+    }
+
+    const b = targetX.num / a;
+
+    if (b === 0 || !linearFractionValuesAreDistinct([a, b])) {
+      continue;
+    }
+
+    const x = targetX.num;
+
+    if (x === 0) {
+      continue;
+    }
+
+    const leftTerms = [{ k: 1, a: 0, b: a, sign: 1 }];
+    const right = { m: 0, e: b, f: 1 };
+    const built = buildLinearEquationFractionProblem({
+      level: displayLevel,
+      variant: 1,
+      leftTerms,
+      right,
+      solutionType: 'unique',
+      displayLeft: `x/${a}`,
+      displayRight: String(b),
+    });
+
+    setLinearFractionUniqueAnswer(built, x, 1);
+    return built;
+  }
+
+  const built = buildLinearEquationFractionProblem({
+    level: displayLevel,
+    variant: 1,
+    leftTerms: [{ k: 1, a: 0, b: 3, sign: 1 }],
+    right: { m: 0, e: 5, f: 1 },
+    solutionType: 'unique',
+    displayLeft: 'x/3',
+    displayRight: '5',
+  });
+  setLinearFractionUniqueAnswer(built, 15, 1);
+  return built;
+}
+
+function createLinearEquationFractionLevel2Problem(displayLevel) {
+  const solutionType = pickLinearEquationSolutionType(displayLevel);
+
+  for (let attempt = 0; attempt < 400; attempt += 1) {
+    const a = randomLinearFractionDenominator();
+    const k = randomLinearFractionCoef();
+    const displayLeft = k === 1 ? `x/${a}` : `${k}x/${a}`;
+
+    if (solutionType === 'unique') {
+      const targetX = randomNiceLinearFractionTargetX(displayLevel);
+      const bNum = k * targetX.num;
+      const bDen = targetX.den * a;
+
+      if (bNum % bDen !== 0) {
+        continue;
+      }
+
+      const b = bNum / bDen;
+      if (b === 0 || Math.abs(b) > LINEAR_EQUATION_COEF_MAX) {
+        continue;
+      }
+
+      if (!linearFractionValuesAreDistinct([k, a, b])) {
+        continue;
+      }
+
+      const leftTerms = [{ k, a: 0, b: a, sign: 1 }];
+      const right = { m: 0, e: b, f: 1 };
+      const built = buildLinearEquationFractionProblem({
+        level: displayLevel,
+        variant: 2,
+        leftTerms,
+        right,
+        solutionType: 'unique',
+        displayLeft,
+        displayRight: String(b),
+      });
+
+      if (!setLinearFractionUniqueAnswer(built, targetX.num, targetX.den)) {
+        continue;
+      }
+
+      if (!targetXMatchesAnswer(targetX, built.answerNum, built.answerDen, built.answerNegative)) {
+        continue;
+      }
+
+      return built;
+    }
+
+    const c = solutionType === 'none'
+      ? randomLinearFractionSignedConstantDistinct([k, a])
+      : 0;
+    const leftTerms = [{ k, a: 0, b: a, sign: 1 }, { k, a: 0, b: a, sign: -1 }];
+    const right = { m: 0, e: c, f: 1 };
+    const displayRight = solutionType === 'infinite'
+      ? displayLeft
+      : `${displayLeft}${formatLinearSignedConstantText(c)}`;
+    const result = finalizeLinearEquationFractionProblem(
+      {
+        level: displayLevel,
+        variant: 2,
+        displayLeft,
+        displayRight,
+      },
+      solutionType,
+      leftTerms,
+      right,
+    );
+
+    if (result) {
+      result.displayLeft = displayLeft;
+      result.displayRight = displayRight;
+      return result;
+    }
+  }
+
+  return createLinearEquationFractionLevel1Problem(displayLevel);
+}
+
+function createLinearEquationFractionLevel3Problem(displayLevel) {
+  const solutionType = pickLinearEquationSolutionType(displayLevel);
+
+  if (solutionType !== 'unique') {
+    for (let attempt = 0; attempt < 400; attempt += 1) {
+      const k = randomLinearFractionCoef();
+      const l = randomLinearFractionCoefDistinct(LINEAR_EQUATION_COEF_MAX, [k]);
+      const a = randomLinearFractionDenominator();
+      const b = randomLinearFractionDenominatorDistinct(LINEAR_EQUATION_FRACTION_DEN_MAX, [a]);
+      const c = randomLinearFractionSignedConstantDistinct([k, l, a, b]);
+      const leftTerms = [{ k, a: 0, b: a, sign: 1 }, { k: l, a: 0, b: b, sign: -1 }];
+      const right = { m: 0, e: c, f: 1 };
+      const displayLeft = k === 1 ? `x/${a}` : `${k}x/${a}`;
+      const displayRight = `${l === 1 ? 'x' : `${l}x`}/${b}${formatLinearSignedConstantText(c)}`;
+      const result = finalizeLinearEquationFractionProblem(
+        {
+          level: displayLevel,
+          variant: 3,
+          displayLeft,
+          displayRight,
+        },
+        solutionType,
+        leftTerms,
+        right,
+      );
+
+      if (result) {
+        result.displayLeft = displayLeft;
+        result.displayRight = displayRight;
+        return result;
+      }
+    }
+  }
+
+  for (let attempt = 0; attempt < 500; attempt += 1) {
+    const targetX = randomNiceLinearFractionTargetX(displayLevel);
+    const k = randomLinearFractionCoef();
+    const l = randomLinearFractionCoefDistinct(LINEAR_EQUATION_COEF_MAX, [k]);
+    const a = randomLinearFractionDenominator();
+    const b = randomLinearFractionDenominatorDistinct(LINEAR_EQUATION_FRACTION_DEN_MAX, [a]);
+    const c = computeLevel3ConstantForTargetX(k, l, a, b, targetX);
+
+    if (c == null) {
+      continue;
+    }
+
+    if (!linearFractionValuesAreDistinct([k, l, a, b, c])) {
+      continue;
+    }
+
+    const leftTerms = [{ k, a: 0, b: a, sign: 1 }, { k: l, a: 0, b: b, sign: -1 }];
+    const right = { m: 0, e: c, f: 1 };
+    const displayLeft = k === 1 ? `x/${a}` : `${k}x/${a}`;
+    const displayRight = `${l === 1 ? 'x' : `${l}x`}/${b}${formatLinearSignedConstantText(c)}`;
+    const built = buildLinearEquationFractionProblem({
+      level: displayLevel,
+      variant: 3,
+      leftTerms,
+      right,
+      solutionType: 'unique',
+      displayLeft,
+      displayRight,
+    });
+
+    if (!setLinearFractionUniqueAnswer(built, targetX.num, targetX.den)) {
+      continue;
+    }
+
+    if (!targetXMatchesAnswer(targetX, built.answerNum, built.answerDen, built.answerNegative)) {
+      continue;
+    }
+
+    return built;
+  }
+
+  const built = buildLinearEquationFractionProblem({
+    level: displayLevel,
+    variant: 3,
+    leftTerms: [{ k: 2, a: 0, b: 3, sign: 1 }, { k: 1, a: 0, b: 4, sign: -1 }],
+    right: { m: 0, e: 5, f: 1 },
+    solutionType: 'unique',
+    displayLeft: '2x/3',
+    displayRight: 'x/4 + 5',
+  });
+  setLinearFractionUniqueAnswer(built, 12, 1);
+  return built;
+}
+
+function createLinearEquationFractionLevel4Problem(displayLevel) {
+  const solutionType = pickLinearEquationSolutionType(displayLevel);
+
+  if (solutionType !== 'unique') {
+    for (let attempt = 0; attempt < 400; attempt += 1) {
+      const k = randomLinearFractionCoef();
+      const l = randomLinearFractionCoefDistinct(LINEAR_EQUATION_COEF_MAX, [k]);
+      const b = randomLinearFractionDenominator();
+      const d = randomLinearFractionDenominatorDistinct(LINEAR_EQUATION_FRACTION_DEN_MAX, [b]);
+      const a = randomLinearFractionSignedConstantDistinct([k, l, b, d]);
+      const c = randomLinearFractionSignedConstantDistinct([k, l, b, d, a]);
+      const leftTerms = [{ k, a, b, sign: 1 }];
+      const right = { m: l, e: c, f: d };
+      const result = finalizeLinearEquationFractionProblem(
+        {
+          level: displayLevel,
+          variant: 4,
+          displayLeft: `${formatLinearFractionNumeratorText(k, a)}/${b}`,
+          displayRight: `${formatLinearFractionNumeratorText(l, c)}/${d}`,
+        },
+        solutionType,
+        leftTerms,
+        right,
+      );
+
+      if (result) {
+        return result;
+      }
+    }
+  }
+
+  for (let attempt = 0; attempt < 500; attempt += 1) {
+    const targetX = randomNiceLinearFractionTargetX(displayLevel);
+    const k = randomLinearFractionCoef();
+    const l = randomLinearFractionCoefDistinct(LINEAR_EQUATION_COEF_MAX, [k]);
+    const b = randomLinearFractionDenominator();
+    const d = randomLinearFractionDenominatorDistinct(LINEAR_EQUATION_FRACTION_DEN_MAX, [b]);
+    const a = randomLinearFractionSignedConstantDistinct([k, l, b, d]);
+    const c = computeLevel4RightConstantForTargetX(k, l, a, b, d, targetX);
+
+    if (c == null) {
+      continue;
+    }
+
+    if (!linearFractionValuesAreDistinct([k, l, a, c, b, d])) {
+      continue;
+    }
+
+    const leftTerms = [{ k, a, b, sign: 1 }];
+    const right = { m: l, e: c, f: d };
+    const built = buildLinearEquationFractionProblem({
+      level: displayLevel,
+      variant: 4,
+      leftTerms,
+      right,
+      solutionType: 'unique',
+      displayLeft: `${formatLinearFractionNumeratorText(k, a)}/${b}`,
+      displayRight: `${formatLinearFractionNumeratorText(l, c)}/${d}`,
+    });
+
+    if (!setLinearFractionUniqueAnswer(built, targetX.num, targetX.den)) {
+      continue;
+    }
+
+    if (!targetXMatchesAnswer(targetX, built.answerNum, built.answerDen, built.answerNegative)) {
+      continue;
+    }
+
+    return built;
+  }
+
+  const built = buildLinearEquationFractionProblem({
+    level: displayLevel,
+    variant: 4,
+    leftTerms: [{ k: 2, a: 1, b: 3, sign: 1 }],
+    right: { m: 1, e: -2, f: 5 },
+    solutionType: 'unique',
+    displayLeft: '(2x + 1)/3',
+    displayRight: '(x − 3)/5',
+  });
+  setLinearFractionUniqueAnswer(built, -2, 1);
+  return built;
+}
+
+function createLinearEquationFractionLevel5Problem(displayLevel) {
+  const solutionType = pickLinearEquationSolutionType(displayLevel);
+
+  if (solutionType !== 'unique') {
+    for (let attempt = 0; attempt < 500; attempt += 1) {
+      const builtLeft = buildLinearFractionLeftTermsRelaxed([
+        { coefMax: LINEAR_EQUATION_COEF_MAX, sign: 1, allowConstant: true },
+        { coefMax: LINEAR_EQUATION_COEF_MAX, sign: randomLinearFractionOpSign(), allowConstant: true },
+      ]);
+
+      if (!builtLeft) {
+        continue;
+      }
+
+      const right = buildLinearFractionRightRelaxed(builtLeft.usedDenominators, LINEAR_EQUATION_COEF_MAX);
+
+      if (!right) {
+        continue;
+      }
+
+      right.e = randomLinearFractionSignedConstant();
+
+      const result = finalizeLinearEquationFractionProblem(
+        {
+          level: displayLevel,
+          variant: 5,
+        },
+        solutionType,
+        builtLeft.terms,
+        right,
+      );
+
+      if (result) {
+        return result;
+      }
+    }
+  }
+
+  const uniqueProblem = tryCreateLinearEquationFractionMultiTermUnique(displayLevel, 5, [
+    { coefMax: LINEAR_EQUATION_COEF_MAX, sign: 1, allowConstant: true },
+    { coefMax: LINEAR_EQUATION_COEF_MAX, sign: randomLinearFractionOpSign(), allowConstant: true },
+  ], LINEAR_EQUATION_COEF_MAX);
+
+  if (uniqueProblem) {
+    return uniqueProblem;
+  }
+
+  return createLinearEquationFractionLevel5Fallback(displayLevel);
+}
+
+function createLinearEquationFractionLevel6Problem(displayLevel) {
+  const solutionType = pickLinearEquationSolutionType(displayLevel);
+
+  if (solutionType !== 'unique') {
+    for (let attempt = 0; attempt < 600; attempt += 1) {
+      const builtLeft = buildLinearFractionLeftTermsRelaxed([
+        { coefMax: LINEAR_EQUATION_FRACTION_LEVEL6_COEF_MAX, sign: 1, allowConstant: true },
+        { coefMax: LINEAR_EQUATION_FRACTION_LEVEL6_COEF_MAX, sign: randomLinearFractionOpSign(), allowConstant: true },
+        { coefMax: LINEAR_EQUATION_FRACTION_LEVEL6_COEF_MAX, sign: randomLinearFractionOpSign(), allowConstant: true },
+      ]);
+
+      if (!builtLeft) {
+        continue;
+      }
+
+      const right = buildLinearFractionRightRelaxed(
+        builtLeft.usedDenominators,
+        LINEAR_EQUATION_FRACTION_LEVEL6_COEF_MAX,
+      );
+
+      if (!right) {
+        continue;
+      }
+
+      right.e = randomLinearFractionSignedConstant();
+
+      const result = finalizeLinearEquationFractionProblem(
+        {
+          level: displayLevel,
+          variant: 6,
+        },
+        solutionType,
+        builtLeft.terms,
+        right,
+      );
+
+      if (result) {
+        return result;
+      }
+    }
+  }
+
+  const uniqueProblem = tryCreateLinearEquationFractionMultiTermUnique(displayLevel, 6, [
+    { coefMax: LINEAR_EQUATION_FRACTION_LEVEL6_COEF_MAX, sign: 1, allowConstant: true },
+    { coefMax: LINEAR_EQUATION_FRACTION_LEVEL6_COEF_MAX, sign: randomLinearFractionOpSign(), allowConstant: true },
+    { coefMax: LINEAR_EQUATION_FRACTION_LEVEL6_COEF_MAX, sign: randomLinearFractionOpSign(), allowConstant: true },
+  ], LINEAR_EQUATION_FRACTION_LEVEL6_COEF_MAX);
+
+  if (uniqueProblem) {
+    return uniqueProblem;
+  }
+
+  return createLinearEquationFractionLevel6Fallback(displayLevel);
+}
+
+function createLinearEquationFractionProblem(difficultyLevel) {
+  const displayLevel = difficultyLevel + 1;
+
+  if (displayLevel === 1) {
+    return createLinearEquationFractionLevel1Problem(displayLevel);
+  }
+
+  if (displayLevel === 2) {
+    return createLinearEquationFractionLevel2Problem(displayLevel);
+  }
+
+  if (displayLevel === 3) {
+    return createLinearEquationFractionLevel3Problem(displayLevel);
+  }
+
+  if (displayLevel === 4) {
+    return createLinearEquationFractionLevel4Problem(displayLevel);
+  }
+
+  if (displayLevel === 5) {
+    return createLinearEquationFractionLevel5Problem(displayLevel);
+  }
+
+  return createLinearEquationFractionLevel6Problem(displayLevel);
+}
+
+function formatLinearEquationFractionProblemText(problem) {
+  return `${problem.displayLeft} = ${problem.displayRight}`;
+}
+
+function formatLinearEquationFractionLevel2DisplayHtml(leftTerm, constant = null) {
+  const leftHtml = formatAlgebraicFractionHtml(leftTerm.k, leftTerm.a, leftTerm.b);
+  let rightHtml = formatAlgebraicFractionHtml(leftTerm.k, leftTerm.a, leftTerm.b);
+
+  if (constant !== null && constant !== 0) {
+    const op = constant > 0 ? '+' : '−';
+    rightHtml += `<span class="problem-expression__operator">${op}</span><span class="problem-expression__term">${escapeHtml(String(Math.abs(constant)))}</span>`;
+  }
+
+  return `<span class="problem-expression problem-expression--linear-equation">${leftHtml}<span class="problem-expression__equals">=</span>${rightHtml}</span>`;
+}
+
+function formatLinearEquationFractionLevel3DisplayHtml(leftTerm, subTerm, constant) {
+  const leftHtml = formatAlgebraicFractionHtml(leftTerm.k, leftTerm.a, leftTerm.b);
+  let rightHtml = formatAlgebraicFractionHtml(subTerm.k, subTerm.a, subTerm.b);
+
+  if (constant !== 0) {
+    const op = constant > 0 ? '+' : '−';
+    rightHtml += `<span class="problem-expression__operator">${op}</span><span class="problem-expression__term">${escapeHtml(String(Math.abs(constant)))}</span>`;
+  }
+
+  return `<span class="problem-expression problem-expression--linear-equation">${leftHtml}<span class="problem-expression__equals">=</span>${rightHtml}</span>`;
+}
+
+function formatLinearEquationFractionDisplayHtml(problem) {
+  if (problem.variant === 2 && problem.leftTerms.length === 1) {
+    return formatLinearFractionEquationHtml(problem.leftTerms, problem.right);
+  }
+
+  if (problem.variant === 2 && problem.leftTerms.length === 2 && problem.right.m === 0 && problem.right.f === 1) {
+    return formatLinearEquationFractionLevel2DisplayHtml(
+      problem.leftTerms[0],
+      problem.solutionType === 'none' ? problem.right.e : null,
+    );
+  }
+
+  if (problem.variant === 3 && problem.leftTerms.length === 2 && problem.right.m === 0 && problem.right.f === 1) {
+    return formatLinearEquationFractionLevel3DisplayHtml(
+      problem.leftTerms[0],
+      problem.leftTerms[1],
+      problem.right.e,
+    );
+  }
+
+  return formatLinearFractionEquationHtml(problem.leftTerms, problem.right);
+}
+
+function linearEquationFractionProblemFromRetry(dueRetry) {
+  const problem = buildLinearEquationFractionProblem({
+    level: dueRetry.level,
+    variant: dueRetry.variant,
+    leftTerms: dueRetry.leftTerms,
+    right: dueRetry.right,
+    solutionType: dueRetry.solutionType,
+    answerKind: dueRetry.answerKind,
+    answerNum: dueRetry.answerNum,
+    answerDen: dueRetry.answerDen,
+    answerNegative: dueRetry.answerNegative,
+    displayLeft: dueRetry.displayLeft,
+    displayRight: dueRetry.displayRight,
+  });
+  problem.isRetry = true;
+  return problem;
+}
+
 function isLinearEquationProblem(problem) {
-  return problem?.type === 'linear-equation';
+  return problem?.type === 'linear-equation'
+    || problem?.type === 'linear-equation-fraction';
 }
 
 function isLinearEquationIntegerAnswerInput() {
@@ -2103,8 +3507,8 @@ function updateLinearEquationActionsUi(problem) {
   }
 
   const visible = isLinearEquationProblem(problem)
-    && !isDecimalCompareProblem(problem)
-    && !isDecimalCompareExerciseMode()
+    && !isCompareProblem(problem)
+    && !isCompareExerciseMode()
     && problem.level >= 2;
   linearEquationActionsEl.hidden = !visible;
 
@@ -2236,6 +3640,57 @@ function formatLinearEquationSessionAnswer(userAnswer) {
 
 function isDecimalCompareProblem(problem) {
   return problem?.type === 'decimal-compare';
+}
+
+function isIntegerCompareProblem(problem) {
+  return problem?.type === 'integer-compare';
+}
+
+function isNonIntegerCompareProblem(problem) {
+  return problem?.type === 'non-integer-compare';
+}
+
+function isFractionCompareProblem(problem) {
+  return problem?.type === 'fraction-compare';
+}
+
+function isCompareProblem(problem) {
+  return isDecimalCompareProblem(problem)
+    || isIntegerCompareProblem(problem)
+    || isNonIntegerCompareProblem(problem)
+    || isFractionCompareProblem(problem);
+}
+
+function getCompareOperandValue(operand) {
+  if (operand?.kind === 'decimal' || operand?.kind === 'fraction') {
+    return getNonIntegerTermValue(operand);
+  }
+
+  return operand.value;
+}
+
+function compareOperandsEqual(left, right) {
+  return Math.abs(getCompareOperandValue(left) - getCompareOperandValue(right)) < 1e-9;
+}
+
+function formatCompareOperand(problem, operand) {
+  if (isIntegerCompareProblem(problem)) {
+    return formatIntegerAnswer(operand.value);
+  }
+
+  if (isNonIntegerCompareProblem(problem) || isFractionCompareProblem(problem)) {
+    return formatNonIntegerTermText(operand);
+  }
+
+  return formatDecimal(operand.value, operand.decimals);
+}
+
+function formatCompareOperandHtml(problem, operand) {
+  if (isNonIntegerCompareProblem(problem) || isFractionCompareProblem(problem)) {
+    return formatNonIntegerTermHtml(operand);
+  }
+
+  return escapeHtml(formatCompareOperand(problem, operand));
 }
 
 function compareDecimalOperands(left, right) {
@@ -2386,17 +3841,24 @@ function generateDecimalCompareOrderOperands(displayLevel) {
   return operands;
 }
 
-function formatDecimalCompareOperand(operand) {
-  return formatDecimal(operand.value, operand.decimals);
+function getCompareSignAnswer(left, right) {
+  const leftValue = getCompareOperandValue(left);
+  const rightValue = getCompareOperandValue(right);
+
+  if (leftValue < rightValue) {
+    return '<';
+  }
+
+  if (leftValue > rightValue) {
+    return '>';
+  }
+
+  return '=';
 }
 
-function getDecimalCompareSignAnswer(left, right) {
-  return compareDecimalOperands(left, right);
-}
-
-function getDecimalCompareSortedIndices(operands) {
+function getCompareSortedIndices(operands) {
   return operands
-    .map((operand, index) => ({ index, value: operand.value }))
+    .map((operand, index) => ({ index, value: getCompareOperandValue(operand) }))
     .sort((a, b) => a.value - b.value)
     .map((item) => item.index);
 }
@@ -2444,7 +3906,7 @@ function createDecimalCompareSignProblem(displayLevel) {
     variant: 'sign',
     left,
     right,
-    answerSign: getDecimalCompareSignAnswer(left, right),
+    answerSign: getCompareSignAnswer(left, right),
   });
 }
 
@@ -2452,7 +3914,7 @@ function createDecimalCompareOrderProblem(displayLevel) {
   const operands = generateDecimalCompareOrderOperands(displayLevel);
   let displayOrder = shuffleIndices(operands.length);
 
-  while (displayOrder.every((value, index) => value === getDecimalCompareSortedIndices(operands)[index])) {
+  while (displayOrder.every((value, index) => value === getCompareSortedIndices(operands)[index])) {
     displayOrder = shuffleIndices(operands.length);
   }
 
@@ -2460,7 +3922,7 @@ function createDecimalCompareOrderProblem(displayLevel) {
     displayLevel,
     variant: 'order',
     operands,
-    correctOrder: getDecimalCompareSortedIndices(operands),
+    correctOrder: getCompareSortedIndices(operands),
     displayOrder,
   });
 }
@@ -2475,28 +3937,747 @@ function createDecimalCompareProblem(level) {
   return createDecimalCompareOrderProblem(displayLevel);
 }
 
-function formatDecimalCompareSignText(problem, sign = '?') {
-  return `${formatDecimalCompareOperand(problem.left)} ${sign} ${formatDecimalCompareOperand(problem.right)}`;
+function buildIntegerCompareOperand(value) {
+  return { value };
 }
 
-function formatDecimalCompareOrderListText(operands, order) {
+function randomPositiveIntegerCompareValue() {
+  return randomWhole(1, INTEGER_COMPARE_POSITIVE_MAX);
+}
+
+function randomNegativeIntegerCompareValue() {
+  return -randomWhole(1, INTEGER_COMPARE_POSITIVE_MAX);
+}
+
+function randomNonPositiveIntegerCompareValue() {
+  if (Math.random() < INTEGER_COMPARE_NON_POSITIVE_ZERO_RATE) {
+    return 0;
+  }
+
+  return randomNegativeIntegerCompareValue();
+}
+
+function randomIntegerCompareValue() {
+  return randomWhole(INTEGER_COMPARE_VALUE_MIN, INTEGER_COMPARE_VALUE_MAX);
+}
+
+function pickCompareOperandSign(mode, { positiveOnLeft = false, side = 'left' } = {}) {
+  if (mode === 'both-positive') {
+    return 1;
+  }
+
+  if (mode === 'both-non-positive') {
+    if (Math.random() < INTEGER_COMPARE_NON_POSITIVE_ZERO_RATE) {
+      return 0;
+    }
+
+    return -1;
+  }
+
+  const isPositiveSide = side === 'left' ? positiveOnLeft : !positiveOnLeft;
+
+  if (isPositiveSide) {
+    return 1;
+  }
+
+  if (Math.random() < INTEGER_COMPARE_NON_POSITIVE_ZERO_RATE) {
+    return 0;
+  }
+
+  return -1;
+}
+
+function pickIntegerCompareSignPairMode() {
+  const roll = Math.random();
+
+  if (roll < INTEGER_COMPARE_BOTH_POSITIVE_RATE) {
+    return 'both-positive';
+  }
+
+  if (roll < INTEGER_COMPARE_BOTH_POSITIVE_RATE + INTEGER_COMPARE_MIXED_SIGN_RATE) {
+    return 'mixed';
+  }
+
+  return 'both-non-positive';
+}
+
+function randomIntegerCompareValueForSignMode(mode, { positiveOnLeft = false, side = 'left' } = {}) {
+  const sign = pickCompareOperandSign(mode, { positiveOnLeft, side });
+
+  if (sign === 0) {
+    return 0;
+  }
+
+  if (sign === 1) {
+    return randomPositiveIntegerCompareValue();
+  }
+
+  return randomNegativeIntegerCompareValue();
+}
+
+function generateDistinctIntegerCompareOperand(existing = [], valuePicker = randomIntegerCompareValue) {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const operand = buildIntegerCompareOperand(valuePicker());
+
+    if (!existing.some((item) => compareOperandsEqual(item, operand))) {
+      return operand;
+    }
+  }
+
+  return buildIntegerCompareOperand(valuePicker());
+}
+
+function generateDistinctIntegerCompareOperandForSignMode(existing, mode, options) {
+  return generateDistinctIntegerCompareOperand(
+    existing,
+    () => randomIntegerCompareValueForSignMode(mode, options),
+  );
+}
+
+function finalizeIntegerCompareSignPair(left, right, mode, positiveOnLeft) {
+  if (Math.random() < INTEGER_COMPARE_EQUAL_RATE) {
+    return [left, buildIntegerCompareOperand(left.value)];
+  }
+
+  if (compareOperandsEqual(left, right)) {
+    return [
+      left,
+      generateDistinctIntegerCompareOperandForSignMode(
+        [left],
+        mode,
+        { positiveOnLeft, side: 'right' },
+      ),
+    ];
+  }
+
+  return [left, right];
+}
+
+function generateIntegerCompareSignPair() {
+  const mode = pickIntegerCompareSignPairMode();
+  const positiveOnLeft = Math.random() < 0.5;
+  const left = buildIntegerCompareOperand(
+    randomIntegerCompareValueForSignMode(mode, { positiveOnLeft, side: 'left' }),
+  );
+  const right = buildIntegerCompareOperand(
+    randomIntegerCompareValueForSignMode(mode, { positiveOnLeft, side: 'right' }),
+  );
+
+  return finalizeIntegerCompareSignPair(left, right, mode, positiveOnLeft);
+}
+
+function generateIntegerCompareOrderOperands(count) {
+  const operands = [];
+
+  while (operands.length < 2) {
+    operands.push(generateDistinctIntegerCompareOperand(operands, randomNegativeIntegerCompareValue));
+  }
+
+  while (operands.length < count) {
+    operands.push(generateDistinctIntegerCompareOperand(operands));
+  }
+
+  return operands;
+}
+
+function buildIntegerCompareProblem({
+  displayLevel,
+  variant,
+  left = null,
+  right = null,
+  operands = null,
+  answerSign = null,
+  correctOrder = null,
+  displayOrder = null,
+}) {
+  return {
+    type: 'integer-compare',
+    variant,
+    level: displayLevel,
+    left,
+    right,
+    operands,
+    answerSign,
+    correctOrder,
+    displayOrder,
+    isRetry: false,
+  };
+}
+
+function createIntegerCompareSignProblem(displayLevel) {
+  const [left, right] = generateIntegerCompareSignPair();
+
+  return buildIntegerCompareProblem({
+    displayLevel,
+    variant: 'sign',
+    left,
+    right,
+    answerSign: getCompareSignAnswer(left, right),
+  });
+}
+
+function createIntegerCompareOrderProblem(displayLevel, count) {
+  const operands = generateIntegerCompareOrderOperands(count);
+  let displayOrder = shuffleIndices(operands.length);
+
+  while (displayOrder.every((value, index) => value === getCompareSortedIndices(operands)[index])) {
+    displayOrder = shuffleIndices(operands.length);
+  }
+
+  return buildIntegerCompareProblem({
+    displayLevel,
+    variant: 'order',
+    operands,
+    correctOrder: getCompareSortedIndices(operands),
+    displayOrder,
+  });
+}
+
+function createIntegerCompareProblem(level) {
+  const displayLevel = level + 1;
+
+  if (displayLevel <= 2) {
+    return createIntegerCompareSignProblem(displayLevel);
+  }
+
+  if (displayLevel === 3) {
+    return createIntegerCompareOrderProblem(displayLevel, 3);
+  }
+
+  return createIntegerCompareOrderProblem(displayLevel, 4);
+}
+
+function cloneNonIntegerCompareOperand(operand) {
+  return { ...operand };
+}
+
+function buildNonIntegerCompareDecimalOperand(sign) {
+  if (sign === 0) {
+    return { kind: 'decimal', magnitude: 0, sign: 1 };
+  }
+
+  return {
+    kind: 'decimal',
+    magnitude: randomNonIntegerDecimalMagnitude(),
+    sign,
+  };
+}
+
+function buildNonIntegerCompareFractionOperand(sign) {
+  if (sign === 0) {
+    return { kind: 'fraction', num: 0, den: 1, sign: 1 };
+  }
+
+  const den = randomWhole(2, NON_INTEGER_FRACTION_DEN_MAX);
+  const num = randomWhole(1, den - 1);
+
+  return {
+    kind: 'fraction',
+    num,
+    den,
+    sign,
+  };
+}
+
+function buildNonIntegerCompareOperand(kind, sign) {
+  if (kind === 'decimal') {
+    return buildNonIntegerCompareDecimalOperand(sign);
+  }
+
+  return buildNonIntegerCompareFractionOperand(sign);
+}
+
+function generateDistinctNonIntegerCompareOperand(kind, existing = [], signPicker = null) {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const sign = signPicker
+      ? signPicker()
+      : pickCompareOperandSign(
+        pickIntegerCompareSignPairMode(),
+        { positiveOnLeft: Math.random() < 0.5, side: 'left' },
+      );
+    const operand = buildNonIntegerCompareOperand(kind, sign);
+
+    if (!existing.some((item) => compareOperandsEqual(item, operand))) {
+      return operand;
+    }
+  }
+
+  return buildNonIntegerCompareOperand(kind, -1);
+}
+
+function buildNonIntegerCompareFractionOperandForDen(sign, den, num = null) {
+  if (sign === 0) {
+    return { kind: 'fraction', num: 0, den: 1, sign: 1 };
+  }
+
+  const resolvedNum = num ?? randomWhole(1, den - 1);
+
+  return {
+    kind: 'fraction',
+    num: resolvedNum,
+    den,
+    sign,
+  };
+}
+
+function pickNonIntegerCompareOperandSign(signPicker = null) {
+  if (signPicker) {
+    return signPicker();
+  }
+
+  return pickCompareOperandSign(
+    pickIntegerCompareSignPairMode(),
+    { positiveOnLeft: Math.random() < 0.5, side: 'left' },
+  );
+}
+
+function generateDistinctNonIntegerCompareFractionOperandForDen(den, existing = [], signPicker = null) {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const operand = buildNonIntegerCompareFractionOperandForDen(
+      pickNonIntegerCompareOperandSign(signPicker),
+      den,
+    );
+
+    if (!existing.some((item) => compareOperandsEqual(item, operand))) {
+      return operand;
+    }
+  }
+
+  for (let num = 1; num < den; num += 1) {
+    const operand = buildNonIntegerCompareFractionOperandForDen(
+      pickNonIntegerCompareOperandSign(signPicker),
+      den,
+      num,
+    );
+
+    if (!existing.some((item) => compareOperandsEqual(item, operand))) {
+      return operand;
+    }
+  }
+
+  return buildNonIntegerCompareFractionOperandForDen(-1, den);
+}
+
+function finalizeNonIntegerCompareSignPair(left, right, mode, positiveOnLeft, leftKind, rightKind) {
+  if (Math.random() < INTEGER_COMPARE_EQUAL_RATE) {
+    return [left, cloneNonIntegerCompareOperand(left)];
+  }
+
+  if (compareOperandsEqual(left, right)) {
+    return [
+      left,
+      generateDistinctNonIntegerCompareOperand(
+        rightKind,
+        [left],
+        () => pickCompareOperandSign(mode, { positiveOnLeft, side: 'right' }),
+      ),
+    ];
+  }
+
+  return [left, right];
+}
+
+function generateNonIntegerCompareSignPair(displayLevel) {
+  const mode = pickIntegerCompareSignPairMode();
+  const positiveOnLeft = Math.random() < 0.5;
+  let leftKind = 'decimal';
+  let rightKind = 'decimal';
+
+  if (displayLevel === 2) {
+    leftKind = 'fraction';
+    rightKind = 'fraction';
+  } else if (displayLevel === 3) {
+    const fractionOnLeft = Math.random() < 0.5;
+    leftKind = fractionOnLeft ? 'fraction' : 'decimal';
+    rightKind = fractionOnLeft ? 'decimal' : 'fraction';
+  }
+
+  let left;
+  let right;
+
+  if (displayLevel === 2) {
+    const [leftDen, rightDen] = generateFriendlyFractionCompareDenominators(2);
+    left = generateDistinctNonIntegerCompareFractionOperandForDen(
+      leftDen,
+      [],
+      () => pickCompareOperandSign(mode, { positiveOnLeft, side: 'left' }),
+    );
+    right = generateDistinctNonIntegerCompareFractionOperandForDen(
+      rightDen,
+      [left],
+      () => pickCompareOperandSign(mode, { positiveOnLeft, side: 'right' }),
+    );
+  } else {
+    left = buildNonIntegerCompareOperand(
+      leftKind,
+      pickCompareOperandSign(mode, { positiveOnLeft, side: 'left' }),
+    );
+    right = buildNonIntegerCompareOperand(
+      rightKind,
+      pickCompareOperandSign(mode, { positiveOnLeft, side: 'right' }),
+    );
+  }
+
+  return finalizeNonIntegerCompareSignPair(
+    left,
+    right,
+    mode,
+    positiveOnLeft,
+    leftKind,
+    rightKind,
+  );
+}
+
+function getNonIntegerCompareOrderKinds(displayLevel) {
+  if (displayLevel === 4) {
+    return ['decimal', 'decimal', 'decimal'];
+  }
+
+  if (displayLevel === 5) {
+    return ['fraction', 'fraction', 'fraction'];
+  }
+
+  return ['decimal', 'decimal', 'fraction', 'fraction'];
+}
+
+function generateNonIntegerCompareOrderOperands(displayLevel) {
+  const kinds = getNonIntegerCompareOrderKinds(displayLevel);
+  const operands = [];
+  const fractionCount = kinds.filter((kind) => kind === 'fraction').length;
+  const friendlyDenominators = fractionCount > 0
+    ? generateFriendlyFractionCompareDenominators(fractionCount)
+    : [];
+  let fractionIndex = 0;
+
+  const addOperand = (kind, signPicker = null) => {
+    if (kind === 'fraction') {
+      operands.push(
+        generateDistinctNonIntegerCompareFractionOperandForDen(
+          friendlyDenominators[fractionIndex],
+          operands,
+          signPicker,
+        ),
+      );
+      fractionIndex += 1;
+      return;
+    }
+
+    operands.push(generateDistinctNonIntegerCompareOperand(kind, operands, signPicker));
+  };
+
+  while (operands.length < 2) {
+    addOperand(kinds[operands.length], () => -1);
+  }
+
+  while (operands.length < kinds.length) {
+    addOperand(kinds[operands.length]);
+  }
+
+  return operands;
+}
+
+function buildNonIntegerCompareProblem({
+  displayLevel,
+  variant,
+  left = null,
+  right = null,
+  operands = null,
+  answerSign = null,
+  correctOrder = null,
+  displayOrder = null,
+}) {
+  return {
+    type: 'non-integer-compare',
+    variant,
+    level: displayLevel,
+    left,
+    right,
+    operands,
+    answerSign,
+    correctOrder,
+    displayOrder,
+    isRetry: false,
+  };
+}
+
+function createNonIntegerCompareSignProblem(displayLevel) {
+  const [left, right] = generateNonIntegerCompareSignPair(displayLevel);
+
+  return buildNonIntegerCompareProblem({
+    displayLevel,
+    variant: 'sign',
+    left,
+    right,
+    answerSign: getCompareSignAnswer(left, right),
+  });
+}
+
+function createNonIntegerCompareOrderProblem(displayLevel) {
+  const operands = generateNonIntegerCompareOrderOperands(displayLevel);
+  let displayOrder = shuffleIndices(operands.length);
+
+  while (displayOrder.every((value, index) => value === getCompareSortedIndices(operands)[index])) {
+    displayOrder = shuffleIndices(operands.length);
+  }
+
+  return buildNonIntegerCompareProblem({
+    displayLevel,
+    variant: 'order',
+    operands,
+    correctOrder: getCompareSortedIndices(operands),
+    displayOrder,
+  });
+}
+
+function createNonIntegerCompareProblem(level) {
+  const displayLevel = level + 1;
+
+  if (displayLevel <= 3) {
+    return createNonIntegerCompareSignProblem(displayLevel);
+  }
+
+  return createNonIntegerCompareOrderProblem(displayLevel);
+}
+
+function buildFractionCompareProblem({
+  displayLevel,
+  variant,
+  left = null,
+  right = null,
+  operands = null,
+  answerSign = null,
+  correctOrder = null,
+  displayOrder = null,
+}) {
+  return {
+    type: 'fraction-compare',
+    variant,
+    level: displayLevel,
+    left,
+    right,
+    operands,
+    answerSign,
+    correctOrder,
+    displayOrder,
+    isRetry: false,
+  };
+}
+
+function buildPositiveFractionCompareOperand(num, den) {
+  return { kind: 'fraction', num, den, sign: 1 };
+}
+
+function createRandomPositiveProperFractionOperand({ den = null } = {}) {
+  const resolvedDen = den ?? randomWhole(2, NON_INTEGER_FRACTION_DEN_MAX);
+  const num = randomWhole(1, resolvedDen - 1);
+  return buildPositiveFractionCompareOperand(num, resolvedDen);
+}
+
+function createRandomDistinctPositiveProperFractionOperand(existing = [], options = {}) {
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    const operand = createRandomPositiveProperFractionOperand(options);
+    if (!existing.some((item) => compareOperandsEqual(item, operand))) {
+      return operand;
+    }
+  }
+
+  return createRandomPositiveProperFractionOperand(options);
+}
+
+function getArrayLcm(values) {
+  return values.reduce((result, value) => lcm(result, value), 1);
+}
+
+function isFriendlyFractionCompareDenominatorSet(denominators, count) {
+  if (denominators.length !== count) {
+    return false;
+  }
+
+  if (new Set(denominators).size !== count) {
+    return false;
+  }
+
+  if (denominators.some((den) => den > NON_INTEGER_FRACTION_DEN_MAX)) {
+    return false;
+  }
+
+  return getArrayLcm(denominators) <= FRACTION_COMPARE_ORDER_LCM_MAX;
+}
+
+function generateFriendlyFractionCompareDenominators(count) {
+  const presets = FRACTION_COMPARE_ORDER_DENOMINATOR_PRESETS[count] ?? [];
+  const multiplierSets = FRACTION_COMPARE_ORDER_MULTIPLIER_SETS[count] ?? [[1, 2, 3]];
+
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    if (presets.length > 0 && Math.random() < 0.45) {
+      const denominators = pickRandomItem(presets);
+
+      if (isFriendlyFractionCompareDenominatorSet(denominators, count)) {
+        return denominators;
+      }
+
+      continue;
+    }
+
+    const base = pickRandomItem(FRACTION_COMPARE_ORDER_BASES);
+    const multipliers = pickRandomItem(multiplierSets);
+    const denominators = multipliers.map((multiplier) => base * multiplier);
+
+    if (isFriendlyFractionCompareDenominatorSet(denominators, count)) {
+      return denominators;
+    }
+  }
+
+  const fallbackSets = {
+    2: [3, 5],
+    3: [3, 5, 9],
+    4: [3, 5, 9, 15],
+  };
+
+  return fallbackSets[count] ?? [3, 5, 9];
+}
+
+function createDistinctPositiveProperFractionOperandForDen(den, existing = []) {
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    const num = randomWhole(1, den - 1);
+    const operand = buildPositiveFractionCompareOperand(num, den);
+
+    if (!existing.some((item) => compareOperandsEqual(item, operand))) {
+      return operand;
+    }
+  }
+
+  for (let num = 1; num < den; num += 1) {
+    const operand = buildPositiveFractionCompareOperand(num, den);
+
+    if (!existing.some((item) => compareOperandsEqual(item, operand))) {
+      return operand;
+    }
+  }
+
+  return buildPositiveFractionCompareOperand(1, den);
+}
+
+function createFractionCompareSignPair(displayLevel) {
+  if (displayLevel === 1) {
+    const den = randomWhole(2, NON_INTEGER_FRACTION_DEN_MAX);
+    const left = createRandomDistinctPositiveProperFractionOperand([], { den });
+
+    if (Math.random() < FRACTION_COMPARE_EQUAL_RATE) {
+      return [left, buildPositiveFractionCompareOperand(left.num, left.den)];
+    }
+
+    return [
+      left,
+      createRandomDistinctPositiveProperFractionOperand([left], { den }),
+    ];
+  }
+
+  const [leftDen, rightDen] = generateFriendlyFractionCompareDenominators(2);
+  const left = createRandomDistinctPositiveProperFractionOperand([], { den: leftDen });
+
+  if (Math.random() < FRACTION_COMPARE_EQUAL_RATE) {
+    return [left, buildPositiveFractionCompareOperand(left.num, left.den)];
+  }
+
+  return [
+    left,
+    createRandomDistinctPositiveProperFractionOperand([left], { den: rightDen }),
+  ];
+}
+
+function createFractionCompareSignProblem(displayLevel) {
+  const [left, right] = createFractionCompareSignPair(displayLevel);
+
+  return buildFractionCompareProblem({
+    displayLevel,
+    variant: 'sign',
+    left,
+    right,
+    answerSign: getCompareSignAnswer(left, right),
+  });
+}
+
+function createFractionCompareOrderProblem(displayLevel, count) {
+  const denominators = generateFriendlyFractionCompareDenominators(count);
+  const operands = [];
+
+  denominators.forEach((den) => {
+    operands.push(createDistinctPositiveProperFractionOperandForDen(den, operands));
+  });
+
+  let displayOrder = shuffleIndices(operands.length);
+
+  while (displayOrder.every((value, index) => value === getCompareSortedIndices(operands)[index])) {
+    displayOrder = shuffleIndices(operands.length);
+  }
+
+  return buildFractionCompareProblem({
+    displayLevel,
+    variant: 'order',
+    operands,
+    correctOrder: getCompareSortedIndices(operands),
+    displayOrder,
+  });
+}
+
+function createFractionCompareProblem(level) {
+  const displayLevel = level + 1;
+
+  if (displayLevel <= 3) {
+    return createFractionCompareSignProblem(displayLevel);
+  }
+
+  if (displayLevel === 4) {
+    return createFractionCompareOrderProblem(displayLevel, 3);
+  }
+
+  return createFractionCompareOrderProblem(displayLevel, 4);
+}
+
+function nonIntegerCompareProblemFromRetry(dueRetry) {
+  const problem = buildNonIntegerCompareProblem({
+    displayLevel: dueRetry.level,
+    variant: dueRetry.variant,
+    left: dueRetry.left ? cloneNonIntegerCompareOperand(dueRetry.left) : null,
+    right: dueRetry.right ? cloneNonIntegerCompareOperand(dueRetry.right) : null,
+    operands: dueRetry.operands ? dueRetry.operands.map(cloneNonIntegerCompareOperand) : null,
+    answerSign: dueRetry.answerSign,
+    correctOrder: dueRetry.correctOrder ? [...dueRetry.correctOrder] : null,
+  });
+
+  if (dueRetry.variant === 'order') {
+    problem.displayOrder = dueRetry.displayOrder
+      ? [...dueRetry.displayOrder]
+      : shuffleIndices(problem.operands.length);
+  }
+
+  problem.isRetry = true;
+  return problem;
+}
+
+function formatCompareSignText(problem, sign = '?') {
+  return `${formatCompareOperand(problem, problem.left)} ${sign} ${formatCompareOperand(problem, problem.right)}`;
+}
+
+function formatCompareOrderListText(problem, order) {
   return order
-    .map((index) => formatDecimalCompareOperand(operands[index]))
+    .map((index) => formatCompareOperand(problem, problem.operands[index]))
     .join('; ');
 }
 
-function formatDecimalCompareProblemText(problem) {
+function formatCompareProblemText(problem) {
   if (problem.variant === 'sign') {
-    return formatDecimalCompareSignText(problem, '?');
+    return formatCompareSignText(problem, '?');
   }
 
   const order = problem.displayOrder ?? shuffleIndices(problem.operands.length);
-  return `Uspořádej: ${formatDecimalCompareOrderListText(problem.operands, order)}`;
+  return `Uspořádej: ${formatCompareOrderListText(problem, order)}`;
 }
 
-function formatDecimalCompareSignHtml(problem, sign = '?', review = null) {
-  const left = formatDecimalCompareOperand(problem.left);
-  const right = formatDecimalCompareOperand(problem.right);
+function formatCompareSignHtml(problem, sign = '?', review = null) {
+  const left = formatCompareOperandHtml(problem, problem.left);
+  const right = formatCompareOperandHtml(problem, problem.right);
   const slotClasses = ['decimal-compare-sign-slot'];
 
   if (sign !== '?') {
@@ -2511,36 +4692,84 @@ function formatDecimalCompareSignHtml(problem, sign = '?', review = null) {
 
   const signHtml = `<span class="${slotClasses.join(' ')}">${escapeHtml(sign)}</span>`;
 
-  return `<span class="problem-expression problem-expression--decimal-compare">${escapeHtml(left)}${signHtml}${escapeHtml(right)}</span>`;
+  return `<span class="problem-expression problem-expression--decimal-compare">${left}${signHtml}${right}</span>`;
 }
 
-function renderDecimalCompareSignProblem(problem, { sign = null, review = null } = {}) {
+function renderCompareSignProblem(problem, { sign = null, review = null } = {}) {
   const displaySign = sign ?? decimalCompareSelectedSign ?? '?';
-  problemEl.innerHTML = formatDecimalCompareSignHtml(problem, displaySign, review);
+  problemEl.innerHTML = formatCompareSignHtml(problem, displaySign, review);
 }
 
-function formatDecimalCompareDisplayHtml(problem) {
+function formatCompareDisplayHtml(problem) {
   if (problem.variant === 'sign') {
-    return formatDecimalCompareSignHtml(problem, '?');
+    return formatCompareSignHtml(problem, '?');
   }
 
   return '<span class="problem-expression problem-expression--decimal-compare">Uspořádej čísla od nejmenšího po největší</span>';
 }
 
-function formatDecimalCompareCorrectAnswer(problem) {
+function formatCompareCorrectAnswer(problem) {
   if (problem.variant === 'sign') {
-    return formatDecimalCompareSignText(problem, problem.answerSign);
+    return formatCompareSignText(problem, problem.answerSign);
   }
 
-  return formatDecimalCompareOrderListText(problem.operands, problem.correctOrder);
+  return formatCompareOrderListText(problem, problem.correctOrder);
 }
 
-function formatDecimalCompareSessionAnswer(problem, userAnswer) {
+function formatCompareSessionAnswer(problem, userAnswer) {
   if (problem.variant === 'sign') {
-    return formatDecimalCompareSignText(problem, userAnswer.sign);
+    return formatCompareSignText(problem, userAnswer.sign);
   }
 
-  return formatDecimalCompareOrderListText(problem.operands, userAnswer.order);
+  return formatCompareOrderListText(problem, userAnswer.order);
+}
+
+function integerCompareProblemFromRetry(dueRetry) {
+  const problem = buildIntegerCompareProblem({
+    displayLevel: dueRetry.level,
+    variant: dueRetry.variant,
+    left: dueRetry.left ? { ...dueRetry.left } : null,
+    right: dueRetry.right ? { ...dueRetry.right } : null,
+    operands: dueRetry.operands ? dueRetry.operands.map((operand) => ({ ...operand })) : null,
+    answerSign: dueRetry.answerSign,
+    correctOrder: dueRetry.correctOrder ? [...dueRetry.correctOrder] : null,
+  });
+
+  if (dueRetry.variant === 'order') {
+    problem.displayOrder = dueRetry.displayOrder
+      ? [...dueRetry.displayOrder]
+      : shuffleIndices(problem.operands.length);
+  }
+
+  problem.isRetry = true;
+  return problem;
+}
+
+function compareProblemFromRetry(dueRetry) {
+  if (dueRetry.type === 'integer-compare') {
+    return integerCompareProblemFromRetry(dueRetry);
+  }
+
+  if (dueRetry.type === 'non-integer-compare') {
+    return nonIntegerCompareProblemFromRetry(dueRetry);
+  }
+
+  if (dueRetry.type === 'fraction-compare') {
+    const problem = buildFractionCompareProblem({
+      displayLevel: dueRetry.level,
+      variant: dueRetry.variant,
+      left: dueRetry.left ? { ...dueRetry.left } : null,
+      right: dueRetry.right ? { ...dueRetry.right } : null,
+      operands: dueRetry.operands ? dueRetry.operands.map((operand) => ({ ...operand })) : null,
+      answerSign: dueRetry.answerSign,
+      correctOrder: dueRetry.correctOrder ? [...dueRetry.correctOrder] : null,
+      displayOrder: dueRetry.displayOrder ? [...dueRetry.displayOrder] : null,
+    });
+    problem.isRetry = true;
+    return problem;
+  }
+
+  return decimalCompareProblemFromRetry(dueRetry);
 }
 
 function decimalCompareProblemFromRetry(dueRetry) {
@@ -2579,17 +4808,17 @@ function setDecimalCompareSelectedSign(sign) {
     button.classList.toggle('is-selected', button.dataset.decimalCompareSign === sign);
   });
 
-  if (isDecimalCompareProblem(currentProblem) && currentProblem.variant === 'sign') {
-    renderDecimalCompareSignProblem(currentProblem);
+  if (isCompareProblem(currentProblem) && currentProblem.variant === 'sign') {
+    renderCompareSignProblem(currentProblem);
   }
 }
 
 function setDecimalCompareSignReviewHighlight(isCorrect) {
-  if (!isDecimalCompareProblem(currentProblem) || currentProblem.variant !== 'sign') {
+  if (!isCompareProblem(currentProblem) || currentProblem.variant !== 'sign') {
     return;
   }
 
-  renderDecimalCompareSignProblem(currentProblem, {
+  renderCompareSignProblem(currentProblem, {
     sign: decimalCompareSelectedSign,
     review: isCorrect ? 'correct' : 'wrong',
   });
@@ -2603,7 +4832,7 @@ function setDecimalCompareSignReviewHighlight(isCorrect) {
 }
 
 function setDecimalCompareOrderReviewHighlight() {
-  if (!isDecimalCompareProblem(currentProblem) || currentProblem.variant !== 'order') {
+  if (!isCompareProblem(currentProblem) || currentProblem.variant !== 'order') {
     return;
   }
 
@@ -2703,7 +4932,12 @@ function renderDecimalCompareSortList(problem, { interactive = true, review = fa
 
     const value = document.createElement('span');
     value.className = 'decimal-compare-sort__value';
-    value.textContent = formatDecimalCompareOperand(problem.operands[operandIndex]);
+
+    if (isNonIntegerCompareProblem(problem) || isFractionCompareProblem(problem)) {
+      value.innerHTML = formatCompareOperandHtml(problem, problem.operands[operandIndex]);
+    } else {
+      value.textContent = formatCompareOperand(problem, problem.operands[operandIndex]);
+    }
 
     item.append(handle, value);
 
@@ -2775,7 +5009,7 @@ function handleDecimalCompareSortDrop(event) {
 }
 
 function updateDecimalCompareAnswerUi(problem) {
-  const isCompare = isDecimalCompareProblem(problem);
+  const isCompare = isCompareProblem(problem);
 
   formEl.classList.toggle('answer-form--hidden', isCompare);
   answerShapeToggleBtn.hidden = isCompare;
@@ -2801,7 +5035,7 @@ function updateDecimalCompareAnswerUi(problem) {
     decimalCompareInequalityButtons.forEach((button) => {
       button.classList.toggle('is-selected', button.dataset.decimalCompareSign === decimalCompareSelectedSign);
     });
-    renderDecimalCompareSignProblem(problem);
+    renderCompareSignProblem(problem);
     return;
   }
 
@@ -2812,7 +5046,7 @@ function updateDecimalCompareAnswerUi(problem) {
   renderDecimalCompareSortList(problem);
 }
 
-function getDecimalCompareUserAnswer(problem) {
+function getCompareUserAnswer(problem) {
   if (problem.variant === 'sign') {
     if (!decimalCompareSelectedSign) {
       return null;
@@ -2828,7 +5062,7 @@ function getDecimalCompareUserAnswer(problem) {
   return { kind: 'order', order: [...decimalCompareSortOrder] };
 }
 
-function evaluateDecimalCompareAnswer(problem, userAnswer) {
+function evaluateCompareAnswer(problem, userAnswer) {
   if (problem.variant === 'sign') {
     const isCorrect = userAnswer?.kind === 'sign' && userAnswer.sign === problem.answerSign;
     return {
@@ -4835,8 +7069,24 @@ function getMaxDifficultyLevelForMode(mode) {
     return LINEAR_EQUATION_MAX_LEVEL;
   }
 
+  if (mode === 'linear-equation-fraction') {
+    return LINEAR_EQUATION_FRACTION_MAX_LEVEL;
+  }
+
   if (mode === 'decimal-compare') {
     return DECIMAL_COMPARE_MAX_LEVEL;
+  }
+
+  if (mode === 'integer-compare') {
+    return INTEGER_COMPARE_MAX_LEVEL;
+  }
+
+  if (mode === 'non-integer-compare') {
+    return NON_INTEGER_COMPARE_MAX_LEVEL;
+  }
+
+  if (mode === 'fraction-compare') {
+    return FRACTION_COMPARE_MAX_LEVEL;
   }
 
   if (mode === 'integer-add-subtract') {
@@ -9610,8 +11860,24 @@ function createProblemForExerciseMode(mode, level) {
     return createLinearEquationProblem(level);
   }
 
+  if (mode === 'linear-equation-fraction') {
+    return createLinearEquationFractionProblem(level);
+  }
+
   if (mode === 'decimal-compare') {
     return createDecimalCompareProblem(level);
+  }
+
+  if (mode === 'integer-compare') {
+    return createIntegerCompareProblem(level);
+  }
+
+  if (mode === 'non-integer-compare') {
+    return createNonIntegerCompareProblem(level);
+  }
+
+  if (mode === 'fraction-compare') {
+    return createFractionCompareProblem(level);
   }
 
   if (mode === 'integer-add-subtract') {
@@ -10307,8 +12573,12 @@ function formatProblemText(problem) {
     return formatLinearEquationProblemText(problem);
   }
 
-  if (problem.type === 'decimal-compare') {
-    return formatDecimalCompareProblemText(problem);
+  if (problem.type === 'linear-equation-fraction') {
+    return formatLinearEquationFractionProblemText(problem);
+  }
+
+  if (isCompareProblem(problem)) {
+    return formatCompareProblemText(problem);
   }
 
   if (problem.type === 'fraction-add') {
@@ -10432,8 +12702,12 @@ function formatProblemDisplayHtml(problem) {
     return formatLinearEquationDisplayHtml(problem);
   }
 
-  if (problem.type === 'decimal-compare') {
-    return formatDecimalCompareDisplayHtml(problem);
+  if (problem.type === 'linear-equation-fraction') {
+    return formatLinearEquationFractionDisplayHtml(problem);
+  }
+
+  if (isCompareProblem(problem)) {
+    return formatCompareDisplayHtml(problem);
   }
 
   return `<span class="problem-expression problem-expression--plain">${escapeHtml(formatProblemText(problem))}</span>`;
@@ -10485,7 +12759,7 @@ function recordSessionAnswer(userAnswer, isCorrect) {
     return;
   }
 
-  if (currentProblem?.type === 'linear-equation') {
+  if (isLinearEquationProblem(currentProblem)) {
     sessionResults.push(createSessionResultEntry(
       formatLinearEquationSessionAnswer(userAnswer),
       getLinearEquationCorrectAnswerLabel(currentProblem),
@@ -10494,10 +12768,10 @@ function recordSessionAnswer(userAnswer, isCorrect) {
     return;
   }
 
-  if (currentProblem?.type === 'decimal-compare') {
+  if (isCompareProblem(currentProblem)) {
     sessionResults.push(createSessionResultEntry(
-      formatDecimalCompareSessionAnswer(currentProblem, userAnswer),
-      formatDecimalCompareCorrectAnswer(currentProblem),
+      formatCompareSessionAnswer(currentProblem, userAnswer),
+      formatCompareCorrectAnswer(currentProblem),
       isCorrect,
     ));
     return;
@@ -10694,17 +12968,139 @@ function formatSuccessRate(correct, total) {
   return `${correct}/${total} (${percent} %)`;
 }
 
+function splitLinearEquationFractionSideTerms(side) {
+  const parts = [];
+  let depth = 0;
+  let start = 0;
+  let pendingOp = '+';
+
+  for (let index = 0; index < side.length; index += 1) {
+    const char = side[index];
+
+    if (char === '(') {
+      depth += 1;
+    } else if (char === ')') {
+      depth -= 1;
+    } else if (depth === 0 && side.slice(index, index + 3) === ' + ') {
+      parts.push({ op: pendingOp, text: side.slice(start, index).trim() });
+      pendingOp = '+';
+      start = index + 3;
+      index += 2;
+    } else if (depth === 0 && side.slice(index, index + 3) === ' − ') {
+      parts.push({ op: pendingOp, text: side.slice(start, index).trim() });
+      pendingOp = '−';
+      start = index + 3;
+      index += 2;
+    }
+  }
+
+  parts.push({ op: pendingOp, text: side.slice(start).trim() });
+  return parts.filter((part) => part.text !== '');
+}
+
+function formatLinearEquationFractionTermFromUloha(termText) {
+  const trimmed = termText.trim();
+
+  if (/^-?\d+$/.test(trimmed)) {
+    return `<span class="problem-expression__term">${escapeHtml(trimmed)}</span>`;
+  }
+
+  const fractionMatch = trimmed.match(/^(.+)\/(\d+)$/);
+  if (!fractionMatch) {
+    return null;
+  }
+
+  const numText = fractionMatch[1];
+  const den = fractionMatch[2];
+  const ariaLabel = `${numText}/${den}`;
+
+  return `<span class="fraction" aria-label="${escapeHtml(ariaLabel)}"><span class="fraction__num">${escapeHtml(numText)}</span><span class="fraction__bar" aria-hidden="true"></span><span class="fraction__den">${escapeHtml(den)}</span></span>`;
+}
+
+function formatLinearEquationFractionSideFromUloha(side) {
+  let text = side.trim();
+
+  if (text === '') {
+    return '';
+  }
+
+  let leadingNegative = false;
+  if (text.startsWith('−')) {
+    leadingNegative = true;
+    text = text.slice(1).trim();
+  }
+
+  const terms = splitLinearEquationFractionSideTerms(text);
+  if (leadingNegative && terms.length > 0) {
+    terms[0].op = '−';
+  }
+
+  return terms.map((term, index) => {
+    const termHtml = formatLinearEquationFractionTermFromUloha(term.text);
+    if (!termHtml) {
+      return null;
+    }
+
+    if (index === 0) {
+      return term.op === '−'
+        ? `<span class="problem-expression__term">−</span>${termHtml}`
+        : termHtml;
+    }
+
+    return `<span class="problem-expression__operator">${term.op}</span>${termHtml}`;
+  }).filter(Boolean).join('');
+}
+
+function formatLinearEquationFractionUlohaHtml(uloha) {
+  const equalsIndex = uloha.indexOf(' = ');
+  if (equalsIndex === -1) {
+    return null;
+  }
+
+  const leftHtml = formatLinearEquationFractionSideFromUloha(uloha.slice(0, equalsIndex));
+  const rightHtml = formatLinearEquationFractionSideFromUloha(uloha.slice(equalsIndex + 3));
+
+  if (!leftHtml || !rightHtml) {
+    return null;
+  }
+
+  return `<span class="problem-expression problem-expression--linear-equation">${leftHtml}<span class="problem-expression__equals">=</span>${rightHtml}</span>`;
+}
+
+function reconstructAnalysisProblemHtml(uloha, modes = []) {
+  const isLinearEquationFractionMode = modes.some((mode) => mode === LINEAR_EQUATION_FRACTION_APP_TITLE
+    || mode === 'Lineární rovnice se zlomky'
+    || mode === 'linear-equation-fraction');
+
+  if (isLinearEquationFractionMode || /\bx\b/.test(uloha)) {
+    const html = formatLinearEquationFractionUlohaHtml(uloha);
+    if (html) {
+      return html;
+    }
+  }
+
+  return '';
+}
+
 function buildAnalysisSharePayload() {
   return {
     n: getAnalysisName(),
     m: sessionSelectedModes,
-    r: sessionResults.map((row) => [
-      row.uloha,
-      row.uroven,
-      row.odpoved,
-      row.spravne,
-      row.vysledek === 'správně' ? 1 : 0,
-    ]),
+    r: sessionResults.map((row) => {
+      const entry = [
+        row.uloha,
+        row.uroven,
+        row.odpoved,
+        row.spravne,
+        row.vysledek === 'správně' ? 1 : 0,
+      ];
+
+      if (row.ulohaHtml) {
+        entry.push(row.ulohaHtml);
+      }
+
+      return entry;
+    }),
   };
 }
 
@@ -10722,12 +13118,18 @@ function parseAnalysisSharePayload(data) {
         throw new Error('Neplatná analýza.');
       }
 
+      const uloha = String(row[0]);
+      const modes = Array.isArray(parsed.m) ? parsed.m.map((mode) => String(mode)) : [];
+
       return {
-        uloha: String(row[0]),
+        uloha,
         uroven: Number(row[1]),
         odpoved: String(row[2]),
         spravne: String(row[3]),
         vysledek: row[4] ? 'správně' : 'špatně',
+        ulohaHtml: typeof row[5] === 'string' && row[5] !== ''
+          ? row[5]
+          : reconstructAnalysisProblemHtml(uloha, modes),
       };
     }),
   };
@@ -11165,9 +13567,9 @@ function finishAnswerReview(isCorrect) {
   updateExerciseStatsUi();
   setFormEnabled(false);
 
-  if (isDecimalCompareProblem(currentProblem) && currentProblem.variant === 'sign') {
+  if (isCompareProblem(currentProblem) && currentProblem.variant === 'sign') {
     setDecimalCompareSignReviewHighlight(isCorrect);
-  } else if (isDecimalCompareProblem(currentProblem) && currentProblem.variant === 'order') {
+  } else if (isCompareProblem(currentProblem) && currentProblem.variant === 'order') {
     setDecimalCompareOrderReviewHighlight();
   } else {
     setAnswerFieldHighlight(isCorrect ? 'correct' : 'wrong');
@@ -11247,7 +13649,7 @@ function setAnswerFieldHighlight(result) {
 }
 
 function showAnswerValidationFeedback() {
-  if (!isDecimalCompareProblem(currentProblem)) {
+  if (!isCompareProblem(currentProblem)) {
     setAnswerFieldHighlight('wrong');
   }
 
@@ -11375,7 +13777,8 @@ function setAnswerInputMode(mode) {
 
   currentAnswerInputMode = mode;
 
-  if (mode === 'powers'
+  if (mode === 'decimal'
+    || mode === 'powers'
     || mode === 'sqrt'
     || mode === 'powers-sqrt-combined'
     || mode === 'integer-add-subtract'
@@ -11398,7 +13801,12 @@ function setAnswerInputMode(mode) {
     return;
   }
 
-  if (mode === 'linear-equation' || mode === 'decimal-compare') {
+  if (mode === 'linear-equation'
+    || mode === 'linear-equation-fraction'
+    || mode === 'decimal-compare'
+    || mode === 'integer-compare'
+    || mode === 'non-integer-compare'
+    || mode === 'fraction-compare') {
     fractionAnswerInputShape = 'number';
     updateFractionAnswerShapeUi();
     return;
@@ -11613,9 +14021,18 @@ function showProblem(problem) {
     }
 
     problemEl.innerHTML = formatLinearEquationDisplayHtml(problem);
-  } else if (problem.type === 'decimal-compare' && problem.variant !== 'sign') {
-    problemEl.innerHTML = formatDecimalCompareDisplayHtml(problem);
-  } else if (problem.type !== 'decimal-compare') {
+  } else if (problem.type === 'linear-equation-fraction') {
+    if (problem.solutionType === 'unique') {
+      const maxInputLength = String(FRACTION_ADD_ANSWER_MAX).length + 1;
+      answerNumeratorEl.maxLength = maxInputLength;
+      answerDenominatorEl.maxLength = String(FRACTION_ADD_ANSWER_MAX).length;
+    }
+
+    fractionAnswerInputShape = 'number';
+    problemEl.innerHTML = formatLinearEquationFractionDisplayHtml(problem);
+  } else if (isCompareProblem(problem) && problem.variant !== 'sign') {
+    problemEl.innerHTML = formatCompareDisplayHtml(problem);
+  } else if (!isCompareProblem(problem)) {
   problemEl.textContent = formatProblemText(problem);
   }
 
@@ -11632,6 +14049,10 @@ function showProblem(problem) {
     answerShapeToggleBtn.hidden = problem.solutionType !== 'unique' || problem.answerKind !== 'fraction';
   }
 
+  if (problem.type === 'linear-equation-fraction') {
+    answerShapeToggleBtn.hidden = problem.solutionType !== 'unique';
+  }
+
   const canAnswer = isMultiModeExercise()
     ? canAnswerProblem(problem)
     : (isFractionExerciseMode()
@@ -11643,16 +14064,17 @@ function showProblem(problem) {
       || isSqrtExerciseMode()
       || isPowersSqrtCombinedExerciseMode()
       || isLinearEquationExerciseMode()
-      || isDecimalCompareExerciseMode()
+      || isLinearEquationFractionExerciseMode()
+      || isCompareExerciseMode()
       || getSelectedOperations().length > 0);
   setFormEnabled(canAnswer);
 
   if (canAnswer) {
     clearAnswerInputs();
-    if (problem.type === 'decimal-compare' && problem.variant === 'order') {
+    if (isCompareProblem(problem) && problem.variant === 'order') {
       initDecimalCompareSortOrder(problem);
     }
-    if (!isDecimalCompareProblem(problem)) {
+    if (!isCompareProblem(problem)) {
       focusAnswerInput();
     } else {
       primaryActionBtn.focus();
@@ -11697,8 +14119,20 @@ function queueRetry(problem) {
     item.answerNum = problem.answerNum;
     item.answerDen = problem.answerDen;
     item.answerNegative = problem.answerNegative;
-  } else if (problem.type === 'decimal-compare') {
-    item.type = 'decimal-compare';
+  } else if (problem.type === 'linear-equation-fraction') {
+    item.type = 'linear-equation-fraction';
+    item.variant = problem.variant;
+    item.leftTerms = problem.leftTerms.map((term) => ({ ...term }));
+    item.right = { ...problem.right };
+    item.displayLeft = problem.displayLeft;
+    item.displayRight = problem.displayRight;
+    item.solutionType = problem.solutionType;
+    item.answerKind = problem.answerKind;
+    item.answerNum = problem.answerNum;
+    item.answerDen = problem.answerDen;
+    item.answerNegative = problem.answerNegative;
+  } else if (isCompareProblem(problem)) {
+    item.type = problem.type;
     item.variant = problem.variant;
     item.left = problem.left ? { ...problem.left } : null;
     item.right = problem.right ? { ...problem.right } : null;
@@ -11851,8 +14285,15 @@ function pickNextProblem() {
       return linearEquationProblemFromRetry(dueRetry);
     }
 
-    if (dueRetry.type === 'decimal-compare') {
-      return decimalCompareProblemFromRetry(dueRetry);
+    if (dueRetry.type === 'linear-equation-fraction') {
+      return linearEquationFractionProblemFromRetry(dueRetry);
+    }
+
+    if (dueRetry.type === 'decimal-compare'
+      || dueRetry.type === 'integer-compare'
+      || dueRetry.type === 'non-integer-compare'
+      || dueRetry.type === 'fraction-compare') {
+      return compareProblemFromRetry(dueRetry);
     }
 
     if (dueRetry.type === 'fraction-add') {
@@ -12107,8 +14548,28 @@ function updateTitle() {
       return;
     }
 
+    if (hasLinearEquationFractionOnlySelection()) {
+      appTitleEl.textContent = LINEAR_EQUATION_FRACTION_APP_TITLE;
+      return;
+    }
+
     if (hasDecimalCompareOnlySelection()) {
       appTitleEl.textContent = DECIMAL_COMPARE_APP_TITLE;
+      return;
+    }
+
+    if (hasIntegerCompareOnlySelection()) {
+      appTitleEl.textContent = INTEGER_COMPARE_APP_TITLE;
+      return;
+    }
+
+    if (hasNonIntegerCompareOnlySelection()) {
+      appTitleEl.textContent = NON_INTEGER_COMPARE_APP_TITLE;
+      return;
+    }
+
+    if (hasFractionCompareOnlySelection()) {
+      appTitleEl.textContent = FRACTION_COMPARE_APP_TITLE;
       return;
     }
 
@@ -12147,8 +14608,28 @@ function updateTitle() {
     return;
   }
 
+  if (activeExerciseMode === 'linear-equation-fraction') {
+    appTitleEl.textContent = LINEAR_EQUATION_FRACTION_APP_TITLE;
+    return;
+  }
+
   if (activeExerciseMode === 'decimal-compare') {
     appTitleEl.textContent = DECIMAL_COMPARE_APP_TITLE;
+    return;
+  }
+
+  if (activeExerciseMode === 'integer-compare') {
+    appTitleEl.textContent = INTEGER_COMPARE_APP_TITLE;
+    return;
+  }
+
+  if (activeExerciseMode === 'non-integer-compare') {
+    appTitleEl.textContent = NON_INTEGER_COMPARE_APP_TITLE;
+    return;
+  }
+
+  if (activeExerciseMode === 'fraction-compare') {
+    appTitleEl.textContent = FRACTION_COMPARE_APP_TITLE;
     return;
   }
 
@@ -12257,6 +14738,7 @@ function showSetupScreen({ preserveAnalysisHash = false } = {}) {
   activeExerciseMode = null;
   currentAnswerInputMode = null;
   setAnswerInputMode('decimal');
+  updateSetupCategoryUi();
   showSetupFeedback('');
   updateStartButton();
   hideAnalysisLinkUi();
@@ -12324,7 +14806,6 @@ function handleExclusiveModeSelectionChange(event) {
       item.dataset.wasChecked = 'false';
     });
     radio.dataset.wasChecked = 'true';
-    clearCombinableModeSelection();
   }
 
   showSetupFeedback('');
@@ -12351,6 +14832,26 @@ function handlePowersModeSelectionChange() {
 primaryActionBtn.addEventListener('click', () => {
   if (awaitingNextProblem) {
     newProblem();
+    return;
+  }
+
+  if (isCompareProblem(currentProblem)) {
+    const userAnswer = getCompareUserAnswer(currentProblem);
+    if (userAnswer === null) {
+      showAnswerValidationFeedback();
+      return;
+    }
+
+    const { isCorrect } = evaluateCompareAnswer(currentProblem, userAnswer);
+
+    if (isCorrect) {
+      handleCorrectAnswer();
+    } else {
+      handleWrongAnswer();
+    }
+
+    recordSessionAnswer(userAnswer, isCorrect);
+    finishAnswerReview(isCorrect);
     return;
   }
 
@@ -12613,7 +15114,7 @@ formEl.addEventListener('submit', (event) => {
     return;
   }
 
-  if (currentProblem?.type === 'linear-equation') {
+  if (isLinearEquationProblem(currentProblem)) {
     const userAnswer = getLinearEquationUserAnswer(currentProblem);
     if (userAnswer === null) {
       showAnswerValidationFeedback();
@@ -12633,14 +15134,14 @@ formEl.addEventListener('submit', (event) => {
     return;
   }
 
-  if (currentProblem?.type === 'decimal-compare') {
-    const userAnswer = getDecimalCompareUserAnswer(currentProblem);
+  if (isCompareProblem(currentProblem)) {
+    const userAnswer = getCompareUserAnswer(currentProblem);
     if (userAnswer === null) {
       showAnswerValidationFeedback();
       return;
     }
 
-    const { isCorrect } = evaluateDecimalCompareAnswer(currentProblem, userAnswer);
+    const { isCorrect } = evaluateCompareAnswer(currentProblem, userAnswer);
 
     if (isCorrect) {
       handleCorrectAnswer();
@@ -12795,6 +15296,10 @@ powersModeCheckboxes.forEach((checkbox) => {
   checkbox.addEventListener('change', handlePowersModeSelectionChange);
 });
 
+setupCategoryRadios.forEach((radio) => {
+  radio.addEventListener('change', handleSetupCategoryChange);
+});
+
 exclusiveModeRadios.forEach((radio) => {
   radio.addEventListener('click', handleExclusiveModeSelectionChange);
 });
@@ -12811,7 +15316,7 @@ linearEquationActionButtons.forEach((button) => {
 
 decimalCompareInequalityButtons.forEach((button) => {
   button.addEventListener('click', () => {
-    if (button.disabled || !isDecimalCompareProblem(currentProblem) || currentProblem.variant !== 'sign') {
+    if (button.disabled || !isCompareProblem(currentProblem) || currentProblem.variant !== 'sign') {
       return;
     }
 
