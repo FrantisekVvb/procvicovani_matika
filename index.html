@@ -129,6 +129,10 @@
               <input type="radio" name="exclusive-mode" value="linear-equation">
               Lineární rovnice
             </label>
+            <label class="operation-picker__option">
+              <input type="radio" name="exclusive-mode" value="decimal-compare">
+              Porovnávání desetinných čísel
+            </label>
           </div>
         </fieldset>
       </div>
@@ -258,6 +262,37 @@
         >
           Libovolné číslo
         </button>
+      </div>
+
+      <div class="decimal-compare-inequality" id="decimal-compare-inequality" hidden>
+        <button
+          class="btn btn--secondary decimal-compare-inequality__btn"
+          type="button"
+          data-decimal-compare-sign="&lt;"
+          aria-label="Menší než"
+        >
+          &lt;
+        </button>
+        <button
+          class="btn btn--secondary decimal-compare-inequality__btn"
+          type="button"
+          data-decimal-compare-sign="="
+          aria-label="Rovná se"
+        >
+          =
+        </button>
+        <button
+          class="btn btn--secondary decimal-compare-inequality__btn"
+          type="button"
+          data-decimal-compare-sign="&gt;"
+          aria-label="Větší než"
+        >
+          &gt;
+        </button>
+      </div>
+
+      <div class="decimal-compare-sort" id="decimal-compare-sort" hidden>
+        <div class="decimal-compare-sort__list" id="decimal-compare-sort-list" role="list"></div>
       </div>
 
       <button class="btn btn--primary" type="button" id="primary-action-btn">Ověřit</button>

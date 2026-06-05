@@ -47,6 +47,10 @@ const exclusiveModeRadios = document.querySelectorAll('#exclusive-mode-picker in
 const requireBasicFormCheckbox = document.getElementById('require-basic-form-checkbox');
 const linearEquationActionsEl = document.getElementById('linear-equation-actions');
 const linearEquationActionButtons = document.querySelectorAll('[data-linear-equation-answer]');
+const decimalCompareInequalityEl = document.getElementById('decimal-compare-inequality');
+const decimalCompareInequalityButtons = document.querySelectorAll('[data-decimal-compare-sign]');
+const decimalCompareSortEl = document.getElementById('decimal-compare-sort');
+const decimalCompareSortListEl = document.getElementById('decimal-compare-sort-list');
 const answerVariablePrefixEl = document.getElementById('answer-variable-prefix');
 
 const DIFFICULTY_LEVELS = [
@@ -132,6 +136,10 @@ const BASIC_FORM_PRIMES = [2, 3, 5, 7];
 const FRACTION_BASIC_FORM_MAX_LEVEL = 2;
 const LINEAR_EQUATION_MAX_LEVEL = 3;
 const LINEAR_EQUATION_COEF_MAX = 9;
+const DECIMAL_COMPARE_MAX_LEVEL = 5;
+const DECIMAL_COMPARE_SAME_WHOLE_RATE = 0.65;
+const DECIMAL_COMPARE_EQUAL_RATE = 0.15;
+const DECIMAL_COMPARE_APP_TITLE = 'Porovnávání desetinných čísel';
 const BASIC_FORM_MAX_BY_LEVEL = {
   1: 32,
   2: 56,
@@ -178,6 +186,9 @@ let activeFractionInputEl = null;
 let fractionAnswerInputShape = 'fraction';
 let analysisProblemDisplayMode = 'text';
 let linearEquationSpecialAnswer = null;
+let decimalCompareSelectedSign = null;
+let decimalCompareSortOrder = [];
+let decimalCompareDragFromIndex = null;
 
 function getSelectedExclusiveMode() {
   const selected = [...exclusiveModeRadios].find((radio) => radio.checked);
@@ -193,8 +204,16 @@ function hasLinearEquationMode() {
   return getSelectedExclusiveMode() === 'linear-equation';
 }
 
+function hasDecimalCompareMode() {
+  return getSelectedExclusiveMode() === 'decimal-compare';
+}
+
 function isLinearEquationExerciseMode() {
   return activeExerciseMode === 'linear-equation';
+}
+
+function isDecimalCompareExerciseMode() {
+  return activeExerciseMode === 'decimal-compare';
 }
 
 function getSelectedFractionModes() {
@@ -293,6 +312,17 @@ function hasBasicFormOnlySelection() {
 
 function hasLinearEquationOnlySelection() {
   return hasLinearEquationMode()
+    && getSelectedOperations().length === 0
+    && getSelectedFractionModes().length === 0
+    && getSelectedIntegerModes().length === 0
+    && !hasPowersMode()
+    && !hasSqrtMode()
+    && !hasNonIntegerPowersMode()
+    && !hasNonIntegerSqrtMode();
+}
+
+function hasDecimalCompareOnlySelection() {
+  return hasDecimalCompareMode()
     && getSelectedOperations().length === 0
     && getSelectedFractionModes().length === 0
     && getSelectedIntegerModes().length === 0
@@ -922,7 +952,8 @@ function isFractionExerciseMode() {
     && activeExerciseMode !== 'powers'
     && activeExerciseMode !== 'sqrt'
     && activeExerciseMode !== 'powers-sqrt-combined'
-    && activeExerciseMode !== 'linear-equation';
+    && activeExerciseMode !== 'linear-equation'
+    && activeExerciseMode !== 'decimal-compare';
 }
 
 function isNonIntegerAnswerInputMode() {
@@ -1048,6 +1079,10 @@ function getExerciseModeForProblem(problem) {
     return 'linear-equation';
   }
 
+  if (problem?.type === 'decimal-compare') {
+    return 'decimal-compare';
+  }
+
   if (problem?.type?.startsWith('fraction-')) {
     return problem.type;
   }
@@ -1112,6 +1147,7 @@ function canAnswerProblem(problem) {
     || problem?.type === 'non-integer-powers'
     || problem?.type === 'non-integer-sqrt'
     || isLinearEquationProblem(problem)
+    || isDecimalCompareProblem(problem)
     || Boolean(problem?.operands);
 }
 
@@ -2066,7 +2102,10 @@ function updateLinearEquationActionsUi(problem) {
     return;
   }
 
-  const visible = isLinearEquationProblem(problem) && problem.level >= 2;
+  const visible = isLinearEquationProblem(problem)
+    && !isDecimalCompareProblem(problem)
+    && !isDecimalCompareExerciseMode()
+    && problem.level >= 2;
   linearEquationActionsEl.hidden = !visible;
 
   if (!visible) {
@@ -2193,6 +2232,618 @@ function formatLinearEquationSessionAnswer(userAnswer) {
   }
 
   return '';
+}
+
+function isDecimalCompareProblem(problem) {
+  return problem?.type === 'decimal-compare';
+}
+
+function compareDecimalOperands(left, right) {
+  if (left.value < right.value) {
+    return '<';
+  }
+
+  if (left.value > right.value) {
+    return '>';
+  }
+
+  return '=';
+}
+
+function decimalCompareValuesEqual(left, right) {
+  return Math.abs(left - right) < 1e-9;
+}
+
+function randomDecimalCompareWholePart() {
+  return randomWhole(0, 9);
+}
+
+function shouldUseSameDecimalCompareWholePart() {
+  return Math.random() < DECIMAL_COMPARE_SAME_WHOLE_RATE;
+}
+
+function randomDecimalCompareFractionalPart(decimals) {
+  if (decimals === 1) {
+    return randomWhole(1, 9) / 10;
+  }
+
+  if (decimals === 2) {
+    return randomDecimalWithNonZeroLastDigit(0.01, 0.99, 2);
+  }
+
+  return randomDecimalWithNonZeroLastDigit(0.001, 0.999, 3);
+}
+
+function buildDecimalCompareOperand(whole, decimals) {
+  const value = roundToDecimals(whole + randomDecimalCompareFractionalPart(decimals), decimals);
+
+  return { value, decimals };
+}
+
+function pickDecimalComparePrecisionPair(displayLevel) {
+  if (displayLevel === 1) {
+    return [1, 1];
+  }
+
+  if (displayLevel === 2) {
+    const highPrecisionSide = Math.random() < 0.5 ? 0 : 1;
+    const leftDecimals = highPrecisionSide === 0
+      ? 2
+      : (Math.random() < 0.45 ? 1 : 2);
+    const rightDecimals = highPrecisionSide === 1
+      ? 2
+      : (Math.random() < 0.45 ? 1 : 2);
+
+    return [leftDecimals, rightDecimals];
+  }
+
+  const highPrecisionSide = Math.random() < 0.5 ? 0 : 1;
+  const pickLowPrecision = () => (Math.random() < 0.5 ? 1 : 2);
+  const leftDecimals = highPrecisionSide === 0
+    ? 3
+    : pickLowPrecision();
+  const rightDecimals = highPrecisionSide === 1
+    ? 3
+    : pickLowPrecision();
+
+  return [leftDecimals, rightDecimals];
+}
+
+function pickDecimalCompareOrderExtraPrecision(displayLevel) {
+  if (displayLevel === 5) {
+    const options = [1, 2, 3];
+    return options[randomWhole(0, options.length - 1)];
+  }
+
+  return Math.random() < 0.35 ? 1 : 2;
+}
+
+function pickDecimalCompareOrderPrecisions(displayLevel) {
+  const precisions = displayLevel === 5
+    ? [1, 2, 3, pickDecimalCompareOrderExtraPrecision(displayLevel)]
+    : [1, 2, pickDecimalCompareOrderExtraPrecision(displayLevel)];
+
+  const requiredPrecisions = displayLevel === 5 ? [1, 2, 3] : [1, 2];
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    for (let i = precisions.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [precisions[i], precisions[j]] = [precisions[j], precisions[i]];
+    }
+
+    if (requiredPrecisions.every((precision) => precisions.includes(precision))) {
+      return precisions;
+    }
+  }
+
+  return displayLevel === 5 ? [1, 2, 3, 2] : [1, 2, 2];
+}
+
+function generateDistinctDecimalCompareOperand(whole, decimals, existing = []) {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const operand = buildDecimalCompareOperand(whole, decimals);
+
+    if (!existing.some((item) => decimalCompareValuesEqual(item.value, operand.value))) {
+      return operand;
+    }
+  }
+
+  return buildDecimalCompareOperand(whole, decimals);
+}
+
+function generateDecimalCompareSignPair(displayLevel) {
+  const useSameWhole = shouldUseSameDecimalCompareWholePart();
+  const sharedWhole = randomDecimalCompareWholePart();
+  const [leftDecimals, rightDecimals] = pickDecimalComparePrecisionPair(displayLevel);
+  const leftWhole = useSameWhole ? sharedWhole : randomDecimalCompareWholePart();
+  const rightWhole = useSameWhole ? sharedWhole : randomDecimalCompareWholePart();
+  const left = buildDecimalCompareOperand(leftWhole, leftDecimals);
+  let right = buildDecimalCompareOperand(rightWhole, rightDecimals);
+
+  if (Math.random() < DECIMAL_COMPARE_EQUAL_RATE) {
+    right = {
+      value: left.value,
+      decimals: rightDecimals,
+    };
+  } else if (decimalCompareValuesEqual(left.value, right.value)) {
+    right = generateDistinctDecimalCompareOperand(rightWhole, rightDecimals, [left]);
+  }
+
+  return [left, right];
+}
+
+function generateDecimalCompareOrderOperands(displayLevel) {
+  const useSameWhole = shouldUseSameDecimalCompareWholePart();
+  const sharedWhole = randomDecimalCompareWholePart();
+  const precisions = pickDecimalCompareOrderPrecisions(displayLevel);
+  const operands = [];
+
+  precisions.forEach((decimals) => {
+    const whole = useSameWhole ? sharedWhole : randomDecimalCompareWholePart();
+    operands.push(generateDistinctDecimalCompareOperand(whole, decimals, operands));
+  });
+
+  return operands;
+}
+
+function formatDecimalCompareOperand(operand) {
+  return formatDecimal(operand.value, operand.decimals);
+}
+
+function getDecimalCompareSignAnswer(left, right) {
+  return compareDecimalOperands(left, right);
+}
+
+function getDecimalCompareSortedIndices(operands) {
+  return operands
+    .map((operand, index) => ({ index, value: operand.value }))
+    .sort((a, b) => a.value - b.value)
+    .map((item) => item.index);
+}
+
+function shuffleIndices(length) {
+  const indices = Array.from({ length }, (_, index) => index);
+
+  for (let i = indices.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+
+  return indices;
+}
+
+function buildDecimalCompareProblem({
+  displayLevel,
+  variant,
+  left = null,
+  right = null,
+  operands = null,
+  answerSign = null,
+  correctOrder = null,
+  displayOrder = null,
+}) {
+  return {
+    type: 'decimal-compare',
+    variant,
+    level: displayLevel,
+    left,
+    right,
+    operands,
+    answerSign,
+    correctOrder,
+    displayOrder,
+    isRetry: false,
+  };
+}
+
+function createDecimalCompareSignProblem(displayLevel) {
+  const [left, right] = generateDecimalCompareSignPair(displayLevel);
+
+  return buildDecimalCompareProblem({
+    displayLevel,
+    variant: 'sign',
+    left,
+    right,
+    answerSign: getDecimalCompareSignAnswer(left, right),
+  });
+}
+
+function createDecimalCompareOrderProblem(displayLevel) {
+  const operands = generateDecimalCompareOrderOperands(displayLevel);
+  let displayOrder = shuffleIndices(operands.length);
+
+  while (displayOrder.every((value, index) => value === getDecimalCompareSortedIndices(operands)[index])) {
+    displayOrder = shuffleIndices(operands.length);
+  }
+
+  return buildDecimalCompareProblem({
+    displayLevel,
+    variant: 'order',
+    operands,
+    correctOrder: getDecimalCompareSortedIndices(operands),
+    displayOrder,
+  });
+}
+
+function createDecimalCompareProblem(level) {
+  const displayLevel = level + 1;
+
+  if (displayLevel <= 3) {
+    return createDecimalCompareSignProblem(displayLevel);
+  }
+
+  return createDecimalCompareOrderProblem(displayLevel);
+}
+
+function formatDecimalCompareSignText(problem, sign = '?') {
+  return `${formatDecimalCompareOperand(problem.left)} ${sign} ${formatDecimalCompareOperand(problem.right)}`;
+}
+
+function formatDecimalCompareOrderListText(operands, order) {
+  return order
+    .map((index) => formatDecimalCompareOperand(operands[index]))
+    .join('; ');
+}
+
+function formatDecimalCompareProblemText(problem) {
+  if (problem.variant === 'sign') {
+    return formatDecimalCompareSignText(problem, '?');
+  }
+
+  const order = problem.displayOrder ?? shuffleIndices(problem.operands.length);
+  return `Uspořádej: ${formatDecimalCompareOrderListText(problem.operands, order)}`;
+}
+
+function formatDecimalCompareSignHtml(problem, sign = '?', review = null) {
+  const left = formatDecimalCompareOperand(problem.left);
+  const right = formatDecimalCompareOperand(problem.right);
+  const slotClasses = ['decimal-compare-sign-slot'];
+
+  if (sign !== '?') {
+    slotClasses.push('decimal-compare-sign-slot--filled');
+  }
+
+  if (review === 'correct') {
+    slotClasses.push('decimal-compare-sign-slot--correct');
+  } else if (review === 'wrong') {
+    slotClasses.push('decimal-compare-sign-slot--wrong');
+  }
+
+  const signHtml = `<span class="${slotClasses.join(' ')}">${escapeHtml(sign)}</span>`;
+
+  return `<span class="problem-expression problem-expression--decimal-compare">${escapeHtml(left)}${signHtml}${escapeHtml(right)}</span>`;
+}
+
+function renderDecimalCompareSignProblem(problem, { sign = null, review = null } = {}) {
+  const displaySign = sign ?? decimalCompareSelectedSign ?? '?';
+  problemEl.innerHTML = formatDecimalCompareSignHtml(problem, displaySign, review);
+}
+
+function formatDecimalCompareDisplayHtml(problem) {
+  if (problem.variant === 'sign') {
+    return formatDecimalCompareSignHtml(problem, '?');
+  }
+
+  return '<span class="problem-expression problem-expression--decimal-compare">Uspořádej čísla od nejmenšího po největší</span>';
+}
+
+function formatDecimalCompareCorrectAnswer(problem) {
+  if (problem.variant === 'sign') {
+    return formatDecimalCompareSignText(problem, problem.answerSign);
+  }
+
+  return formatDecimalCompareOrderListText(problem.operands, problem.correctOrder);
+}
+
+function formatDecimalCompareSessionAnswer(problem, userAnswer) {
+  if (problem.variant === 'sign') {
+    return formatDecimalCompareSignText(problem, userAnswer.sign);
+  }
+
+  return formatDecimalCompareOrderListText(problem.operands, userAnswer.order);
+}
+
+function decimalCompareProblemFromRetry(dueRetry) {
+  const problem = buildDecimalCompareProblem({
+    displayLevel: dueRetry.level,
+    variant: dueRetry.variant,
+    left: dueRetry.left ? { ...dueRetry.left } : null,
+    right: dueRetry.right ? { ...dueRetry.right } : null,
+    operands: dueRetry.operands ? dueRetry.operands.map((operand) => ({ ...operand })) : null,
+    answerSign: dueRetry.answerSign,
+    correctOrder: dueRetry.correctOrder ? [...dueRetry.correctOrder] : null,
+  });
+
+  if (dueRetry.variant === 'order') {
+    problem.displayOrder = dueRetry.displayOrder
+      ? [...dueRetry.displayOrder]
+      : shuffleIndices(problem.operands.length);
+  }
+
+  problem.isRetry = true;
+  return problem;
+}
+
+function clearDecimalCompareSelectedSign() {
+  decimalCompareSelectedSign = null;
+
+  decimalCompareInequalityButtons.forEach((button) => {
+    button.classList.remove('is-selected', 'is-correct', 'is-wrong');
+  });
+}
+
+function setDecimalCompareSelectedSign(sign) {
+  decimalCompareSelectedSign = sign;
+
+  decimalCompareInequalityButtons.forEach((button) => {
+    button.classList.toggle('is-selected', button.dataset.decimalCompareSign === sign);
+  });
+
+  if (isDecimalCompareProblem(currentProblem) && currentProblem.variant === 'sign') {
+    renderDecimalCompareSignProblem(currentProblem);
+  }
+}
+
+function setDecimalCompareSignReviewHighlight(isCorrect) {
+  if (!isDecimalCompareProblem(currentProblem) || currentProblem.variant !== 'sign') {
+    return;
+  }
+
+  renderDecimalCompareSignProblem(currentProblem, {
+    sign: decimalCompareSelectedSign,
+    review: isCorrect ? 'correct' : 'wrong',
+  });
+
+  decimalCompareInequalityButtons.forEach((button) => {
+    const isChosen = button.dataset.decimalCompareSign === decimalCompareSelectedSign;
+    button.classList.remove('is-selected');
+    button.classList.toggle('is-correct', isCorrect && isChosen);
+    button.classList.toggle('is-wrong', !isCorrect && isChosen);
+  });
+}
+
+function setDecimalCompareOrderReviewHighlight() {
+  if (!isDecimalCompareProblem(currentProblem) || currentProblem.variant !== 'order') {
+    return;
+  }
+
+  renderDecimalCompareSortList(currentProblem, { interactive: false, review: true });
+}
+
+function initDecimalCompareSortOrder(problem) {
+  decimalCompareSortOrder = problem.displayOrder
+    ? [...problem.displayOrder]
+    : shuffleIndices(problem.operands.length);
+}
+
+function moveDecimalCompareSortItem(fromIndex, insertIndex) {
+  if (fromIndex < 0 || insertIndex < 0 || insertIndex > decimalCompareSortOrder.length) {
+    return;
+  }
+
+  if (fromIndex === insertIndex || fromIndex + 1 === insertIndex) {
+    return;
+  }
+
+  const nextOrder = [...decimalCompareSortOrder];
+  const [moved] = nextOrder.splice(fromIndex, 1);
+  const adjustedInsertIndex = insertIndex > fromIndex ? insertIndex - 1 : insertIndex;
+  nextOrder.splice(adjustedInsertIndex, 0, moved);
+  decimalCompareSortOrder = nextOrder;
+}
+
+function clearDecimalCompareDropTargets() {
+  decimalCompareSortListEl?.querySelectorAll(
+    '.decimal-compare-sort__item, .decimal-compare-sort__edge',
+  ).forEach((element) => {
+    element.classList.remove('is-drop-target');
+  });
+}
+
+function bindDecimalCompareDropZone(element, insertIndex) {
+  element.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    clearDecimalCompareDropTargets();
+    element.classList.add('is-drop-target');
+  });
+  element.addEventListener('dragleave', () => {
+    element.classList.remove('is-drop-target');
+  });
+  element.addEventListener('drop', (event) => {
+    event.preventDefault();
+    const fromIndex = Number(event.dataTransfer.getData('text/plain'));
+    if (!Number.isInteger(fromIndex)) {
+      return;
+    }
+
+    moveDecimalCompareSortItem(fromIndex, insertIndex);
+    renderDecimalCompareSortList(currentProblem);
+  });
+}
+
+function renderDecimalCompareSortList(problem, { interactive = true, review = false } = {}) {
+  if (!decimalCompareSortListEl) {
+    return;
+  }
+
+  decimalCompareSortListEl.replaceChildren();
+  decimalCompareSortListEl.classList.toggle(
+    'decimal-compare-sort__list--four',
+    problem.operands.length === 4,
+  );
+
+  if (interactive) {
+    const startEdge = document.createElement('div');
+    startEdge.className = 'decimal-compare-sort__edge decimal-compare-sort__edge--start';
+    startEdge.setAttribute('aria-hidden', 'true');
+    bindDecimalCompareDropZone(startEdge, 0);
+    decimalCompareSortListEl.append(startEdge);
+  }
+
+  decimalCompareSortOrder.forEach((operandIndex, position) => {
+    const item = document.createElement('div');
+    item.className = 'decimal-compare-sort__item';
+    item.setAttribute('role', 'listitem');
+    item.dataset.position = String(position);
+
+    if (review) {
+      const positionCorrect = operandIndex === problem.correctOrder[position];
+      item.classList.add(positionCorrect ? 'is-correct' : 'is-wrong');
+    }
+
+    if (interactive) {
+      item.draggable = true;
+    }
+
+    const handle = document.createElement('span');
+    handle.className = 'decimal-compare-sort__handle';
+    handle.setAttribute('aria-hidden', 'true');
+    handle.textContent = '⠿';
+
+    const value = document.createElement('span');
+    value.className = 'decimal-compare-sort__value';
+    value.textContent = formatDecimalCompareOperand(problem.operands[operandIndex]);
+
+    item.append(handle, value);
+
+    if (interactive) {
+      item.addEventListener('dragstart', handleDecimalCompareSortDragStart);
+      item.addEventListener('dragend', handleDecimalCompareSortDragEnd);
+      item.addEventListener('dragover', handleDecimalCompareSortDragOver);
+      item.addEventListener('dragleave', handleDecimalCompareSortDragLeave);
+      item.addEventListener('drop', handleDecimalCompareSortDrop);
+    }
+
+    decimalCompareSortListEl.append(item);
+  });
+
+  if (interactive) {
+    const endEdge = document.createElement('div');
+    endEdge.className = 'decimal-compare-sort__edge decimal-compare-sort__edge--end';
+    endEdge.setAttribute('aria-hidden', 'true');
+    bindDecimalCompareDropZone(endEdge, decimalCompareSortOrder.length);
+    decimalCompareSortListEl.append(endEdge);
+  }
+}
+
+function handleDecimalCompareSortDragStart(event) {
+  const position = Number(event.currentTarget.dataset.position);
+  decimalCompareDragFromIndex = position;
+  event.currentTarget.classList.add('is-dragging');
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', String(position));
+}
+
+function handleDecimalCompareSortDragEnd(event) {
+  event.currentTarget.classList.remove('is-dragging');
+  decimalCompareDragFromIndex = null;
+  clearDecimalCompareDropTargets();
+}
+
+function getDecimalCompareInsertIndexFromItemDrop(event) {
+  const item = event.currentTarget;
+  const position = Number(item.dataset.position);
+  const bounds = item.getBoundingClientRect();
+  const placeAfter = event.clientX > bounds.left + bounds.width / 2;
+
+  return placeAfter ? position + 1 : position;
+}
+
+function handleDecimalCompareSortDragOver(event) {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+  clearDecimalCompareDropTargets();
+  event.currentTarget.classList.add('is-drop-target');
+}
+
+function handleDecimalCompareSortDragLeave(event) {
+  event.currentTarget.classList.remove('is-drop-target');
+}
+
+function handleDecimalCompareSortDrop(event) {
+  event.preventDefault();
+  const fromIndex = Number(event.dataTransfer.getData('text/plain'));
+  const insertIndex = getDecimalCompareInsertIndexFromItemDrop(event);
+
+  if (!Number.isInteger(fromIndex) || !Number.isInteger(insertIndex)) {
+    return;
+  }
+
+  moveDecimalCompareSortItem(fromIndex, insertIndex);
+  renderDecimalCompareSortList(currentProblem);
+}
+
+function updateDecimalCompareAnswerUi(problem) {
+  const isCompare = isDecimalCompareProblem(problem);
+
+  formEl.classList.toggle('answer-form--hidden', isCompare);
+  answerShapeToggleBtn.hidden = isCompare;
+
+  if (linearEquationActionsEl) {
+    linearEquationActionsEl.hidden = isCompare || !isLinearEquationProblem(problem) || problem?.level < 2;
+  }
+
+  if (decimalCompareInequalityEl) {
+    decimalCompareInequalityEl.hidden = !isCompare || problem?.variant !== 'sign';
+  }
+
+  if (decimalCompareSortEl) {
+    decimalCompareSortEl.hidden = !isCompare || problem?.variant !== 'order';
+  }
+
+  if (!isCompare) {
+    clearDecimalCompareSelectedSign();
+    return;
+  }
+
+  if (problem.variant === 'sign') {
+    decimalCompareInequalityButtons.forEach((button) => {
+      button.classList.toggle('is-selected', button.dataset.decimalCompareSign === decimalCompareSelectedSign);
+    });
+    renderDecimalCompareSignProblem(problem);
+    return;
+  }
+
+  clearDecimalCompareSelectedSign();
+  if (decimalCompareInequalityEl) {
+    decimalCompareInequalityEl.hidden = true;
+  }
+  renderDecimalCompareSortList(problem);
+}
+
+function getDecimalCompareUserAnswer(problem) {
+  if (problem.variant === 'sign') {
+    if (!decimalCompareSelectedSign) {
+      return null;
+    }
+
+    return { kind: 'sign', sign: decimalCompareSelectedSign };
+  }
+
+  if (!Array.isArray(decimalCompareSortOrder) || decimalCompareSortOrder.length !== problem.operands.length) {
+    return null;
+  }
+
+  return { kind: 'order', order: [...decimalCompareSortOrder] };
+}
+
+function evaluateDecimalCompareAnswer(problem, userAnswer) {
+  if (problem.variant === 'sign') {
+    const isCorrect = userAnswer?.kind === 'sign' && userAnswer.sign === problem.answerSign;
+    return {
+      isCorrect,
+      feedbackMessage: isCorrect ? 'Správně!' : 'Špatně.',
+    };
+  }
+
+  const isCorrect = userAnswer?.kind === 'order'
+    && userAnswer.order.every((value, index) => value === problem.correctOrder[index]);
+
+  return {
+    isCorrect,
+    feedbackMessage: isCorrect ? 'Správně!' : 'Špatně.',
+  };
 }
 
 function applyOperator(result, value, op) {
@@ -4182,6 +4833,10 @@ function getMaxDifficultyLevelForMode(mode) {
 
   if (mode === 'linear-equation') {
     return LINEAR_EQUATION_MAX_LEVEL;
+  }
+
+  if (mode === 'decimal-compare') {
+    return DECIMAL_COMPARE_MAX_LEVEL;
   }
 
   if (mode === 'integer-add-subtract') {
@@ -8955,6 +9610,10 @@ function createProblemForExerciseMode(mode, level) {
     return createLinearEquationProblem(level);
   }
 
+  if (mode === 'decimal-compare') {
+    return createDecimalCompareProblem(level);
+  }
+
   if (mode === 'integer-add-subtract') {
     return createIntegerAddSubtractProblem(level);
   }
@@ -9648,6 +10307,10 @@ function formatProblemText(problem) {
     return formatLinearEquationProblemText(problem);
   }
 
+  if (problem.type === 'decimal-compare') {
+    return formatDecimalCompareProblemText(problem);
+  }
+
   if (problem.type === 'fraction-add') {
     return formatFractionAddProblemText(problem);
   }
@@ -9769,6 +10432,10 @@ function formatProblemDisplayHtml(problem) {
     return formatLinearEquationDisplayHtml(problem);
   }
 
+  if (problem.type === 'decimal-compare') {
+    return formatDecimalCompareDisplayHtml(problem);
+  }
+
   return `<span class="problem-expression problem-expression--plain">${escapeHtml(formatProblemText(problem))}</span>`;
 }
 
@@ -9822,6 +10489,15 @@ function recordSessionAnswer(userAnswer, isCorrect) {
     sessionResults.push(createSessionResultEntry(
       formatLinearEquationSessionAnswer(userAnswer),
       getLinearEquationCorrectAnswerLabel(currentProblem),
+      isCorrect,
+    ));
+    return;
+  }
+
+  if (currentProblem?.type === 'decimal-compare') {
+    sessionResults.push(createSessionResultEntry(
+      formatDecimalCompareSessionAnswer(currentProblem, userAnswer),
+      formatDecimalCompareCorrectAnswer(currentProblem),
       isCorrect,
     ));
     return;
@@ -10488,7 +11164,15 @@ function showNextExampleAction() {
 function finishAnswerReview(isCorrect) {
   updateExerciseStatsUi();
   setFormEnabled(false);
-  setAnswerFieldHighlight(isCorrect ? 'correct' : 'wrong');
+
+  if (isDecimalCompareProblem(currentProblem) && currentProblem.variant === 'sign') {
+    setDecimalCompareSignReviewHighlight(isCorrect);
+  } else if (isDecimalCompareProblem(currentProblem) && currentProblem.variant === 'order') {
+    setDecimalCompareOrderReviewHighlight();
+  } else {
+    setAnswerFieldHighlight(isCorrect ? 'correct' : 'wrong');
+  }
+
   feedbackEl.textContent = '';
   feedbackEl.className = 'feedback';
   showNextExampleAction();
@@ -10508,6 +11192,12 @@ function setFormEnabled(enabled) {
   });
   linearEquationActionButtons.forEach((button) => {
     button.disabled = !enabled;
+  });
+  decimalCompareInequalityButtons.forEach((button) => {
+    button.disabled = !enabled;
+  });
+  decimalCompareSortListEl?.querySelectorAll('.decimal-compare-sort__item').forEach((item) => {
+    item.draggable = enabled;
   });
 }
 
@@ -10557,7 +11247,10 @@ function setAnswerFieldHighlight(result) {
 }
 
 function showAnswerValidationFeedback() {
-  setAnswerFieldHighlight('wrong');
+  if (!isDecimalCompareProblem(currentProblem)) {
+    setAnswerFieldHighlight('wrong');
+  }
+
   feedbackEl.textContent = '';
   feedbackEl.className = 'feedback';
 }
@@ -10569,6 +11262,8 @@ function clearAnswerInputs() {
   setAnswerFractionNegative(false);
   clearAnswerFieldHighlight();
   clearLinearEquationSpecialAnswer();
+  clearDecimalCompareSelectedSign();
+  decimalCompareSortOrder = [];
 }
 
 function shouldUseKeypadOnlyAnswerInput() {
@@ -10703,7 +11398,7 @@ function setAnswerInputMode(mode) {
     return;
   }
 
-  if (mode === 'linear-equation') {
+  if (mode === 'linear-equation' || mode === 'decimal-compare') {
     fractionAnswerInputShape = 'number';
     updateFractionAnswerShapeUi();
     return;
@@ -10918,7 +11613,9 @@ function showProblem(problem) {
     }
 
     problemEl.innerHTML = formatLinearEquationDisplayHtml(problem);
-  } else {
+  } else if (problem.type === 'decimal-compare' && problem.variant !== 'sign') {
+    problemEl.innerHTML = formatDecimalCompareDisplayHtml(problem);
+  } else if (problem.type !== 'decimal-compare') {
   problemEl.textContent = formatProblemText(problem);
   }
 
@@ -10946,13 +11643,23 @@ function showProblem(problem) {
       || isSqrtExerciseMode()
       || isPowersSqrtCombinedExerciseMode()
       || isLinearEquationExerciseMode()
+      || isDecimalCompareExerciseMode()
       || getSelectedOperations().length > 0);
   setFormEnabled(canAnswer);
 
   if (canAnswer) {
     clearAnswerInputs();
-    focusAnswerInput();
+    if (problem.type === 'decimal-compare' && problem.variant === 'order') {
+      initDecimalCompareSortOrder(problem);
+    }
+    if (!isDecimalCompareProblem(problem)) {
+      focusAnswerInput();
+    } else {
+      primaryActionBtn.focus();
+    }
   }
+
+  updateDecimalCompareAnswerUi(problem);
 
   feedbackEl.textContent = '';
   feedbackEl.className = 'feedback';
@@ -10990,6 +11697,15 @@ function queueRetry(problem) {
     item.answerNum = problem.answerNum;
     item.answerDen = problem.answerDen;
     item.answerNegative = problem.answerNegative;
+  } else if (problem.type === 'decimal-compare') {
+    item.type = 'decimal-compare';
+    item.variant = problem.variant;
+    item.left = problem.left ? { ...problem.left } : null;
+    item.right = problem.right ? { ...problem.right } : null;
+    item.operands = problem.operands ? problem.operands.map((operand) => ({ ...operand })) : null;
+    item.answerSign = problem.answerSign;
+    item.correctOrder = problem.correctOrder ? [...problem.correctOrder] : null;
+    item.displayOrder = problem.displayOrder ? [...problem.displayOrder] : null;
   } else if (problem.type === 'fraction-add') {
     item.type = 'fraction-add';
     item.terms = problem.terms.map((term) => ({ ...term }));
@@ -11133,6 +11849,10 @@ function pickNextProblem() {
 
     if (dueRetry.type === 'linear-equation') {
       return linearEquationProblemFromRetry(dueRetry);
+    }
+
+    if (dueRetry.type === 'decimal-compare') {
+      return decimalCompareProblemFromRetry(dueRetry);
     }
 
     if (dueRetry.type === 'fraction-add') {
@@ -11387,6 +12107,11 @@ function updateTitle() {
       return;
     }
 
+    if (hasDecimalCompareOnlySelection()) {
+      appTitleEl.textContent = DECIMAL_COMPARE_APP_TITLE;
+      return;
+    }
+
     appTitleEl.textContent = APP_TITLE;
     return;
   }
@@ -11419,6 +12144,11 @@ function updateTitle() {
 
   if (activeExerciseMode === 'linear-equation') {
     appTitleEl.textContent = LINEAR_EQUATION_APP_TITLE;
+    return;
+  }
+
+  if (activeExerciseMode === 'decimal-compare') {
+    appTitleEl.textContent = DECIMAL_COMPARE_APP_TITLE;
     return;
   }
 
@@ -11903,6 +12633,26 @@ formEl.addEventListener('submit', (event) => {
     return;
   }
 
+  if (currentProblem?.type === 'decimal-compare') {
+    const userAnswer = getDecimalCompareUserAnswer(currentProblem);
+    if (userAnswer === null) {
+      showAnswerValidationFeedback();
+      return;
+    }
+
+    const { isCorrect } = evaluateDecimalCompareAnswer(currentProblem, userAnswer);
+
+    if (isCorrect) {
+      handleCorrectAnswer();
+    } else {
+      handleWrongAnswer();
+    }
+
+    recordSessionAnswer(userAnswer, isCorrect);
+    finishAnswerReview(isCorrect);
+    return;
+  }
+
   if (getSelectedOperations().length === 0) {
     return;
   }
@@ -12056,6 +12806,16 @@ linearEquationActionButtons.forEach((button) => {
     }
 
     setLinearEquationSpecialAnswer(button.dataset.linearEquationAnswer);
+  });
+});
+
+decimalCompareInequalityButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    if (button.disabled || !isDecimalCompareProblem(currentProblem) || currentProblem.variant !== 'sign') {
+      return;
+    }
+
+    setDecimalCompareSelectedSign(button.dataset.decimalCompareSign);
   });
 });
 
