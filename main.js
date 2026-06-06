@@ -1,5 +1,6 @@
 const problemEl = document.getElementById('problem');
 const appTitleEl = document.getElementById('app-title');
+const appSubtitleEl = document.getElementById('app-subtitle');
 const appEl = document.querySelector('.app');
 const setupScreenEl = document.getElementById('setup-screen');
 const setupFeedbackEl = document.getElementById('setup-feedback');
@@ -78,6 +79,7 @@ const decimalCompareInequalityButtons = document.querySelectorAll('[data-decimal
 const decimalCompareSortEl = document.getElementById('decimal-compare-sort');
 const decimalCompareSortListEl = document.getElementById('decimal-compare-sort-list');
 const answerVariablePrefixEl = document.getElementById('answer-variable-prefix');
+const answerUnitSuffixEl = document.getElementById('answer-unit-suffix');
 
 const DIFFICULTY_LEVELS = [
   { type: 'two', min: 0.1, max: 9.9, decimals: 1, decimalPartsSumBelowOne: true },
@@ -228,6 +230,8 @@ const VOLUME_CONVERT_MAX_LEVEL = 5;
 const VOLUME_CONVERT_APP_TITLE = 'Objem';
 const PERCENT_PART_MAX_LEVEL = 2;
 const PERCENT_PART_APP_TITLE = 'Výpočet části celku';
+const PERCENT_COUNT_APP_TITLE = 'Výpočet počtu procent';
+const PERCENT_WHOLE_APP_TITLE = 'Určení velikosti celku';
 const VOLUME_UNIT_ORDER = ['mm3', 'cm3', 'dm3', 'm3', 'ml', 'cl', 'dl', 'l', 'hl'];
 const VOLUME_UNIT_LABELS = {
   mm3: 'mm³',
@@ -378,6 +382,7 @@ let activeAssignmentConfig = null;
 let pendingAssignmentDepotId = null;
 let awaitingAssignmentSubmission = false;
 let activeDepotId = null;
+let activeDepotModes = [];
 let analysisReturnDepotId = null;
 let activeFractionInputEl = null;
 let fractionAnswerInputShape = 'fraction';
@@ -479,6 +484,14 @@ function hasPercentPartMode() {
   return getSelectedExclusiveMode() === 'percent-part';
 }
 
+function hasPercentCountMode() {
+  return getSelectedExclusiveMode() === 'percent-count';
+}
+
+function hasPercentWholeMode() {
+  return getSelectedExclusiveMode() === 'percent-whole';
+}
+
 function isLinearEquationExerciseMode() {
   return activeExerciseMode === 'linear-equation';
 }
@@ -533,6 +546,18 @@ function isVolumeConvertExerciseMode() {
 
 function isPercentPartExerciseMode() {
   return activeExerciseMode === 'percent-part';
+}
+
+function isPercentCountExerciseMode() {
+  return activeExerciseMode === 'percent-count';
+}
+
+function isPercentWholeExerciseMode() {
+  return activeExerciseMode === 'percent-whole';
+}
+
+function isPercentTaskExerciseMode() {
+  return isPercentPartExerciseMode() || isPercentCountExerciseMode() || isPercentWholeExerciseMode();
 }
 
 function isCompareExerciseMode() {
@@ -793,6 +818,28 @@ function hasVolumeConvertOnlySelection() {
 
 function hasPercentPartOnlySelection() {
   return hasPercentPartMode()
+    && getSelectedOperations().length === 0
+    && getSelectedFractionModes().length === 0
+    && getSelectedIntegerModes().length === 0
+    && !hasPowersMode()
+    && !hasSqrtMode()
+    && !hasNonIntegerPowersMode()
+    && !hasNonIntegerSqrtMode();
+}
+
+function hasPercentCountOnlySelection() {
+  return hasPercentCountMode()
+    && getSelectedOperations().length === 0
+    && getSelectedFractionModes().length === 0
+    && getSelectedIntegerModes().length === 0
+    && !hasPowersMode()
+    && !hasSqrtMode()
+    && !hasNonIntegerPowersMode()
+    && !hasNonIntegerSqrtMode();
+}
+
+function hasPercentWholeOnlySelection() {
+  return hasPercentWholeMode()
     && getSelectedOperations().length === 0
     && getSelectedFractionModes().length === 0
     && getSelectedIntegerModes().length === 0
@@ -1613,7 +1660,9 @@ function isFractionExerciseMode() {
     && activeExerciseMode !== 'weight-convert'
     && activeExerciseMode !== 'area-convert'
     && activeExerciseMode !== 'volume-convert'
-    && activeExerciseMode !== 'percent-part';
+    && activeExerciseMode !== 'percent-part'
+    && activeExerciseMode !== 'percent-count'
+    && activeExerciseMode !== 'percent-whole';
 }
 
 function isNonIntegerAnswerInputMode() {
@@ -1791,6 +1840,14 @@ function getExerciseModeForProblem(problem) {
     return 'percent-part';
   }
 
+  if (problem?.type === 'percent-count') {
+    return 'percent-count';
+  }
+
+  if (problem?.type === 'percent-whole') {
+    return 'percent-whole';
+  }
+
   if (problem?.type?.startsWith('fraction-')) {
     return problem.type;
   }
@@ -1863,8 +1920,12 @@ function canAnswerProblem(problem) {
     || isWeightConvertProblem(problem)
     || isAreaConvertProblem(problem)
     || isVolumeConvertProblem(problem)
-    || isPercentPartProblem(problem)
+    || isPercentTaskProblem(problem)
     || Boolean(problem?.operands);
+}
+
+function isPercentTaskProblem(problem) {
+  return isPercentPartProblem(problem) || isPercentCountProblem(problem) || isPercentWholeProblem(problem);
 }
 
 function isNonIntegerPowersProblem(problem) {
@@ -3991,6 +4052,15 @@ function updateLinearEquationAnswerFormUi(problem) {
     inputEl.classList.remove('answer-form__input--special-answer');
   } else {
     updateLinearEquationAnswerInputWidth();
+  }
+}
+
+function updatePercentCountAnswerFormUi(problem) {
+  const showPercentSuffix = isPercentCountProblem(problem);
+
+  if (answerUnitSuffixEl) {
+    answerUnitSuffixEl.hidden = !showPercentSuffix;
+    answerUnitSuffixEl.setAttribute('aria-hidden', showPercentSuffix ? 'false' : 'true');
   }
 }
 
@@ -7779,6 +7849,224 @@ function getPercentPartUserAnswer() {
   return parseAnswer(inputEl.value);
 }
 
+function isPercentCountProblem(problem) {
+  return problem?.type === 'percent-count';
+}
+
+function buildPercentCountProblem({
+  level,
+  part,
+  whole,
+  preposition,
+  answer,
+  answerDecimals,
+}) {
+  return {
+    type: 'percent-count',
+    level,
+    part,
+    whole,
+    preposition,
+    answer,
+    answerDecimals,
+    isRetry: false,
+  };
+}
+
+function createPercentCountProblem(level) {
+  const displayLevel = level + 1;
+  const maxPartDecimals = 0;
+
+  for (let attempt = 0; attempt < 160; attempt += 1) {
+    const percent = pickPercentPartPercent(displayLevel);
+    const whole = pickPercentPartWhole(displayLevel);
+    const partRaw = whole * percent / 100;
+    const partDecimals = getExactDecimalPlaces(partRaw, maxPartDecimals);
+
+    if (partRaw <= 0 || partDecimals === null) {
+      continue;
+    }
+
+    if (!isValidPercentPartPair(percent, whole)) {
+      continue;
+    }
+
+    const part = fromScaled(toScaled(partRaw, partDecimals), partDecimals);
+    const answerDecimals = getExactDecimalPlaces(percent, 1);
+    if (answerDecimals === null) {
+      continue;
+    }
+
+    const answer = fromScaled(toScaled(percent, answerDecimals), answerDecimals);
+    const preposition = getPercentPartPreposition(whole);
+
+    return buildPercentCountProblem({
+      level: displayLevel,
+      part,
+      whole,
+      preposition,
+      answer,
+      answerDecimals,
+    });
+  }
+
+  return buildPercentCountProblem({
+    level: displayLevel,
+    part: 30,
+    whole: 25,
+    preposition: 'z',
+    answer: 120,
+    answerDecimals: 0,
+  });
+}
+
+function percentCountProblemFromRetry(dueRetry) {
+  const problem = buildPercentCountProblem({
+    level: dueRetry.level,
+    part: dueRetry.part,
+    whole: dueRetry.whole,
+    preposition: dueRetry.preposition,
+    answer: dueRetry.answer,
+    answerDecimals: dueRetry.answerDecimals,
+  });
+  problem.isRetry = true;
+  return problem;
+}
+
+function formatPercentCountExpression(problem) {
+  const preposition = problem.preposition ?? getPercentPartPreposition(problem.whole);
+  const calculation = `${formatWholeNumberForPercent(problem.part)} ${preposition} ${formatWholeNumberForPercent(problem.whole)}.`;
+  return `Urči, kolik procent je\n${calculation}`;
+}
+
+function formatPercentCountProblemText(problem) {
+  return formatPercentCountExpression(problem);
+}
+
+function formatPercentCountDisplayHtml(problem) {
+  const preposition = problem.preposition ?? getPercentPartPreposition(problem.whole);
+  const calculation = `${formatWholeNumberForPercent(problem.part)} ${preposition} ${formatWholeNumberForPercent(problem.whole)}.`;
+  return `<span class="problem-expression problem-expression--percent-part">Urči, kolik procent je<br>${escapeHtml(calculation)}</span>`;
+}
+
+function evaluatePercentCountAnswer(problem, userAnswer) {
+  const isCorrect = answersMatch(userAnswer, problem.answer, problem.answerDecimals);
+
+  return {
+    isCorrect,
+    feedbackMessage: isCorrect ? 'Správně!' : 'Špatně.',
+  };
+}
+
+function getPercentCountUserAnswer() {
+  return parseAnswer(inputEl.value);
+}
+
+function isPercentWholeProblem(problem) {
+  return problem?.type === 'percent-whole';
+}
+
+function buildPercentWholeProblem({
+  level,
+  percent,
+  part,
+  answer,
+  answerDecimals,
+}) {
+  return {
+    type: 'percent-whole',
+    level,
+    percent,
+    part,
+    answer,
+    answerDecimals,
+    isRetry: false,
+  };
+}
+
+function createPercentWholeProblem(level) {
+  const displayLevel = level + 1;
+  const maxPartDecimals = 0;
+
+  for (let attempt = 0; attempt < 160; attempt += 1) {
+    const percent = pickPercentPartPercent(displayLevel);
+    const whole = pickPercentPartWhole(displayLevel);
+    const partRaw = whole * percent / 100;
+    const partDecimals = getExactDecimalPlaces(partRaw, maxPartDecimals);
+
+    if (partRaw <= 0 || partDecimals === null || whole > PERCENT_PART_ANSWER_MAX) {
+      continue;
+    }
+
+    if (!isValidPercentPartPair(percent, partRaw)) {
+      continue;
+    }
+
+    const part = fromScaled(toScaled(partRaw, partDecimals), partDecimals);
+    const answerDecimals = getExactDecimalPlaces(whole, 0);
+    if (answerDecimals === null) {
+      continue;
+    }
+
+    const answer = fromScaled(toScaled(whole, answerDecimals), answerDecimals);
+
+    return buildPercentWholeProblem({
+      level: displayLevel,
+      percent,
+      part,
+      answer,
+      answerDecimals,
+    });
+  }
+
+  return buildPercentWholeProblem({
+    level: displayLevel,
+    percent: 20,
+    part: 15,
+    answer: 75,
+    answerDecimals: 0,
+  });
+}
+
+function percentWholeProblemFromRetry(dueRetry) {
+  const problem = buildPercentWholeProblem({
+    level: dueRetry.level,
+    percent: dueRetry.percent,
+    part: dueRetry.part,
+    answer: dueRetry.answer,
+    answerDecimals: dueRetry.answerDecimals,
+  });
+  problem.isRetry = true;
+  return problem;
+}
+
+function formatPercentWholeExpression(problem) {
+  const calculation = `${problem.percent} % je ${formatWholeNumberForPercent(problem.part)}.`;
+  return `Urči, kolik je 100 % procent, když\n${calculation}`;
+}
+
+function formatPercentWholeProblemText(problem) {
+  return formatPercentWholeExpression(problem);
+}
+
+function formatPercentWholeDisplayHtml(problem) {
+  const calculation = `${problem.percent} % je ${formatWholeNumberForPercent(problem.part)}.`;
+  return `<span class="problem-expression problem-expression--percent-part">Urči, kolik je 100 % procent, když<br>${escapeHtml(calculation)}</span>`;
+}
+
+function evaluatePercentWholeAnswer(problem, userAnswer) {
+  const isCorrect = answersMatch(userAnswer, problem.answer, problem.answerDecimals);
+
+  return {
+    isCorrect,
+    feedbackMessage: isCorrect ? 'Správně!' : 'Špatně.',
+  };
+}
+
+function getPercentWholeUserAnswer() {
+  return parseAnswer(inputEl.value);
+}
+
 function nonIntegerCompareProblemFromRetry(dueRetry) {
   const problem = buildNonIntegerCompareProblem({
     displayLevel: dueRetry.level,
@@ -10282,7 +10570,7 @@ function getMaxDifficultyLevelForMode(mode) {
     return VOLUME_CONVERT_MAX_LEVEL;
   }
 
-  if (mode === 'percent-part') {
+  if (mode === 'percent-part' || mode === 'percent-count' || mode === 'percent-whole') {
     return PERCENT_PART_MAX_LEVEL;
   }
 
@@ -15109,6 +15397,14 @@ function createProblemForExerciseMode(mode, level) {
     return createPercentPartProblem(level);
   }
 
+  if (mode === 'percent-count') {
+    return createPercentCountProblem(level);
+  }
+
+  if (mode === 'percent-whole') {
+    return createPercentWholeProblem(level);
+  }
+
   if (mode === 'integer-add-subtract') {
     return createIntegerAddSubtractProblem(level);
   }
@@ -15850,6 +16146,14 @@ function formatProblemText(problem) {
     return formatPercentPartProblemText(problem);
   }
 
+  if (problem.type === 'percent-count') {
+    return formatPercentCountProblemText(problem);
+  }
+
+  if (problem.type === 'percent-whole') {
+    return formatPercentWholeProblemText(problem);
+  }
+
   if (problem.type === 'fraction-add') {
     return formatFractionAddProblemText(problem);
   }
@@ -16009,6 +16313,14 @@ function formatProblemDisplayHtml(problem) {
 
   if (problem.type === 'percent-part') {
     return formatPercentPartDisplayHtml(problem);
+  }
+
+  if (problem.type === 'percent-count') {
+    return formatPercentCountDisplayHtml(problem);
+  }
+
+  if (problem.type === 'percent-whole') {
+    return formatPercentWholeDisplayHtml(problem);
   }
 
   return `<span class="problem-expression problem-expression--plain">${escapeHtml(formatProblemText(problem))}</span>`;
@@ -16186,7 +16498,7 @@ function recordSessionAnswer(userAnswer, isCorrect) {
     return;
   }
 
-  if (isPercentPartProblem(currentProblem)) {
+  if (isPercentTaskProblem(currentProblem)) {
     sessionResults.push(createSessionResultEntry(
       formatDecimal(userAnswer, currentProblem.answerDecimals),
       formatDecimal(currentProblem.answer, currentProblem.answerDecimals),
@@ -16659,7 +16971,7 @@ function summarizeStoredAnalysisPayload(payload) {
   }
 }
 
-async function createAssignmentDepot() {
+async function createAssignmentDepot({ modes = [] } = {}) {
   const supabase = getSupabaseClient();
   if (!supabase) {
     throw new Error('missing-config');
@@ -16667,7 +16979,12 @@ async function createAssignmentDepot() {
 
   const { data, error } = await supabase
     .from('analyses')
-    .insert({ payload: { t: 'depot' } })
+    .insert({
+      payload: {
+        t: 'depot',
+        m: modes,
+      },
+    })
     .select('id')
     .single();
 
@@ -16768,6 +17085,91 @@ async function loadDepotRecord(depotId) {
   return data;
 }
 
+async function loadAssignmentByDepotId(depotId) {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    throw new Error('missing-config');
+  }
+
+  const { data, error } = await supabase
+    .from('analyses')
+    .select('payload')
+    .eq('payload->>t', 'assignment')
+    .eq('payload->>d', depotId)
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data?.payload) {
+    return null;
+  }
+
+  try {
+    return parseAssignmentSharePayload(data.payload);
+  } catch {
+    return null;
+  }
+}
+
+async function loadDepotAssignmentMeta(depotId) {
+  const depot = await loadDepotRecord(depotId);
+  if (Array.isArray(depot.payload?.m) && depot.payload.m.length > 0) {
+    return depot.payload.m.map((mode) => String(mode));
+  }
+
+  const assignment = await loadAssignmentByDepotId(depotId);
+  if (assignment) {
+    return getAssignmentModeLabels(assignment);
+  }
+
+  const submissions = await loadDepotSubmissions(depotId);
+  for (const submission of submissions) {
+    if (!submission.analysis_payload) {
+      continue;
+    }
+
+    try {
+      const parsed = parseAnalysisSharePayload(submission.analysis_payload);
+      if (parsed.modes.length > 0) {
+        return parsed.modes;
+      }
+    } catch {
+      // try next submission
+    }
+  }
+
+  return [];
+}
+
+function updateDepotSubtitle(modes = activeDepotModes) {
+  if (!appSubtitleEl) {
+    return;
+  }
+
+  if (!depotScreenEl || depotScreenEl.hidden || modes.length === 0) {
+    appSubtitleEl.hidden = true;
+    appSubtitleEl.innerHTML = '';
+    return;
+  }
+
+  appSubtitleEl.hidden = false;
+  appSubtitleEl.innerHTML = `<p class="depot__modes-label"><strong>Zvolené režimy:</strong></p>
+    <ul class="depot__modes">
+      ${modes.map((mode) => `<li>${escapeHtml(mode)}</li>`).join('')}
+    </ul>`;
+}
+
+async function prepareDepotScreen(depotId) {
+  const [submissions, modes] = await Promise.all([
+    loadDepotSubmissions(depotId),
+    loadDepotAssignmentMeta(depotId),
+  ]);
+
+  activeDepotId = depotId;
+  activeDepotModes = modes;
+  showDepotScreen();
+  renderDepot(submissions);
+}
+
 async function copyShareLinkToInput(inputEl, feedbackEl, url, successMessage) {
   if (!inputEl || !url) {
     return false;
@@ -16854,7 +17256,7 @@ function getAssignmentProblemLimit() {
   return activeAssignmentConfig?.count ?? null;
 }
 
-function captureSessionModeSelectionFromAssignment(config) {
+function getAssignmentModeLabels(config) {
   const modes = [];
   const addLabels = (inputs, values) => {
     inputs.forEach((input) => {
@@ -16877,6 +17279,10 @@ function captureSessionModeSelectionFromAssignment(config) {
   }
 
   return modes;
+}
+
+function captureSessionModeSelectionFromAssignment(config) {
+  return getAssignmentModeLabels(config);
 }
 
 async function saveAssignmentToSupabase(payload = buildAssignmentSharePayload()) {
@@ -16944,7 +17350,8 @@ async function createAssignmentLink() {
   }
 
   try {
-    const depotId = await createAssignmentDepot();
+    const modes = captureSessionModeSelection();
+    const depotId = await createAssignmentDepot({ modes });
     const payload = {
       ...buildAssignmentSharePayload(),
       d: depotId,
@@ -17123,16 +17530,14 @@ function showDepotScreen() {
 }
 
 async function returnToDepotScreen(depotId) {
-  activeDepotId = depotId;
   viewingSharedAnalysis = false;
   history.replaceState(null, '', buildDepotShareUrl(depotId));
 
   try {
-    const submissions = await loadDepotSubmissions(depotId);
-    showDepotScreen();
-    renderDepot(submissions);
+    await prepareDepotScreen(depotId);
   } catch {
     activeDepotId = null;
+    activeDepotModes = [];
     analysisReturnDepotId = null;
     showSetupScreen({ preserveDepotHash: true });
     showSetupFeedback('Depozitář se nepodařilo načíst.');
@@ -17146,14 +17551,11 @@ async function loadDepotFromUrl() {
   }
 
   try {
-    await loadDepotRecord(id);
-    const submissions = await loadDepotSubmissions(id);
-    activeDepotId = id;
-    showDepotScreen();
-    renderDepot(submissions);
+    await prepareDepotScreen(id);
     return true;
   } catch {
     activeDepotId = null;
+    activeDepotModes = [];
     return false;
   }
 }
@@ -17884,7 +18286,7 @@ function updateAnswerShapeToggleVisibility(problem = currentProblem) {
     return;
   }
 
-  if (problem.type === 'percent-part') {
+  if (problem.type === 'percent-part' || problem.type === 'percent-count' || problem.type === 'percent-whole') {
     answerShapeToggleBtn.hidden = true;
     return;
   }
@@ -18019,7 +18421,7 @@ function setAnswerInputMode(mode) {
     return;
   }
 
-  if (mode === 'percent-part') {
+  if (mode === 'percent-part' || mode === 'percent-count' || mode === 'percent-whole') {
     fractionAnswerInputShape = 'number';
     updateFractionAnswerShapeUi();
     return;
@@ -18154,7 +18556,7 @@ function showProblem(problem) {
   appEl.classList.toggle('app--weight-convert', problem.type === 'weight-convert');
   appEl.classList.toggle('app--area-convert', problem.type === 'area-convert');
   appEl.classList.toggle('app--volume-convert', problem.type === 'volume-convert');
-  appEl.classList.toggle('app--percent-part', problem.type === 'percent-part');
+  appEl.classList.toggle('app--percent-part', isPercentTaskProblem(problem));
   appEl.classList.toggle('app--fraction-expand-reduce', problem.type === 'fraction-expand-reduce');
 
   if (problem.type === 'basic-form') {
@@ -18285,6 +18687,12 @@ function showProblem(problem) {
   } else if (problem.type === 'percent-part') {
     fractionAnswerInputShape = 'number';
     problemEl.innerHTML = formatPercentPartDisplayHtml(problem);
+  } else if (problem.type === 'percent-count') {
+    fractionAnswerInputShape = 'number';
+    problemEl.innerHTML = formatPercentCountDisplayHtml(problem);
+  } else if (problem.type === 'percent-whole') {
+    fractionAnswerInputShape = 'number';
+    problemEl.innerHTML = formatPercentWholeDisplayHtml(problem);
   } else if (isCompareProblem(problem) && problem.variant !== 'sign') {
     problemEl.innerHTML = formatCompareDisplayHtml(problem);
   } else if (!isCompareProblem(problem)) {
@@ -18292,6 +18700,7 @@ function showProblem(problem) {
   }
 
   updateLinearEquationAnswerFormUi(problem);
+  updatePercentCountAnswerFormUi(problem);
   updateLinearEquationActionsUi(problem);
 
   if (isMultiModeExercise()) {
@@ -18320,7 +18729,7 @@ function showProblem(problem) {
       || isWeightConvertExerciseMode()
       || isAreaConvertExerciseMode()
       || isVolumeConvertExerciseMode()
-      || isPercentPartExerciseMode()
+      || isPercentTaskExerciseMode()
       || getSelectedOperations().length > 0);
   setFormEnabled(canAnswer);
 
@@ -18486,6 +18895,19 @@ function queueRetry(problem) {
     item.percent = problem.percent;
     item.whole = problem.whole;
     item.preposition = problem.preposition;
+    item.answer = problem.answer;
+    item.answerDecimals = problem.answerDecimals;
+  } else if (problem.type === 'percent-count') {
+    item.type = 'percent-count';
+    item.part = problem.part;
+    item.whole = problem.whole;
+    item.preposition = problem.preposition;
+    item.answer = problem.answer;
+    item.answerDecimals = problem.answerDecimals;
+  } else if (problem.type === 'percent-whole') {
+    item.type = 'percent-whole';
+    item.percent = problem.percent;
+    item.part = problem.part;
     item.answer = problem.answer;
     item.answerDecimals = problem.answerDecimals;
   } else if (isCompareProblem(problem)) {
@@ -18676,6 +19098,14 @@ function pickNextProblem() {
 
     if (dueRetry.type === 'percent-part') {
       return percentPartProblemFromRetry(dueRetry);
+    }
+
+    if (dueRetry.type === 'percent-count') {
+      return percentCountProblemFromRetry(dueRetry);
+    }
+
+    if (dueRetry.type === 'percent-whole') {
+      return percentWholeProblemFromRetry(dueRetry);
     }
 
     if (dueRetry.type === 'decimal-compare'
@@ -18914,8 +19344,11 @@ function updateTitle() {
   if (depotScreenEl && !depotScreenEl.hidden) {
     appTitleEl.hidden = false;
     appTitleEl.textContent = 'Depozitář odevzdaných úkolů';
+    updateDepotSubtitle();
     return;
   }
+
+  updateDepotSubtitle([]);
 
   if (!analysisScreenEl.hidden) {
     appTitleEl.hidden = true;
@@ -19016,6 +19449,16 @@ function updateTitle() {
       return;
     }
 
+    if (hasPercentCountOnlySelection()) {
+      appTitleEl.textContent = PERCENT_COUNT_APP_TITLE;
+      return;
+    }
+
+    if (hasPercentWholeOnlySelection()) {
+      appTitleEl.textContent = PERCENT_WHOLE_APP_TITLE;
+      return;
+    }
+
     if (isAssignmentSetupCategory()) {
       appTitleEl.textContent = 'Vytvořit úkol';
       return;
@@ -19098,6 +19541,16 @@ function updateTitle() {
 
   if (activeExerciseMode === 'percent-part') {
     appTitleEl.textContent = PERCENT_PART_APP_TITLE;
+    return;
+  }
+
+  if (activeExerciseMode === 'percent-count') {
+    appTitleEl.textContent = PERCENT_COUNT_APP_TITLE;
+    return;
+  }
+
+  if (activeExerciseMode === 'percent-whole') {
+    appTitleEl.textContent = PERCENT_WHOLE_APP_TITLE;
     return;
   }
 
@@ -19241,6 +19694,7 @@ function showSetupScreen({ preserveAnalysisHash = false, preserveAssignmentHash 
   activeExerciseMode = null;
   currentAnswerInputMode = null;
   activeDepotId = null;
+  activeDepotModes = [];
   analysisReturnDepotId = null;
   pendingAssignmentDepotId = null;
   awaitingAssignmentSubmission = false;
@@ -19830,6 +20284,48 @@ formEl.addEventListener('submit', (event) => {
     }
 
     const { isCorrect } = evaluateVolumeConvertAnswer(currentProblem, userAnswer);
+
+    if (isCorrect) {
+      handleCorrectAnswer();
+    } else {
+      handleWrongAnswer();
+    }
+
+    recordSessionAnswer(userAnswer, isCorrect);
+    finishAnswerReview(isCorrect);
+    return;
+  }
+
+  if (isPercentCountProblem(currentProblem)) {
+    const userAnswer = getPercentCountUserAnswer();
+
+    if (userAnswer === null) {
+      showAnswerValidationFeedback();
+      return;
+    }
+
+    const { isCorrect } = evaluatePercentCountAnswer(currentProblem, userAnswer);
+
+    if (isCorrect) {
+      handleCorrectAnswer();
+    } else {
+      handleWrongAnswer();
+    }
+
+    recordSessionAnswer(userAnswer, isCorrect);
+    finishAnswerReview(isCorrect);
+    return;
+  }
+
+  if (isPercentWholeProblem(currentProblem)) {
+    const userAnswer = getPercentWholeUserAnswer();
+
+    if (userAnswer === null) {
+      showAnswerValidationFeedback();
+      return;
+    }
+
+    const { isCorrect } = evaluatePercentWholeAnswer(currentProblem, userAnswer);
 
     if (isCorrect) {
       handleCorrectAnswer();

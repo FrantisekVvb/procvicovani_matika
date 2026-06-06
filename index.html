@@ -12,6 +12,7 @@
 <body>
   <main class="app">
     <h1 class="app__title" id="app-title">Procvičování matematiky</h1>
+    <div class="app__subtitle" id="app-subtitle" hidden></div>
 
     <section class="screen" id="setup-screen">
       <fieldset class="setup-category-picker" id="setup-category-picker">
@@ -223,6 +224,14 @@
               <input type="radio" name="exclusive-mode" value="percent-part">
               Výpočet části celku
             </label>
+            <label class="operation-picker__option">
+              <input type="radio" name="exclusive-mode" value="percent-count">
+              Výpočet počtu procent
+            </label>
+            <label class="operation-picker__option">
+              <input type="radio" name="exclusive-mode" value="percent-whole">
+              Určení velikosti celku
+            </label>
           </div>
         </fieldset>
       </div>
@@ -381,6 +390,7 @@
                 required
               >
             </div>
+            <span class="answer-form__unit-suffix" id="answer-unit-suffix" hidden aria-hidden="true">%</span>
 
             <div class="answer-form__fraction-wrap" id="fraction-answer-wrap" hidden>
               <div class="fraction answer-fraction" id="answer-fraction">
