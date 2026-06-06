@@ -49,6 +49,28 @@ const exclusiveSetupPanelsEl = document.getElementById('exclusive-setup-panels')
 const exclusiveModeRadios = document.querySelectorAll('#exclusive-setup-panels input[type="radio"]');
 const requireBasicFormOptionEl = document.getElementById('require-basic-form-option');
 const requireBasicFormCheckbox = document.getElementById('require-basic-form-checkbox');
+const createAssignmentCheckboxEl = document.getElementById('create-assignment-checkbox');
+const setupAssignmentOptionsEl = document.getElementById('setup-assignment-options');
+const assignmentCountInputEl = document.getElementById('assignment-count-input');
+const assignmentLinkFeedbackEl = document.getElementById('assignment-link-feedback');
+const assignmentLinkWrapEl = document.getElementById('assignment-link-wrap');
+const assignmentLinkInputEl = document.getElementById('assignment-link-input');
+const assignmentLinkCopyBtn = document.getElementById('assignment-link-copy-btn');
+const assignmentLinkQrBtn = document.getElementById('assignment-link-qr-btn');
+const assignmentLinkQrWrapEl = document.getElementById('assignment-link-qr-wrap');
+const assignmentLinkQrCanvasEl = document.getElementById('assignment-link-qr-canvas');
+const assignmentLinkQrPreviewBtn = document.getElementById('assignment-link-qr-preview-btn');
+const assignmentLinkQrLightboxEl = document.getElementById('assignment-link-qr-lightbox');
+const assignmentLinkQrLightboxCanvasEl = document.getElementById('assignment-link-qr-lightbox-canvas');
+const assignmentLinkQrLightboxCloseBtn = document.getElementById('assignment-link-qr-lightbox-close-btn');
+const assignmentDepotLinkWrapEl = document.getElementById('assignment-depot-link-wrap');
+const assignmentDepotLinkInputEl = document.getElementById('assignment-depot-link-input');
+const assignmentDepotLinkCopyBtn = document.getElementById('assignment-depot-link-copy-btn');
+const assignmentDepotLinkDownloadBtn = document.getElementById('assignment-depot-link-download-btn');
+const depotScreenEl = document.getElementById('depot-screen');
+const depotTableWrapEl = document.getElementById('depot-table-wrap');
+const depotEmptyEl = document.getElementById('depot-empty');
+const depotRefreshBtn = document.getElementById('depot-refresh-btn');
 const linearEquationActionsEl = document.getElementById('linear-equation-actions');
 const linearEquationActionButtons = document.querySelectorAll('[data-linear-equation-answer]');
 const decimalCompareInequalityEl = document.getElementById('decimal-compare-inequality');
@@ -204,6 +226,8 @@ const AREA_UNIT_TO_MM2 = {
 const AREA_CONVERT_ANSWER_MAX = 999999;
 const VOLUME_CONVERT_MAX_LEVEL = 5;
 const VOLUME_CONVERT_APP_TITLE = 'Objem';
+const PERCENT_PART_MAX_LEVEL = 2;
+const PERCENT_PART_APP_TITLE = 'Výpočet části celku';
 const VOLUME_UNIT_ORDER = ['mm3', 'cm3', 'dm3', 'm3', 'ml', 'cl', 'dl', 'l', 'hl'];
 const VOLUME_UNIT_LABELS = {
   mm3: 'mm³',
@@ -228,6 +252,11 @@ const VOLUME_UNIT_TO_MM3 = {
   hl: 100000000,
 };
 const VOLUME_CONVERT_ANSWER_MAX = 999999;
+const PERCENT_PART_ANSWER_MAX = 999999;
+const PERCENT_PART_BASIC_PERCENTS = [1, 10, 20, 25, 50];
+const PERCENT_PART_LARGE_PERCENT_MIN = 110;
+const PERCENT_PART_LARGE_PERCENT_MAX = 250;
+const PERCENT_PART_MAX_SIGNIFICANT_DIGITS = 3;
 const INTEGER_COMPARE_MAX_LEVEL = 4;
 const INTEGER_COMPARE_VALUE_MIN = -99;
 const INTEGER_COMPARE_VALUE_MAX = 99;
@@ -345,6 +374,10 @@ let shuffledWithinPanelDeck = [];
 let lastPickedWithinPanel = null;
 let currentAnswerInputMode = null;
 let viewingSharedAnalysis = false;
+let activeAssignmentConfig = null;
+let pendingAssignmentDepotId = null;
+let awaitingAssignmentSubmission = false;
+let activeDepotId = null;
 let activeFractionInputEl = null;
 let fractionAnswerInputShape = 'fraction';
 let analysisProblemDisplayMode = 'text';
@@ -367,7 +400,15 @@ function isExclusiveSetupCategory() {
   return getSelectedSetupCategory() === 'exclusive';
 }
 
+function isAssignmentSetupCategory() {
+  return createAssignmentCheckboxEl?.checked === true;
+}
+
 function getSelectedExclusiveMode() {
+  if (activeAssignmentConfig?.exclusiveMode) {
+    return activeAssignmentConfig.exclusiveMode;
+  }
+
   if (!isExclusiveSetupCategory()) {
     return null;
   }
@@ -433,6 +474,10 @@ function hasVolumeConvertMode() {
   return getSelectedExclusiveMode() === 'volume-convert';
 }
 
+function hasPercentPartMode() {
+  return getSelectedExclusiveMode() === 'percent-part';
+}
+
 function isLinearEquationExerciseMode() {
   return activeExerciseMode === 'linear-equation';
 }
@@ -485,6 +530,10 @@ function isVolumeConvertExerciseMode() {
   return activeExerciseMode === 'volume-convert';
 }
 
+function isPercentPartExerciseMode() {
+  return activeExerciseMode === 'percent-part';
+}
+
 function isCompareExerciseMode() {
   return isDecimalCompareExerciseMode()
     || isIntegerCompareExerciseMode()
@@ -493,18 +542,30 @@ function isCompareExerciseMode() {
 }
 
 function getSelectedFractionModes() {
+  if (activeAssignmentConfig) {
+    return [...activeAssignmentConfig.fractionModes];
+  }
+
   return [...fractionModeCheckboxes]
     .filter((checkbox) => checkbox.checked)
     .map((checkbox) => checkbox.value);
 }
 
 function getSelectedIntegerModes() {
+  if (activeAssignmentConfig) {
+    return [...activeAssignmentConfig.integerModes];
+  }
+
   return [...integerModeCheckboxes]
     .filter((checkbox) => checkbox.checked)
     .map((checkbox) => checkbox.value);
 }
 
 function getPowersModePickerValues() {
+  if (activeAssignmentConfig) {
+    return [...activeAssignmentConfig.powersModes];
+  }
+
   return [...powersModeCheckboxes]
     .filter((checkbox) => checkbox.checked)
     .map((checkbox) => checkbox.value);
@@ -729,6 +790,17 @@ function hasVolumeConvertOnlySelection() {
     && !hasNonIntegerSqrtMode();
 }
 
+function hasPercentPartOnlySelection() {
+  return hasPercentPartMode()
+    && getSelectedOperations().length === 0
+    && getSelectedFractionModes().length === 0
+    && getSelectedIntegerModes().length === 0
+    && !hasPowersMode()
+    && !hasSqrtMode()
+    && !hasNonIntegerPowersMode()
+    && !hasNonIntegerSqrtMode();
+}
+
 function hasPowersOnlySelection() {
   return hasPowersMode()
     && !hasSqrtMode()
@@ -830,6 +902,7 @@ function clearExclusiveModeSelection() {
 function updateSetupCategoryUi() {
   const combinable = isCombinableSetupCategory();
   const exclusive = isExclusiveSetupCategory();
+  const assignment = isAssignmentSetupCategory();
 
   if (combinableSetupPanelsEl) {
     combinableSetupPanelsEl.hidden = !combinable;
@@ -842,6 +915,139 @@ function updateSetupCategoryUi() {
   if (requireBasicFormOptionEl) {
     requireBasicFormOptionEl.hidden = !combinable;
   }
+
+  if (setupAssignmentOptionsEl) {
+    setupAssignmentOptionsEl.hidden = !assignment;
+  }
+
+  startBtn.textContent = assignment ? 'Vytvořit úkol' : 'Spustit';
+}
+
+function handleCreateAssignmentChange() {
+  hideAssignmentLinkUi();
+  showSetupFeedback('');
+  updateSetupCategoryUi();
+  updateStartButton();
+  updateTitle();
+}
+
+function hideAssignmentLinkUi() {
+  if (!assignmentLinkFeedbackEl || !assignmentLinkWrapEl) {
+    return;
+  }
+
+  assignmentLinkFeedbackEl.hidden = true;
+  assignmentLinkWrapEl.hidden = true;
+  assignmentLinkFeedbackEl.textContent = '';
+  assignmentLinkFeedbackEl.classList.remove('analysis__link-feedback--error');
+  if (assignmentLinkInputEl) {
+    assignmentLinkInputEl.value = '';
+  }
+  if (assignmentDepotLinkWrapEl) {
+    assignmentDepotLinkWrapEl.hidden = true;
+  }
+  if (assignmentDepotLinkInputEl) {
+    assignmentDepotLinkInputEl.value = '';
+  }
+  hideAssignmentLinkQrCode();
+  setAssignmentCountInputLocked(false);
+}
+
+function hideAssignmentLinkQrCode() {
+  hideAssignmentLinkQrLightbox();
+  if (assignmentLinkQrWrapEl) {
+    assignmentLinkQrWrapEl.hidden = true;
+  }
+  if (assignmentLinkQrBtn) {
+    assignmentLinkQrBtn.setAttribute('aria-expanded', 'false');
+  }
+}
+
+function hideAssignmentLinkQrLightbox() {
+  if (assignmentLinkQrLightboxEl) {
+    assignmentLinkQrLightboxEl.hidden = true;
+  }
+}
+
+let qrCodeLibraryPromise = null;
+
+function loadQrCodeLibrary() {
+  if (window.QRCode) {
+    return Promise.resolve();
+  }
+
+  if (!qrCodeLibraryPromise) {
+    qrCodeLibraryPromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js';
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('qr-load-failed'));
+      document.head.appendChild(script);
+    });
+  }
+
+  return qrCodeLibraryPromise;
+}
+
+async function renderAssignmentLinkQrCanvas(canvasEl, url, width) {
+  await loadQrCodeLibrary();
+  await window.QRCode.toCanvas(canvasEl, url, {
+    width,
+    margin: 1,
+    errorCorrectionLevel: 'M',
+  });
+}
+
+async function toggleAssignmentLinkQrCode() {
+  const url = assignmentLinkInputEl?.value.trim();
+  if (!url || !assignmentLinkQrWrapEl || !assignmentLinkQrCanvasEl) {
+    return;
+  }
+
+  if (!assignmentLinkQrWrapEl.hidden) {
+    hideAssignmentLinkQrCode();
+    return;
+  }
+
+  try {
+    assignmentLinkFeedbackEl.hidden = true;
+    assignmentLinkFeedbackEl.textContent = '';
+    assignmentLinkFeedbackEl.classList.remove('analysis__link-feedback--error');
+    await renderAssignmentLinkQrCanvas(assignmentLinkQrCanvasEl, url, 200);
+    assignmentLinkQrWrapEl.hidden = false;
+    assignmentLinkQrBtn?.setAttribute('aria-expanded', 'true');
+  } catch {
+    assignmentLinkFeedbackEl.textContent = 'QR kód se nepodařilo zobrazit.';
+    assignmentLinkFeedbackEl.classList.add('analysis__link-feedback--error');
+    assignmentLinkFeedbackEl.hidden = false;
+  }
+}
+
+async function showAssignmentLinkQrLightbox() {
+  const url = assignmentLinkInputEl?.value.trim();
+  if (!url || !assignmentLinkQrLightboxEl || !assignmentLinkQrLightboxCanvasEl) {
+    return;
+  }
+
+  try {
+    await renderAssignmentLinkQrCanvas(assignmentLinkQrLightboxCanvasEl, url, 360);
+    assignmentLinkQrLightboxEl.hidden = false;
+    assignmentLinkQrLightboxCloseBtn?.focus();
+  } catch {
+    assignmentLinkFeedbackEl.textContent = 'QR kód se nepodařilo zobrazit.';
+    assignmentLinkFeedbackEl.classList.add('analysis__link-feedback--error');
+    assignmentLinkFeedbackEl.hidden = false;
+  }
+}
+
+function setAssignmentCountInputLocked(locked) {
+  if (!assignmentCountInputEl) {
+    return;
+  }
+
+  assignmentCountInputEl.readOnly = locked;
+  assignmentCountInputEl.disabled = locked;
 }
 
 function handleSetupCategoryChange() {
@@ -851,6 +1057,7 @@ function handleSetupCategoryChange() {
     clearCombinableModeSelection();
   }
 
+  hideAssignmentLinkUi();
   updateSetupCategoryUi();
   showSetupFeedback('');
   updateStartButton();
@@ -858,6 +1065,7 @@ function handleSetupCategoryChange() {
 }
 
 function handleCombinableModeSelectionChange() {
+  hideAssignmentLinkUi();
   showSetupFeedback('');
   updateStartButton();
   updateTitle();
@@ -868,6 +1076,10 @@ function updateStartButton() {
 }
 
 function getSelectedOperations() {
+  if (activeAssignmentConfig) {
+    return [...activeAssignmentConfig.operations];
+  }
+
   return [...operationCheckboxes]
     .filter((checkbox) => checkbox.checked)
     .map((checkbox) => checkbox.value);
@@ -1333,6 +1545,13 @@ function getSetupStartBlockReason() {
     return 'Vyber alespoň jeden režim procvičování.';
   }
 
+  if (isAssignmentSetupCategory()) {
+    const count = getAssignmentProblemCount();
+    if (!Number.isInteger(count) || count < 1 || count > 200) {
+      return 'Zadej počet úloh od 1 do 200.';
+    }
+  }
+
   if (resolveActiveExerciseMode() === null) {
     return 'Vyber alespoň jeden režim procvičování.';
   }
@@ -1392,7 +1611,8 @@ function isFractionExerciseMode() {
     && activeExerciseMode !== 'length-convert'
     && activeExerciseMode !== 'weight-convert'
     && activeExerciseMode !== 'area-convert'
-    && activeExerciseMode !== 'volume-convert';
+    && activeExerciseMode !== 'volume-convert'
+    && activeExerciseMode !== 'percent-part';
 }
 
 function isNonIntegerAnswerInputMode() {
@@ -1566,6 +1786,10 @@ function getExerciseModeForProblem(problem) {
     return 'volume-convert';
   }
 
+  if (problem?.type === 'percent-part') {
+    return 'percent-part';
+  }
+
   if (problem?.type?.startsWith('fraction-')) {
     return problem.type;
   }
@@ -1638,6 +1862,7 @@ function canAnswerProblem(problem) {
     || isWeightConvertProblem(problem)
     || isAreaConvertProblem(problem)
     || isVolumeConvertProblem(problem)
+    || isPercentPartProblem(problem)
     || Boolean(problem?.operands);
 }
 
@@ -1740,6 +1965,22 @@ function fractionAnswersEquivalent(userFraction, correctFraction) {
   return user.num * correct.den === correct.num * user.den;
 }
 
+function isCombinableBasicFormScope() {
+  if (activeAssignmentConfig) {
+    return activeAssignmentConfig.exclusiveMode === null;
+  }
+
+  return isCombinableSetupCategory();
+}
+
+function isRequireBasicFormEnabledInSetup() {
+  if (isExclusiveSetupCategory()) {
+    return false;
+  }
+
+  return requireBasicFormCheckbox?.checked ?? false;
+}
+
 function shouldRequireBasicFormAnswer() {
   if (currentProblem?.type === 'basic-form') {
     return true;
@@ -1755,6 +1996,14 @@ function shouldRequireBasicFormAnswer() {
 
   if (currentProblem?.type === 'decimal-fraction-convert') {
     return false;
+  }
+
+  if (!isCombinableBasicFormScope()) {
+    return false;
+  }
+
+  if (activeAssignmentConfig) {
+    return activeAssignmentConfig.requireBasicForm !== false;
   }
 
   return requireBasicFormCheckbox?.checked ?? false;
@@ -7359,6 +7608,176 @@ function getVolumeConvertUserAnswer(problem) {
   return { kind: 'order', order: [...decimalCompareSortOrder] };
 }
 
+function isPercentPartProblem(problem) {
+  return problem?.type === 'percent-part';
+}
+
+function formatWholeNumberForPercent(value) {
+  if (Number.isInteger(value)) {
+    return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
+  }
+
+  const decimals = getExactDecimalPlaces(value, 3) ?? 0;
+  return formatDecimal(value, decimals);
+}
+
+function getPercentPartPreposition(whole) {
+  if (whole >= 100 && whole < 200) {
+    return 'ze';
+  }
+
+  return 'z';
+}
+
+function countPercentPartSignificantDigits(value) {
+  let remaining = Math.abs(Math.trunc(value));
+
+  if (remaining === 0) {
+    return 1;
+  }
+
+  while (remaining >= 10 && remaining % 10 === 0) {
+    remaining /= 10;
+  }
+
+  return String(remaining).length;
+}
+
+function isValidPercentPartPair(percent, whole) {
+  return countPercentPartSignificantDigits(percent) + countPercentPartSignificantDigits(whole)
+    <= PERCENT_PART_MAX_SIGNIFICANT_DIGITS;
+}
+
+function pickPercentPartPercent(displayLevel) {
+  if (displayLevel === 1 || displayLevel === 2) {
+    return pickRandomItem(PERCENT_PART_BASIC_PERCENTS);
+  }
+
+  if (Math.random() < 0.5) {
+    return randomWhole(1, 99);
+  }
+
+  return randomWhole(
+    PERCENT_PART_LARGE_PERCENT_MIN / 10,
+    PERCENT_PART_LARGE_PERCENT_MAX / 10,
+  ) * 10;
+}
+
+function pickPercentPartWhole(displayLevel) {
+  if (displayLevel === 1 || displayLevel === 3) {
+    return randomWhole(1, 10) * 100;
+  }
+
+  if (displayLevel === 2) {
+    return randomWhole(1, 99) * 10;
+  }
+
+  return randomWhole(1, 10) * 100;
+}
+
+function buildPercentPartProblem({
+  level,
+  percent,
+  whole,
+  preposition,
+  answer,
+  answerDecimals,
+}) {
+  return {
+    type: 'percent-part',
+    level,
+    percent,
+    whole,
+    preposition,
+    answer,
+    answerDecimals,
+    isRetry: false,
+  };
+}
+
+function createPercentPartProblem(level) {
+  const displayLevel = level + 1;
+  const maxAnswerDecimals = 1;
+
+  for (let attempt = 0; attempt < 160; attempt += 1) {
+    const percent = pickPercentPartPercent(displayLevel);
+    const whole = pickPercentPartWhole(displayLevel);
+    const answerRaw = whole * percent / 100;
+    const answerDecimals = getExactDecimalPlaces(answerRaw, maxAnswerDecimals);
+
+    if (answerRaw <= 0 || answerDecimals === null || answerRaw > PERCENT_PART_ANSWER_MAX) {
+      continue;
+    }
+
+    if (!isValidPercentPartPair(percent, whole)) {
+      continue;
+    }
+
+    const answer = fromScaled(toScaled(answerRaw, answerDecimals), answerDecimals);
+    const preposition = getPercentPartPreposition(whole);
+
+    return buildPercentPartProblem({
+      level: displayLevel,
+      percent,
+      whole,
+      preposition,
+      answer,
+      answerDecimals,
+    });
+  }
+
+  return buildPercentPartProblem({
+    level: displayLevel,
+    percent: 120,
+    whole: 40,
+    preposition: 'z',
+    answer: 48,
+    answerDecimals: 0,
+  });
+}
+
+function percentPartProblemFromRetry(dueRetry) {
+  const problem = buildPercentPartProblem({
+    level: dueRetry.level,
+    percent: dueRetry.percent,
+    whole: dueRetry.whole,
+    preposition: dueRetry.preposition,
+    answer: dueRetry.answer,
+    answerDecimals: dueRetry.answerDecimals,
+  });
+  problem.isRetry = true;
+  return problem;
+}
+
+function formatPercentPartExpression(problem) {
+  const preposition = problem.preposition ?? getPercentPartPreposition(problem.whole);
+  const calculation = `${problem.percent} % ${preposition} ${formatWholeNumberForPercent(problem.whole)}.`;
+  return `Urči, kolik je\n${calculation}`;
+}
+
+function formatPercentPartProblemText(problem) {
+  return formatPercentPartExpression(problem);
+}
+
+function formatPercentPartDisplayHtml(problem) {
+  const preposition = problem.preposition ?? getPercentPartPreposition(problem.whole);
+  const calculation = `${problem.percent} % ${preposition} ${formatWholeNumberForPercent(problem.whole)}.`;
+  return `<span class="problem-expression problem-expression--percent-part">Urči, kolik je<br>${escapeHtml(calculation)}</span>`;
+}
+
+function evaluatePercentPartAnswer(problem, userAnswer) {
+  const isCorrect = answersMatch(userAnswer, problem.answer, problem.answerDecimals);
+
+  return {
+    isCorrect,
+    feedbackMessage: isCorrect ? 'Správně!' : 'Špatně.',
+  };
+}
+
+function getPercentPartUserAnswer() {
+  return parseAnswer(inputEl.value);
+}
+
 function nonIntegerCompareProblemFromRetry(dueRetry) {
   const problem = buildNonIntegerCompareProblem({
     displayLevel: dueRetry.level,
@@ -9860,6 +10279,10 @@ function getMaxDifficultyLevelForMode(mode) {
 
   if (mode === 'volume-convert') {
     return VOLUME_CONVERT_MAX_LEVEL;
+  }
+
+  if (mode === 'percent-part') {
+    return PERCENT_PART_MAX_LEVEL;
   }
 
   if (mode === 'integer-add-subtract') {
@@ -14681,6 +15104,10 @@ function createProblemForExerciseMode(mode, level) {
     return createVolumeConvertProblem(level);
   }
 
+  if (mode === 'percent-part') {
+    return createPercentPartProblem(level);
+  }
+
   if (mode === 'integer-add-subtract') {
     return createIntegerAddSubtractProblem(level);
   }
@@ -15418,6 +15845,10 @@ function formatProblemText(problem) {
     return formatVolumeConvertProblemText(problem);
   }
 
+  if (problem.type === 'percent-part') {
+    return formatPercentPartProblemText(problem);
+  }
+
   if (problem.type === 'fraction-add') {
     return formatFractionAddProblemText(problem);
   }
@@ -15573,6 +16004,10 @@ function formatProblemDisplayHtml(problem) {
 
   if (problem.type === 'volume-convert') {
     return formatVolumeConvertDisplayHtml(problem);
+  }
+
+  if (problem.type === 'percent-part') {
+    return formatPercentPartDisplayHtml(problem);
   }
 
   return `<span class="problem-expression problem-expression--plain">${escapeHtml(formatProblemText(problem))}</span>`;
@@ -15750,6 +16185,15 @@ function recordSessionAnswer(userAnswer, isCorrect) {
     return;
   }
 
+  if (isPercentPartProblem(currentProblem)) {
+    sessionResults.push(createSessionResultEntry(
+      formatDecimal(userAnswer, currentProblem.answerDecimals),
+      formatDecimal(currentProblem.answer, currentProblem.answerDecimals),
+      isCorrect,
+    ));
+    return;
+  }
+
   if (currentProblem?.type === 'non-integer-add-subtract') {
     if (isNumberAnswerInputShape()) {
       sessionResults.push(createSessionResultEntry(
@@ -15855,8 +16299,11 @@ function updateExerciseStatsUi() {
   const total = sessionResults.length;
   const correct = sessionResults.filter((row) => row.vysledek === 'správně').length;
   const wrong = total - correct;
+  const limit = getAssignmentProblemLimit();
 
-  exerciseStatsTotalEl.textContent = String(total);
+  exerciseStatsTotalEl.textContent = limit !== null
+    ? `${total} / ${limit}`
+    : String(total);
   exerciseStatsCorrectEl.textContent = String(correct);
   exerciseStatsWrongEl.textContent = String(wrong);
 }
@@ -15925,10 +16372,13 @@ function buildAnalysisStats() {
     byLevel.set(row.uroven, stats);
   });
 
+  const levelSum = sessionResults.reduce((sum, row) => sum + row.uroven, 0);
+
   return {
     total: sessionResults.length,
     correct,
     byLevel,
+    averageLevel: sessionResults.length > 0 ? levelSum / sessionResults.length : null,
   };
 }
 
@@ -15939,6 +16389,14 @@ function formatSuccessRate(correct, total) {
 
   const percent = Math.round((correct / total) * 100);
   return `${correct}/${total} (${percent} %)`;
+}
+
+function formatAverageLevel(averageLevel) {
+  if (averageLevel == null) {
+    return '—';
+  }
+
+  return averageLevel.toFixed(1).replace('.', ',');
 }
 
 function splitLinearEquationFractionSideTerms(side) {
@@ -16136,6 +16594,583 @@ function getSupabaseClient() {
   return window.supabase.createClient(config.url, config.anonKey);
 }
 
+function getAssignmentIdFromUrl() {
+  const match = location.hash.match(/^#u=(.+)$/);
+  if (!match || !ANALYSIS_ID_PATTERN.test(match[1])) {
+    return null;
+  }
+
+  return match[1];
+}
+
+function buildAssignmentShareUrl(id) {
+  return `${location.origin}${location.pathname}${location.search}#u=${id}`;
+}
+
+function getDepotIdFromUrl() {
+  const match = location.hash.match(/^#d=(.+)$/);
+  if (!match || !ANALYSIS_ID_PATTERN.test(match[1])) {
+    return null;
+  }
+
+  return match[1];
+}
+
+function buildDepotShareUrl(id) {
+  return `${location.origin}${location.pathname}${location.search}#d=${id}`;
+}
+
+function formatDepotTimestamp(iso) {
+  return new Date(iso).toLocaleString('cs-CZ', {
+    day: 'numeric',
+    month: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function summarizeStoredAnalysisPayload(payload) {
+  try {
+    const parsed = parseAnalysisSharePayload(payload);
+    const stats = parsed.results.reduce((acc, row) => {
+      acc.total += 1;
+      if (row.vysledek === 'správně') {
+        acc.correct += 1;
+      }
+      return acc;
+    }, { correct: 0, total: 0 });
+
+    const levelSum = parsed.results.reduce((sum, row) => sum + row.uroven, 0);
+    const averageLevel = parsed.results.length > 0 ? levelSum / parsed.results.length : null;
+
+    return {
+      name: parsed.name,
+      successRate: formatSuccessRate(stats.correct, stats.total),
+      averageLevel: formatAverageLevel(averageLevel),
+    };
+  } catch {
+    return {
+      name: '',
+      successRate: '—',
+      averageLevel: '—',
+    };
+  }
+}
+
+async function createAssignmentDepot() {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    throw new Error('missing-config');
+  }
+
+  const { data, error } = await supabase
+    .from('analyses')
+    .insert({ payload: { t: 'depot' } })
+    .select('id')
+    .single();
+
+  if (error || !data?.id) {
+    throw new Error('depot-save-failed');
+  }
+
+  return data.id;
+}
+
+async function saveAssignmentSubmission(depotId, analysisId) {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    throw new Error('missing-config');
+  }
+
+  const { error } = await supabase
+    .from('analyses')
+    .insert({
+      payload: {
+        t: 'submission',
+        d: depotId,
+        a: analysisId,
+      },
+    });
+
+  if (error) {
+    throw new Error('submission-save-failed');
+  }
+}
+
+async function loadDepotSubmissions(depotId) {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    throw new Error('missing-config');
+  }
+
+  const { data: markers, error } = await supabase
+    .from('analyses')
+    .select('id, created_at, payload')
+    .eq('payload->>t', 'submission')
+    .eq('payload->>d', depotId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new Error('load-failed');
+  }
+
+  if (!markers?.length) {
+    return [];
+  }
+
+  const analysisIds = markers
+    .map((row) => row.payload?.a)
+    .filter((id) => typeof id === 'string' && ANALYSIS_ID_PATTERN.test(id));
+
+  const analysesById = new Map();
+
+  if (analysisIds.length > 0) {
+    const { data: analyses, error: analysesError } = await supabase
+      .from('analyses')
+      .select('id, payload')
+      .in('id', analysisIds);
+
+    if (analysesError) {
+      throw new Error('load-failed');
+    }
+
+    (analyses ?? []).forEach((row) => {
+      analysesById.set(row.id, row.payload);
+    });
+  }
+
+  return markers.map((marker) => ({
+    id: marker.id,
+    created_at: marker.created_at,
+    analysis_id: marker.payload?.a ?? null,
+    analysis_payload: analysesById.get(marker.payload?.a) ?? null,
+  }));
+}
+
+async function loadDepotRecord(depotId) {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    throw new Error('missing-config');
+  }
+
+  const { data, error } = await supabase
+    .from('analyses')
+    .select('payload')
+    .eq('id', depotId)
+    .single();
+
+  if (error || data?.payload?.t !== 'depot') {
+    throw new Error('load-failed');
+  }
+
+  return data;
+}
+
+async function copyShareLinkToInput(inputEl, feedbackEl, url, successMessage) {
+  if (!inputEl || !url) {
+    return false;
+  }
+
+  inputEl.value = url;
+
+  try {
+    await navigator.clipboard.writeText(url);
+    if (feedbackEl) {
+      feedbackEl.textContent = successMessage;
+      feedbackEl.hidden = false;
+    }
+    return true;
+  } catch {
+    if (feedbackEl) {
+      feedbackEl.textContent = 'Odkaz vytvořen – zkopíruj ho ikonou vedle pole.';
+      feedbackEl.hidden = false;
+    }
+    return false;
+  }
+}
+
+function getAssignmentProblemCount() {
+  const value = Number(assignmentCountInputEl?.value);
+  if (!Number.isFinite(value)) {
+    return NaN;
+  }
+
+  return Math.trunc(value);
+}
+
+function buildAssignmentSharePayload() {
+  return {
+    t: 'assignment',
+    n: '',
+    c: getAssignmentProblemCount(),
+    r: isRequireBasicFormEnabledInSetup(),
+    o: [...operationCheckboxes]
+      .filter((checkbox) => checkbox.checked)
+      .map((checkbox) => checkbox.value),
+    i: [...integerModeCheckboxes]
+      .filter((checkbox) => checkbox.checked)
+      .map((checkbox) => checkbox.value),
+    p: [...powersModeCheckboxes]
+      .filter((checkbox) => checkbox.checked)
+      .map((checkbox) => checkbox.value),
+    f: [...fractionModeCheckboxes]
+      .filter((checkbox) => checkbox.checked)
+      .map((checkbox) => checkbox.value),
+    e: [...exclusiveModeRadios].find((radio) => radio.checked)?.value ?? null,
+  };
+}
+
+function parseAssignmentSharePayload(data) {
+  const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+  if (!parsed || parsed.t !== 'assignment') {
+    throw new Error('Neplatný úkol.');
+  }
+
+  const count = Number(parsed.c);
+  if (!Number.isInteger(count) || count < 1 || count > 200) {
+    throw new Error('Neplatný úkol.');
+  }
+
+  return {
+    name: typeof parsed.n === 'string' ? parsed.n : '',
+    count,
+    depotId: typeof parsed.d === 'string' && ANALYSIS_ID_PATTERN.test(parsed.d) ? parsed.d : null,
+    requireBasicForm: parsed.r !== false,
+    operations: Array.isArray(parsed.o) ? parsed.o.map(String) : [],
+    integerModes: Array.isArray(parsed.i) ? parsed.i.map(String) : [],
+    powersModes: Array.isArray(parsed.p) ? parsed.p.map(String) : [],
+    fractionModes: Array.isArray(parsed.f) ? parsed.f.map(String) : [],
+    exclusiveMode: typeof parsed.e === 'string' && parsed.e !== '' ? parsed.e : null,
+  };
+}
+
+function isAssignmentExercise() {
+  return activeAssignmentConfig !== null;
+}
+
+function getAssignmentProblemLimit() {
+  return activeAssignmentConfig?.count ?? null;
+}
+
+function captureSessionModeSelectionFromAssignment(config) {
+  const modes = [];
+  const addLabels = (inputs, values) => {
+    inputs.forEach((input) => {
+      if (values.includes(input.value)) {
+        modes.push(getCheckboxLabel(input));
+      }
+    });
+  };
+
+  addLabels([...operationCheckboxes], config.operations);
+  addLabels([...integerModeCheckboxes], config.integerModes);
+  addLabels([...powersModeCheckboxes], config.powersModes);
+  addLabels([...fractionModeCheckboxes], config.fractionModes);
+
+  if (config.exclusiveMode) {
+    const radio = [...exclusiveModeRadios].find((item) => item.value === config.exclusiveMode);
+    if (radio) {
+      modes.push(getCheckboxLabel(radio));
+    }
+  }
+
+  return modes;
+}
+
+async function saveAssignmentToSupabase(payload = buildAssignmentSharePayload()) {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    throw new Error('missing-config');
+  }
+
+  const { data, error } = await supabase
+    .from('analyses')
+    .insert({ payload })
+    .select('id')
+    .single();
+
+  if (error || !data?.id) {
+    throw new Error('save-failed');
+  }
+
+  return data.id;
+}
+
+async function loadAssignmentFromSupabase(id) {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    throw new Error('missing-config');
+  }
+
+  const { data, error } = await supabase
+    .from('analyses')
+    .select('payload')
+    .eq('id', id)
+    .single();
+
+  if (error || !data?.payload) {
+    throw new Error('load-failed');
+  }
+
+  return parseAssignmentSharePayload(data.payload);
+}
+
+async function createAssignmentLink() {
+  const blockReason = getSetupStartBlockReason();
+  if (blockReason !== '') {
+    assignmentLinkFeedbackEl.textContent = blockReason;
+    assignmentLinkFeedbackEl.classList.add('analysis__link-feedback--error');
+    assignmentLinkFeedbackEl.hidden = false;
+    return;
+  }
+
+  if (!isSupabaseConfigured()) {
+    assignmentLinkFeedbackEl.textContent = getSupabaseConfigHelpMessage();
+    assignmentLinkFeedbackEl.classList.add('analysis__link-feedback--error');
+    assignmentLinkFeedbackEl.hidden = false;
+    return;
+  }
+
+  assignmentLinkFeedbackEl.classList.remove('analysis__link-feedback--error');
+  startBtn.disabled = true;
+  assignmentLinkFeedbackEl.textContent = 'Ukládám úkol…';
+  assignmentLinkFeedbackEl.hidden = false;
+  assignmentLinkWrapEl.hidden = true;
+  hideAssignmentLinkQrCode();
+  if (assignmentDepotLinkWrapEl) {
+    assignmentDepotLinkWrapEl.hidden = true;
+  }
+
+  try {
+    const depotId = await createAssignmentDepot();
+    const payload = {
+      ...buildAssignmentSharePayload(),
+      d: depotId,
+    };
+    const id = await saveAssignmentToSupabase(payload);
+    const url = buildAssignmentShareUrl(id);
+    assignmentLinkInputEl.value = url;
+    assignmentLinkWrapEl.hidden = false;
+
+    if (assignmentDepotLinkInputEl && assignmentDepotLinkWrapEl) {
+      assignmentDepotLinkInputEl.value = buildDepotShareUrl(depotId);
+      assignmentDepotLinkWrapEl.hidden = false;
+    }
+
+    const copied = await copyShareLinkToInput(
+      assignmentLinkInputEl,
+      assignmentLinkFeedbackEl,
+      url,
+      'Úkol vytvořen. Odkaz na úkol zkopírován – depozitář je níže.',
+    );
+    if (!copied) {
+      assignmentLinkFeedbackEl.textContent = 'Úkol vytvořen – zkopíruj odkazy ikonami vedle polí.';
+    }
+    assignmentLinkFeedbackEl.hidden = false;
+    setAssignmentCountInputLocked(true);
+  } catch (error) {
+    if (error.message === 'missing-config') {
+      assignmentLinkFeedbackEl.textContent = getSupabaseConfigHelpMessage();
+    } else {
+      assignmentLinkFeedbackEl.textContent = 'Úkol se nepodařilo uložit. Zkus to znovu.';
+    }
+    assignmentLinkFeedbackEl.classList.add('analysis__link-feedback--error');
+    assignmentLinkFeedbackEl.hidden = false;
+  } finally {
+    startBtn.disabled = getSetupStartBlockReason() !== '';
+  }
+}
+
+async function loadAssignmentFromUrl() {
+  const id = getAssignmentIdFromUrl();
+  if (!id) {
+    return false;
+  }
+
+  try {
+    const config = await loadAssignmentFromSupabase(id);
+    activeAssignmentConfig = config;
+    startAssignmentExercise();
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+async function submitAssignmentToDepot() {
+  const depotId = pendingAssignmentDepotId;
+  if (!depotId || !canUseAnalysisLinkButton()) {
+    return;
+  }
+
+  if (getAnalysisName() === '') {
+    analysisLinkFeedbackEl.textContent = 'Pro odevzdání úkolu je potřeba nejprve vyplnit jméno.';
+    analysisLinkFeedbackEl.classList.add('analysis__link-feedback--error');
+    analysisLinkFeedbackEl.hidden = false;
+    analysisNameInputEl.focus();
+    return;
+  }
+
+  if (!isSupabaseConfigured()) {
+    analysisLinkFeedbackEl.textContent = 'Úkol se nepodařilo odevzdat – Supabase není nakonfigurované.';
+    analysisLinkFeedbackEl.classList.add('analysis__link-feedback--error');
+    analysisLinkFeedbackEl.hidden = false;
+    return;
+  }
+
+  analysisLinkFeedbackEl.classList.remove('analysis__link-feedback--error');
+  analysisLinkFeedbackEl.textContent = 'Odevzdávám úkol…';
+  analysisLinkFeedbackEl.hidden = false;
+  analysisLinkBtn.disabled = true;
+  hideAnalysisLinkUi();
+
+  try {
+    const analysisId = await saveAnalysisToSupabase();
+    await saveAssignmentSubmission(depotId, analysisId);
+    pendingAssignmentDepotId = null;
+    awaitingAssignmentSubmission = false;
+    location.hash = `a=${analysisId}`;
+    analysisLinkInputEl.value = buildAnalysisShareUrl(analysisId);
+    analysisLinkWrapEl.hidden = false;
+
+    const copied = await copyAnalysisLinkToClipboard('Úkol odevzdán do depozitáře a odkaz zkopírován do schránky.');
+    if (!copied) {
+      analysisLinkFeedbackEl.textContent = 'Úkol odevzdán do depozitáře – zkopíruj odkaz ikonou vedle pole.';
+      analysisLinkFeedbackEl.hidden = false;
+    }
+  } catch (error) {
+    if (error.message === 'missing-config') {
+      analysisLinkFeedbackEl.textContent = getSupabaseConfigHelpMessage();
+    } else {
+      analysisLinkFeedbackEl.textContent = 'Úkol se nepodařilo odevzdat do depozitáře.';
+    }
+    analysisLinkFeedbackEl.classList.add('analysis__link-feedback--error');
+    analysisLinkFeedbackEl.hidden = false;
+  } finally {
+    updateAnalysisLinkButton();
+    updateAnalysisNameField();
+  }
+}
+
+function renderDepotTableHead() {
+  return `<thead>
+    <tr>
+      <th>Čas</th>
+      <th>Jméno</th>
+      <th>Úspěšnost</th>
+      <th class="num">Prům. úroveň</th>
+      <th>Analýza</th>
+    </tr>
+  </thead>`;
+}
+
+function renderDepot(submissions) {
+  if (!depotTableWrapEl || !depotEmptyEl) {
+    return;
+  }
+
+  if (submissions.length === 0) {
+    depotTableWrapEl.hidden = true;
+    depotTableWrapEl.innerHTML = '';
+    depotEmptyEl.textContent = 'Zatím nebyl odevzdáný žádný úkol.';
+    depotEmptyEl.hidden = false;
+    return;
+  }
+
+  depotEmptyEl.hidden = true;
+  depotTableWrapEl.hidden = false;
+  const rows = submissions.map((submission) => {
+    const summary = summarizeStoredAnalysisPayload(submission.analysis_payload);
+    const name = summary.name.trim() !== '' ? summary.name : '—';
+
+    return `<tr>
+      <td>${escapeHtml(formatDepotTimestamp(submission.created_at))}</td>
+      <td>${escapeHtml(name)}</td>
+      <td>${escapeHtml(summary.successRate)}</td>
+      <td class="num">${escapeHtml(summary.averageLevel)}</td>
+      <td>${submission.analysis_id
+        ? `<a class="depot__analysis-link" href="#a=${escapeHtml(submission.analysis_id)}">Otevřít</a>`
+        : '—'}</td>
+    </tr>`;
+  }).join('');
+
+  depotTableWrapEl.innerHTML = `<table class="depot__table">${renderDepotTableHead()}<tbody>${rows}</tbody></table>`;
+}
+
+async function refreshDepotScreen() {
+  if (!activeDepotId) {
+    return;
+  }
+
+  try {
+    const submissions = await loadDepotSubmissions(activeDepotId);
+    renderDepot(submissions);
+  } catch {
+    depotTableWrapEl.hidden = true;
+    depotEmptyEl.hidden = false;
+    depotEmptyEl.textContent = 'Depozitář se nepodařilo načíst.';
+  }
+}
+
+function showDepotScreen() {
+  hideAllScreens();
+  depotScreenEl.hidden = false;
+  appEl.classList.remove('app--exercise', 'app--decimal-fraction-convert', 'app--length-convert', 'app--weight-convert', 'app--area-convert', 'app--volume-convert', 'app--percent-part', 'app--fraction-expand-reduce');
+  appEl.classList.add('app--wide');
+  updateTitle();
+}
+
+async function loadDepotFromUrl() {
+  const id = getDepotIdFromUrl();
+  if (!id) {
+    return false;
+  }
+
+  try {
+    await loadDepotRecord(id);
+    const submissions = await loadDepotSubmissions(id);
+    activeDepotId = id;
+    showDepotScreen();
+    renderDepot(submissions);
+    return true;
+  } catch {
+    activeDepotId = null;
+    return false;
+  }
+}
+
+function startAssignmentExercise() {
+  const resolvedMode = resolveActiveExerciseMode();
+  if (resolvedMode === null || !activeAssignmentConfig) {
+    activeAssignmentConfig = null;
+    showSetupScreen({ preserveAssignmentHash: true });
+    showSetupFeedback('Úkol se nepodařilo načíst nebo obsahuje neplatné režimy.');
+    return;
+  }
+
+  showExerciseScreen({ fromAssignment: true });
+}
+
+function isAssignmentProblemLimitReached() {
+  if (!isAssignmentExercise()) {
+    return false;
+  }
+
+  const limit = getAssignmentProblemLimit();
+  return limit !== null && sessionResults.length >= limit;
+}
+
+function completeAssignmentExercise() {
+  showAnalysisScreen({ pendingAssignmentSubmission: true });
+}
+
+function showFinishAssignmentAction() {
+  awaitingNextProblem = true;
+  primaryActionBtn.textContent = 'Dokončit';
+  primaryActionBtn.disabled = false;
+}
+
 function getAnalysisIdFromUrl() {
   const match = location.hash.match(/^#a=(.+)$/);
   if (!match || !ANALYSIS_ID_PATTERN.test(match[1])) {
@@ -16209,6 +17244,11 @@ async function loadAnalysisFromSupabase(id) {
     .single();
 
   if (error || !data?.payload) {
+    throw new Error('load-failed');
+  }
+
+  const payloadType = data.payload?.t;
+  if (payloadType === 'depot' || payloadType === 'submission' || payloadType === 'assignment') {
     throw new Error('load-failed');
   }
 
@@ -16300,8 +17340,28 @@ function canUseAnalysisLinkButton() {
   return !viewingSharedAnalysis && sessionResults.length > 0;
 }
 
+function canSubmitAssignment() {
+  return canUseAnalysisLinkButton() && getAnalysisName() !== '';
+}
+
 function updateAnalysisLinkButton() {
+  if (pendingAssignmentDepotId) {
+    analysisLinkBtn.textContent = 'Odevzdat úkol';
+    analysisLinkBtn.disabled = !canSubmitAssignment();
+    return;
+  }
+
+  analysisLinkBtn.textContent = 'Vygenerovat odkaz';
   analysisLinkBtn.disabled = !canUseAnalysisLinkButton();
+}
+
+async function handleAnalysisLinkButtonClick() {
+  if (pendingAssignmentDepotId) {
+    await submitAssignmentToDepot();
+    return;
+  }
+
+  await generateAnalysisLink();
 }
 
 function updateAnalysisNameField() {
@@ -16314,11 +17374,46 @@ function updateAnalysisNameField() {
 
   analysisNameInputEl.hidden = false;
   analysisNameDisplayEl.hidden = true;
+  analysisNameInputEl.placeholder = awaitingAssignmentSubmission ? 'Povinné pole' : 'Volitelné';
 }
 
 function sanitizeFilenamePart(text) {
   const cleaned = text.trim().replace(/\s+/g, '-').replace(/[^\p{L}\p{N}\-_]/gu, '');
   return cleaned.slice(0, 50);
+}
+
+function buildDepotLinkHtmlFile(depotUrl) {
+  const safeAttr = escapeHtml(depotUrl);
+  const safeJs = JSON.stringify(depotUrl);
+
+  return `<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="refresh" content="0;url=${safeAttr}">
+  <title>Depozitář odevzdaných úkolů</title>
+  <script>location.replace(${safeJs});</script>
+</head>
+<body>
+  <p><a href="${safeAttr}">Otevřít depozitář odevzdaných úkolů</a></p>
+</body>
+</html>`;
+}
+
+function downloadDepotLinkFile() {
+  const depotUrl = assignmentDepotLinkInputEl?.value.trim();
+  if (!depotUrl) {
+    return;
+  }
+
+  const html = buildDepotLinkHtmlFile(depotUrl);
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = 'depozitar-odevzdanych-ukolu.html';
+  link.click();
+  URL.revokeObjectURL(objectUrl);
 }
 
 function buildAnalysisDocument() {
@@ -16340,6 +17435,8 @@ function buildAnalysisDocument() {
     modes: [...sessionSelectedModes],
     overallLabel: 'Celková úspěšnost:',
     overall: formatSuccessRate(stats.correct, stats.total),
+    averageLevelLabel: 'Průměrná úroveň úlohy:',
+    averageLevel: formatAverageLevel(stats.averageLevel),
     levelsHeading: 'Úspěšnost podle úrovně',
     levels,
     rows: sessionResults.map((row, index) => ({
@@ -16424,6 +17521,7 @@ function buildAnalysisSummaryText(doc) {
   }
 
   lines.push(`${doc.overallLabel} ${doc.overall}`);
+  lines.push(`${doc.averageLevelLabel} ${doc.averageLevel}`);
 
   if (doc.levels.length > 0) {
     lines.push(`${doc.levelsHeading}:`);
@@ -16500,7 +17598,7 @@ function renderAnalysis() {
       </div>`
     : '';
 
-  analysisSummaryEl.innerHTML = `${modesHtml}<p><strong>${escapeHtml(doc.overallLabel)}</strong> ${escapeHtml(doc.overall)}</p>`;
+  analysisSummaryEl.innerHTML = `${modesHtml}<p><strong>${escapeHtml(doc.overallLabel)}</strong> ${escapeHtml(doc.overall)}</p><p><strong>${escapeHtml(doc.averageLevelLabel)}</strong> ${escapeHtml(doc.averageLevel)}</p>`;
 
   const levelLines = doc.levels
     .map((level) => `<p>${escapeHtml(level.displayLabel)}</p>`)
@@ -16523,6 +17621,9 @@ function hideAllScreens() {
   setupScreenEl.hidden = true;
   exerciseScreenEl.hidden = true;
   analysisScreenEl.hidden = true;
+  if (depotScreenEl) {
+    depotScreenEl.hidden = true;
+  }
 }
 
 function showVerifyAction() {
@@ -16558,6 +17659,13 @@ function finishAnswerReview(isCorrect) {
 
   feedbackEl.textContent = '';
   feedbackEl.className = 'feedback';
+
+  if (isAssignmentProblemLimitReached()) {
+    showFinishAssignmentAction();
+    primaryActionBtn.focus();
+    return;
+  }
+
   showNextExampleAction();
   primaryActionBtn.focus();
 }
@@ -16758,6 +17866,11 @@ function updateAnswerShapeToggleVisibility(problem = currentProblem) {
     return;
   }
 
+  if (problem.type === 'percent-part') {
+    answerShapeToggleBtn.hidden = true;
+    return;
+  }
+
   if (problem.type === 'linear-equation') {
     answerShapeToggleBtn.hidden = problem.solutionType !== 'unique';
     return;
@@ -16883,6 +17996,12 @@ function setAnswerInputMode(mode) {
   }
 
   if (mode === 'volume-convert') {
+    fractionAnswerInputShape = 'number';
+    updateFractionAnswerShapeUi();
+    return;
+  }
+
+  if (mode === 'percent-part') {
     fractionAnswerInputShape = 'number';
     updateFractionAnswerShapeUi();
     return;
@@ -17017,6 +18136,7 @@ function showProblem(problem) {
   appEl.classList.toggle('app--weight-convert', problem.type === 'weight-convert');
   appEl.classList.toggle('app--area-convert', problem.type === 'area-convert');
   appEl.classList.toggle('app--volume-convert', problem.type === 'volume-convert');
+  appEl.classList.toggle('app--percent-part', problem.type === 'percent-part');
   appEl.classList.toggle('app--fraction-expand-reduce', problem.type === 'fraction-expand-reduce');
 
   if (problem.type === 'basic-form') {
@@ -17144,6 +18264,9 @@ function showProblem(problem) {
   } else if (problem.type === 'volume-convert') {
     fractionAnswerInputShape = 'number';
     problemEl.innerHTML = formatVolumeConvertDisplayHtml(problem);
+  } else if (problem.type === 'percent-part') {
+    fractionAnswerInputShape = 'number';
+    problemEl.innerHTML = formatPercentPartDisplayHtml(problem);
   } else if (isCompareProblem(problem) && problem.variant !== 'sign') {
     problemEl.innerHTML = formatCompareDisplayHtml(problem);
   } else if (!isCompareProblem(problem)) {
@@ -17179,6 +18302,7 @@ function showProblem(problem) {
       || isWeightConvertExerciseMode()
       || isAreaConvertExerciseMode()
       || isVolumeConvertExerciseMode()
+      || isPercentPartExerciseMode()
       || getSelectedOperations().length > 0);
   setFormEnabled(canAnswer);
 
@@ -17339,6 +18463,13 @@ function queueRetry(problem) {
     item.operands = problem.operands ? problem.operands.map((operand) => ({ ...operand })) : null;
     item.correctOrder = problem.correctOrder ? [...problem.correctOrder] : null;
     item.displayOrder = problem.displayOrder ? [...problem.displayOrder] : null;
+  } else if (problem.type === 'percent-part') {
+    item.type = 'percent-part';
+    item.percent = problem.percent;
+    item.whole = problem.whole;
+    item.preposition = problem.preposition;
+    item.answer = problem.answer;
+    item.answerDecimals = problem.answerDecimals;
   } else if (isCompareProblem(problem)) {
     item.type = problem.type;
     item.variant = problem.variant;
@@ -17523,6 +18654,10 @@ function pickNextProblem() {
 
     if (dueRetry.type === 'volume-convert') {
       return volumeConvertProblemFromRetry(dueRetry);
+    }
+
+    if (dueRetry.type === 'percent-part') {
+      return percentPartProblemFromRetry(dueRetry);
     }
 
     if (dueRetry.type === 'decimal-compare'
@@ -17758,6 +18893,20 @@ function pickNextProblem() {
 }
 
 function updateTitle() {
+  if (depotScreenEl && !depotScreenEl.hidden) {
+    appTitleEl.hidden = false;
+    appTitleEl.textContent = 'Depozitář odevzdaných úkolů';
+    return;
+  }
+
+  if (!analysisScreenEl.hidden) {
+    appTitleEl.hidden = true;
+    appTitleEl.textContent = '';
+    return;
+  }
+
+  appTitleEl.hidden = false;
+
   if (exerciseScreenEl.hidden && analysisScreenEl.hidden) {
     if (hasCrossTypeSelection()) {
       appTitleEl.textContent = DECIMAL_FRACTION_COMBINED_APP_TITLE;
@@ -17844,7 +18993,22 @@ function updateTitle() {
       return;
     }
 
+    if (hasPercentPartOnlySelection()) {
+      appTitleEl.textContent = PERCENT_PART_APP_TITLE;
+      return;
+    }
+
+    if (isAssignmentSetupCategory()) {
+      appTitleEl.textContent = 'Vytvořit úkol';
+      return;
+    }
+
     appTitleEl.textContent = APP_TITLE;
+    return;
+  }
+
+  if (isAssignmentExercise()) {
+    appTitleEl.textContent = activeAssignmentConfig.name || 'Úkol';
     return;
   }
 
@@ -17914,6 +19078,11 @@ function updateTitle() {
     return;
   }
 
+  if (activeExerciseMode === 'percent-part') {
+    appTitleEl.textContent = PERCENT_PART_APP_TITLE;
+    return;
+  }
+
   if (activeExerciseMode === 'integer-compare') {
     appTitleEl.textContent = INTEGER_COMPARE_APP_TITLE;
     return;
@@ -17964,7 +19133,13 @@ function resetSession() {
   activeExerciseModePool = [];
   analysisNameInputEl.value = '';
   viewingSharedAnalysis = false;
+  pendingAssignmentDepotId = null;
+  awaitingAssignmentSubmission = false;
   hideAnalysisLinkUi();
+}
+
+function clearActiveAssignment() {
+  activeAssignmentConfig = null;
 }
 
 function resetProgress() {
@@ -17983,6 +19158,10 @@ function resetProgress() {
   shuffledWithinPanelDeck = [];
   lastPickedWithinPanel = null;
   resetSession();
+
+  if (!isAssignmentExercise()) {
+    clearActiveAssignment();
+  }
 }
 
 function advanceMultiModePhaseAfterIndividualComplete() {
@@ -18036,13 +19215,17 @@ function newProblem() {
   showProblem(pickNextProblem());
 }
 
-function showSetupScreen({ preserveAnalysisHash = false } = {}) {
+function showSetupScreen({ preserveAnalysisHash = false, preserveAssignmentHash = false, preserveDepotHash = false } = {}) {
   hideAllScreens();
   setupScreenEl.hidden = false;
-  appEl.classList.remove('app--wide', 'app--exercise', 'app--decimal-fraction-convert', 'app--length-convert', 'app--weight-convert', 'app--area-convert', 'app--volume-convert', 'app--fraction-expand-reduce');
+  appEl.classList.remove('app--wide', 'app--exercise', 'app--decimal-fraction-convert', 'app--length-convert', 'app--weight-convert', 'app--area-convert', 'app--volume-convert', 'app--percent-part', 'app--fraction-expand-reduce');
   viewingSharedAnalysis = false;
   activeExerciseMode = null;
   currentAnswerInputMode = null;
+  activeDepotId = null;
+  pendingAssignmentDepotId = null;
+  awaitingAssignmentSubmission = false;
+  clearActiveAssignment();
   setAnswerInputMode('decimal');
   updateSetupCategoryUi();
   showSetupFeedback('');
@@ -18051,18 +19234,33 @@ function showSetupScreen({ preserveAnalysisHash = false } = {}) {
   if (location.hash.startsWith('#a=') && !preserveAnalysisHash) {
     history.replaceState(null, '', `${location.pathname}${location.search}`);
   }
+  if (location.hash.startsWith('#u=') && !preserveAssignmentHash) {
+    history.replaceState(null, '', `${location.pathname}${location.search}`);
+  }
+  if (location.hash.startsWith('#d=') && !preserveDepotHash) {
+    history.replaceState(null, '', `${location.pathname}${location.search}`);
+  }
   updateTitle();
 }
 
-function showExerciseScreen() {
+function showExerciseScreen({ fromAssignment = false } = {}) {
+  if (!fromAssignment) {
+    clearActiveAssignment();
+  }
+
   const resolvedMode = resolveActiveExerciseMode();
   if (resolvedMode === null) {
-    showSetupFeedback(getSetupStartBlockReason());
+    if (fromAssignment) {
+      clearActiveAssignment();
+    }
+    showSetupFeedback(getSetupStartBlockReason() || 'Vyber alespoň jeden režim procvičování.');
     return;
   }
 
   activeExerciseMode = resolvedMode;
-  const selectedModes = captureSessionModeSelection();
+  const selectedModes = fromAssignment && activeAssignmentConfig
+    ? captureSessionModeSelectionFromAssignment(activeAssignmentConfig)
+    : captureSessionModeSelection();
 
   hideAllScreens();
   exerciseScreenEl.hidden = false;
@@ -18078,6 +19276,9 @@ function showExerciseScreen() {
 
   resetProgress();
   sessionSelectedModes = selectedModes;
+  if (fromAssignment && activeAssignmentConfig?.name) {
+    analysisNameInputEl.value = activeAssignmentConfig.name;
+  }
   activeExerciseModePool = resolvedMode === 'multi-mode'
     ? buildExerciseModePool()
     : [resolvedMode];
@@ -18092,19 +19293,30 @@ function showExerciseScreen() {
   newProblem();
 }
 
-function showAnalysisScreen() {
+function showAnalysisScreen({ pendingAssignmentSubmission = false } = {}) {
+  awaitingAssignmentSubmission = pendingAssignmentSubmission;
+
+  if (pendingAssignmentSubmission && activeAssignmentConfig?.depotId) {
+    pendingAssignmentDepotId = activeAssignmentConfig.depotId;
+  } else if (!pendingAssignmentSubmission) {
+    pendingAssignmentDepotId = null;
+    awaitingAssignmentSubmission = false;
+  }
+
   hideAllScreens();
   analysisScreenEl.hidden = false;
-  appEl.classList.remove('app--exercise', 'app--decimal-fraction-convert', 'app--length-convert', 'app--weight-convert', 'app--area-convert', 'app--volume-convert', 'app--fraction-expand-reduce');
+  appEl.classList.remove('app--exercise', 'app--decimal-fraction-convert', 'app--length-convert', 'app--weight-convert', 'app--area-convert', 'app--volume-convert', 'app--percent-part', 'app--fraction-expand-reduce');
   appEl.classList.add('app--wide');
+  clearActiveAssignment();
   renderAnalysis();
-  if (location.hash.startsWith('#a=')) {
+  if (!pendingAssignmentDepotId && location.hash.startsWith('#a=')) {
     const id = getAnalysisIdFromUrl();
     if (id) {
       analysisLinkInputEl.value = buildAnalysisShareUrl(id);
       analysisLinkWrapEl.hidden = false;
     }
   }
+  updateAnalysisNameField();
   updateTitle();
 }
 
@@ -18122,29 +19334,38 @@ function handleExclusiveModeSelectionChange(event) {
     radio.dataset.wasChecked = 'true';
   }
 
+  hideAssignmentLinkUi();
   showSetupFeedback('');
   updateStartButton();
   updateTitle();
 }
 
 function handleOperationSelectionChange() {
+  hideAssignmentLinkUi();
   handleCombinableModeSelectionChange();
 }
 
 function handleFractionModeSelectionChange() {
+  hideAssignmentLinkUi();
   handleCombinableModeSelectionChange();
 }
 
 function handleIntegerModeSelectionChange() {
+  hideAssignmentLinkUi();
   handleCombinableModeSelectionChange();
 }
 
 function handlePowersModeSelectionChange() {
+  hideAssignmentLinkUi();
   handleCombinableModeSelectionChange();
 }
 
 primaryActionBtn.addEventListener('click', () => {
   if (awaitingNextProblem) {
+    if (isAssignmentProblemLimitReached()) {
+      completeAssignmentExercise();
+      return;
+    }
     newProblem();
     return;
   }
@@ -18602,6 +19823,27 @@ formEl.addEventListener('submit', (event) => {
     return;
   }
 
+  if (isPercentPartProblem(currentProblem)) {
+    const userAnswer = getPercentPartUserAnswer();
+
+    if (userAnswer === null) {
+      showAnswerValidationFeedback();
+      return;
+    }
+
+    const { isCorrect } = evaluatePercentPartAnswer(currentProblem, userAnswer);
+
+    if (isCorrect) {
+      handleCorrectAnswer();
+    } else {
+      handleWrongAnswer();
+    }
+
+    recordSessionAnswer(userAnswer, isCorrect);
+    finishAnswerReview(isCorrect);
+    return;
+  }
+
   if (isCompareProblem(currentProblem)) {
     const userAnswer = getCompareUserAnswer(currentProblem);
     if (userAnswer === null) {
@@ -18683,6 +19925,12 @@ document.addEventListener('keydown', (event) => {
       return;
     }
 
+    if (isAssignmentProblemLimitReached()) {
+      event.preventDefault();
+      completeAssignmentExercise();
+      return;
+    }
+
     event.preventDefault();
     newProblem();
     return;
@@ -18712,16 +19960,77 @@ answerDenominatorEl.addEventListener('focus', () => {
 
 answerShapeToggleBtn.addEventListener('click', toggleFractionAnswerShape);
 
-startBtn.addEventListener('click', () => {
+startBtn.addEventListener('click', async () => {
   const startBlockReason = getSetupStartBlockReason();
   if (startBlockReason !== '') {
     showSetupFeedback(startBlockReason);
     return;
   }
 
+  if (isAssignmentSetupCategory()) {
+    showSetupFeedback('');
+    await createAssignmentLink();
+    return;
+  }
+
   showSetupFeedback('');
   showExerciseScreen();
 });
+
+assignmentLinkCopyBtn?.addEventListener('click', async () => {
+  const url = assignmentLinkInputEl?.value.trim();
+  if (!url) {
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(url);
+    assignmentLinkFeedbackEl.textContent = 'Odkaz na úkol zkopírován do schránky.';
+    assignmentLinkFeedbackEl.hidden = false;
+  } catch {
+    assignmentLinkInputEl.select();
+  }
+});
+
+assignmentLinkQrBtn?.addEventListener('click', () => {
+  toggleAssignmentLinkQrCode();
+});
+
+assignmentLinkQrPreviewBtn?.addEventListener('click', () => {
+  showAssignmentLinkQrLightbox();
+});
+
+assignmentLinkQrLightboxCloseBtn?.addEventListener('click', () => {
+  hideAssignmentLinkQrLightbox();
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && assignmentLinkQrLightboxEl && !assignmentLinkQrLightboxEl.hidden) {
+    hideAssignmentLinkQrLightbox();
+  }
+});
+
+assignmentDepotLinkCopyBtn?.addEventListener('click', async () => {
+  const url = assignmentDepotLinkInputEl?.value.trim();
+  if (!url) {
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(url);
+    assignmentLinkFeedbackEl.textContent = 'Odkaz na depozitář zkopírován do schránky.';
+    assignmentLinkFeedbackEl.hidden = false;
+  } catch {
+    assignmentDepotLinkInputEl.select();
+  }
+});
+
+assignmentDepotLinkDownloadBtn?.addEventListener('click', () => {
+  downloadDepotLinkFile();
+});
+
+assignmentCountInputEl?.addEventListener('input', updateStartButton);
+assignmentCountInputEl?.addEventListener('change', updateStartButton);
 
 finishBtn.addEventListener('click', () => {
   viewingSharedAnalysis = false;
@@ -18732,11 +20041,17 @@ backBtn.addEventListener('click', showSetupScreen);
 
 analysisBackBtn.addEventListener('click', showSetupScreen);
 
+depotRefreshBtn?.addEventListener('click', () => {
+  refreshDepotScreen();
+});
+
 analysisDownloadBtn.addEventListener('click', downloadAnalysisCsv);
 
 analysisLinkBtn.addEventListener('click', () => {
-  generateAnalysisLink();
+  handleAnalysisLinkButtonClick();
 });
+
+analysisNameInputEl.addEventListener('input', updateAnalysisLinkButton);
 
 analysisLinkCopyBtn.addEventListener('click', () => {
   copyAnalysisLinkToClipboard();
@@ -18768,6 +20083,8 @@ setupCategoryRadios.forEach((radio) => {
   radio.addEventListener('change', handleSetupCategoryChange);
 });
 
+createAssignmentCheckboxEl?.addEventListener('change', handleCreateAssignmentChange);
+
 exclusiveModeRadios.forEach((radio) => {
   radio.addEventListener('click', handleExclusiveModeSelectionChange);
 });
@@ -18792,10 +20109,32 @@ decimalCompareInequalityButtons.forEach((button) => {
   });
 });
 
-(async () => {
-  const loaded = await loadAnalysisFromUrl();
-  if (loaded) {
+async function navigateFromAppHash() {
+  const assignmentLoaded = await loadAssignmentFromUrl();
+  if (assignmentLoaded) {
+    return;
+  }
+
+  const depotLoaded = await loadDepotFromUrl();
+  if (depotLoaded) {
+    return;
+  }
+
+  const analysisLoaded = await loadAnalysisFromUrl();
+  if (analysisLoaded) {
     showAnalysisScreen();
+    return;
+  }
+
+  if (getAssignmentIdFromUrl()) {
+    showSetupScreen({ preserveAssignmentHash: true });
+    showSetupFeedback('Odkaz na úkol je neplatný nebo vypršel.');
+    return;
+  }
+
+  if (getDepotIdFromUrl()) {
+    showSetupScreen({ preserveDepotHash: true });
+    showSetupFeedback('Odkaz na depozitář je neplatný nebo vypršel.');
     return;
   }
 
@@ -18808,4 +20147,12 @@ decimalCompareInequalityButtons.forEach((button) => {
   }
 
   showSetupScreen();
+}
+
+window.addEventListener('hashchange', () => {
+  navigateFromAppHash();
+});
+
+(async () => {
+  await navigateFromAppHash();
 })();

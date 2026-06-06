@@ -215,6 +215,16 @@
             </label>
           </div>
         </fieldset>
+
+        <fieldset class="operation-picker" id="exclusive-percent-picker">
+          <legend class="operation-picker__legend">Procenta</legend>
+          <div class="operation-picker__options operation-picker__options--single">
+            <label class="operation-picker__option">
+              <input type="radio" name="exclusive-mode" value="percent-part">
+              Výpočet části celku
+            </label>
+          </div>
+        </fieldset>
       </div>
 
       <div class="setup-option" id="require-basic-form-option">
@@ -222,7 +232,116 @@
           <input type="checkbox" id="require-basic-form-checkbox" checked>
           Vyžadovat jako výsledek zlomek v základním tvaru.
         </label>
-        <p class="setup-option__hint">Platí pro operace násobení a dělení zlomků.</p>
+        <p class="setup-option__hint">Platí pro všechny kombinovatelné úlohy se zlomkovou odpovědí.</p>
+      </div>
+
+      <label class="setup-assignment-toggle setup-option__label">
+        <input type="checkbox" id="create-assignment-checkbox">
+        Vytvořit úkol
+      </label>
+
+      <div class="setup-assignment-options" id="setup-assignment-options" hidden>
+        <label class="setup-assignment-options__field setup-assignment-options__field--count">
+          <span class="setup-assignment-options__label">Počet úloh</span>
+          <input
+            class="setup-assignment-options__input setup-assignment-options__input--count"
+            id="assignment-count-input"
+            type="number"
+            inputmode="numeric"
+            min="1"
+            max="200"
+            value="10"
+            required
+          >
+        </label>
+        <p class="setup-feedback setup-assignment-options__feedback" id="assignment-link-feedback" hidden aria-live="polite"></p>
+        <div class="analysis__link-wrap setup-assignment-options__link-wrap" id="assignment-link-wrap" hidden>
+          <label class="analysis__link-label" for="assignment-link-input">Odkaz na úkol</label>
+          <div class="analysis__link-row">
+            <input
+              class="analysis__link-input"
+              id="assignment-link-input"
+              type="text"
+              readonly
+            >
+            <button
+              class="analysis__link-copy"
+              type="button"
+              id="assignment-link-copy-btn"
+              aria-label="Zkopírovat odkaz na úkol"
+              title="Zkopírovat odkaz na úkol"
+            >
+              <svg class="analysis__link-copy-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+                <path d="M7 15H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1" fill="none" stroke="currentColor" stroke-width="1.8"/>
+              </svg>
+            </button>
+            <button
+              class="analysis__link-copy"
+              type="button"
+              id="assignment-link-qr-btn"
+              aria-label="Zobrazit QR kód odkazu na úkol"
+              title="Zobrazit QR kód"
+              aria-expanded="false"
+              aria-controls="assignment-link-qr-wrap"
+            >
+              <svg class="analysis__link-copy-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="3" y="3" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.8"/>
+                <rect x="14" y="3" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.8"/>
+                <rect x="3" y="14" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.8"/>
+                <rect x="15" y="15" width="5" height="5" fill="currentColor"/>
+                <path d="M16 3v3M20 7h-3M7 16v3M3 20h3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            </button>
+          </div>
+          <div class="assignment-link-qr" id="assignment-link-qr-wrap" hidden>
+            <button
+              class="assignment-link-qr__preview"
+              type="button"
+              id="assignment-link-qr-preview-btn"
+              aria-label="Zvětšit QR kód"
+              title="Zvětšit QR kód"
+            >
+              <canvas id="assignment-link-qr-canvas" aria-hidden="true"></canvas>
+            </button>
+          </div>
+        </div>
+        <div class="analysis__link-wrap setup-assignment-options__link-wrap" id="assignment-depot-link-wrap" hidden>
+          <label class="analysis__link-label" for="assignment-depot-link-input">Depozitář odevzdaných úkolů</label>
+          <div class="analysis__link-row">
+            <input
+              class="analysis__link-input"
+              id="assignment-depot-link-input"
+              type="text"
+              readonly
+            >
+            <button
+              class="analysis__link-copy"
+              type="button"
+              id="assignment-depot-link-copy-btn"
+              aria-label="Zkopírovat odkaz na depozitář"
+              title="Zkopírovat odkaz na depozitář"
+            >
+              <svg class="analysis__link-copy-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+                <path d="M7 15H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1" fill="none" stroke="currentColor" stroke-width="1.8"/>
+              </svg>
+            </button>
+            <button
+              class="analysis__link-copy"
+              type="button"
+              id="assignment-depot-link-download-btn"
+              aria-label="Stáhnout odkaz na depozitář"
+              title="Stáhnout odkaz na depozitář"
+            >
+              <svg class="analysis__link-copy-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 4v10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                <path d="M8 10l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M5 19h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
 
       <p class="setup-feedback" id="setup-feedback" hidden aria-live="polite"></p>
@@ -453,6 +572,25 @@
         </div>
       </div>
     </section>
+
+    <section class="screen screen--wide" id="depot-screen" hidden>
+      <p class="depot__empty" id="depot-empty" hidden>Zatím nebyl odevzdaný žádný úkol.</p>
+      <div class="depot__table-wrap" id="depot-table-wrap" hidden></div>
+      <div class="depot__actions">
+        <button class="btn btn--secondary" type="button" id="depot-refresh-btn">Obnovit</button>
+      </div>
+    </section>
   </main>
+  <div class="assignment-link-qr-lightbox" id="assignment-link-qr-lightbox" hidden>
+    <button
+      class="assignment-link-qr-lightbox__backdrop"
+      type="button"
+      id="assignment-link-qr-lightbox-close-btn"
+      aria-label="Zavřít zvětšený QR kód"
+    ></button>
+    <div class="assignment-link-qr-lightbox__panel">
+      <canvas id="assignment-link-qr-lightbox-canvas" aria-label="QR kód odkazu na úkol"></canvas>
+    </div>
+  </div>
 </body>
 </html>

@@ -1,114 +1,16 @@
 import { readFileSync } from 'node:fs';
 
-const TOTAL_ANSWERS = 50;
-const CORRECT_RATE = 1;
+const TOTAL_ANSWERS = 100;
+const CORRECT_RATE = 0.8;
 const SEED = 20250606;
-const USER_NAME = 'Fiktivní uživatel – všechny operace se zlomky (100 %)';
+const USER_NAME = 'Fiktivní uživatel – sčítání, odčítání, násobení a dělení zlomků (80 %)';
 const CORRECT_STREAK_TO_LEVEL_UP = 2;
 const PROBLEMS_BEFORE_RETRY = 3;
 const FRACTION_MIXED_DISPLAY_LEVEL = 5;
 const FRACTION_COMBINED_EXTRA_MIXED_DISPLAY_LEVEL = 6;
 const SELECTED_FRACTION_OPS = ['add', 'subtract', 'multiply', 'divide'];
 
-const ENGINE_STUBS = `
-const MULTI_OP_MIXED_START_LEVEL = 4;
-const MULTI_OP_EXTRA_MIXED_START_LEVEL = 5;
-const MIXED_OPERATOR_RATE = 0.8;
-const PARENTHESES_RATE = 0.5;
-
-function isAddOrSubtract(op) {
-  return op === 'add' || op === 'subtract';
-}
-
-function resolveEvaluationGroup(operators, parenthesesGroup) {
-  if (parenthesesGroup === 0) {
-    return 0;
-  }
-
-  if (parenthesesGroup === 1) {
-    return 1;
-  }
-
-  if (isAddOrSubtract(operators[0]) && !isAddOrSubtract(operators[1])) {
-    return 1;
-  }
-
-  return 0;
-}
-
-function buildPureOperatorPairs(operations) {
-  return operations.map((operation) => [operation, operation]);
-}
-
-function buildMixedOperatorPairs(operations) {
-  const pairs = [];
-
-  for (const first of operations) {
-    for (const second of operations) {
-      if (first !== second) {
-        pairs.push([first, second]);
-      }
-    }
-  }
-
-  return pairs;
-}
-
-function pickParenthesesGroup(operators) {
-  if (operators[0] === operators[1]) {
-    return null;
-  }
-
-  const validGroups = [];
-  if (isAddOrSubtract(operators[0])) {
-    validGroups.push(0);
-  }
-  if (isAddOrSubtract(operators[1])) {
-    validGroups.push(1);
-  }
-
-  if (validGroups.length === 0 || Math.random() >= PARENTHESES_RATE) {
-    return null;
-  }
-
-  return pickRandomItem(validGroups);
-}
-
-function resolveParenthesesGroup(operators, parenthesesGroup) {
-  if (parenthesesGroup === null) {
-    return null;
-  }
-
-  if (parenthesesGroup === 0 && isAddOrSubtract(operators[0])) {
-    return 0;
-  }
-
-  if (parenthesesGroup === 1 && isAddOrSubtract(operators[1])) {
-    return 1;
-  }
-
-  return null;
-}
-
-function pickOperatorsForLevel(level, regularOps) {
-  const purePairs = buildPureOperatorPairs(regularOps);
-  const mixedPairs = buildMixedOperatorPairs(regularOps);
-
-  if (mixedPairs.length === 0) {
-    return pickRandomItem(purePairs);
-  }
-
-  if (level >= MULTI_OP_EXTRA_MIXED_START_LEVEL) {
-    return pickRandomItem(mixedPairs);
-  }
-
-  if (Math.random() < MIXED_OPERATOR_RATE) {
-    return pickRandomItem(mixedPairs);
-  }
-
-  return pickRandomItem(purePairs);
-}
-
+const ENGINE_POST_STUBS = `
 function getSelectedFractionModes() {
   return ['fraction-add', 'fraction-subtract', 'fraction-multiply', 'fraction-divide'];
 }
@@ -121,6 +23,27 @@ function getFractionCombinedMaxLevel() {
   return FRACTION_COMBINED_EXTRA_MAX_LEVEL + 1;
 }
 `;
+
+const USER_VISIBLE_LEVEL_THRESHOLD = 4;
+const USER_VISIBLE_MAX_LEVEL = 5;
+const WITHIN_PANEL_COMBINATION_LEVEL_BOOST = 1;
+
+function getCombinationLevelBoost(problem) {
+  if (problem.type === 'fraction-mixed') {
+    return WITHIN_PANEL_COMBINATION_LEVEL_BOOST;
+  }
+
+  return 0;
+}
+
+function getDisplayLevel(problem) {
+  const internalLevel = problem.level + getCombinationLevelBoost(problem);
+  if (internalLevel > USER_VISIBLE_LEVEL_THRESHOLD) {
+    return USER_VISIBLE_MAX_LEVEL;
+  }
+
+  return internalLevel;
+}
 
 function readSupabaseConfig() {
   const source = readFileSync(new URL('./supabase-config.js', import.meta.url), 'utf8');
@@ -142,20 +65,27 @@ function createRng(seed) {
 
 function loadEngine(random) {
   const mainJs = readFileSync(new URL('./main.js', import.meta.url), 'utf8');
-  const start = mainJs.indexOf('const FRACTION_ADD_MAX_LEVEL');
+  const start = mainJs.indexOf('const MULTI_OP_MIXED_START_LEVEL');
   const end = mainJs.indexOf('function applyRationalStep(num, den, operand, op)');
-  if (start === -1 || end === -1) {
+  const helperStart = mainJs.indexOf('function isAddOrSubtract');
+  const helperEnd = mainJs.indexOf('function operationFromOperators');
+  const parenStart = mainJs.indexOf('function resolveParenthesesGroup');
+  const parenEnd = mainJs.indexOf('function buildProblem(');
+  if (start === -1 || end === -1 || helperStart === -1 || helperEnd === -1 || parenStart === -1 || parenEnd === -1) {
     throw new Error('Nepodařilo se načíst logiku zlomků z main.js');
   }
 
-  const body = mainJs.slice(start, end)
-    .replace(/\bMath\.random\(\)/g, 'rand()');
+  const body = [
+    mainJs.slice(start, end),
+    mainJs.slice(helperStart, helperEnd),
+    mainJs.slice(parenStart, parenEnd),
+  ].join('\n').replace(/\bMath\.random\(\)/g, 'rand()');
 
   const factory = new Function(
     'rand',
     'pickRandomItem',
     `${body}
-${ENGINE_STUBS}
+${ENGINE_POST_STUBS}
       return {
         createFractionCombinedProblem,
         getFractionCombinedMaxLevel,
@@ -416,7 +346,7 @@ function simulate() {
 
     results.push([
       formatProblemText(problem),
-      problem.level,
+      getDisplayLevel(problem),
       formatFraction(userAnswer.num, userAnswer.den),
       formatFraction(problem.answerNum, problem.answerDen),
       shouldBeCorrect ? 1 : 0,
@@ -424,9 +354,11 @@ function simulate() {
   }
 
   const correctCount = results.filter((row) => row[4] === 1).length;
-  const mixedLevel5Count = results.filter((row) => row[1] === FRACTION_MIXED_DISPLAY_LEVEL).length;
-  const mixedLevel6Count = results.filter((row) => row[1] === FRACTION_COMBINED_EXTRA_MIXED_DISPLAY_LEVEL).length;
-  const mixedCount = results.filter((row) => row[1] >= FRACTION_MIXED_DISPLAY_LEVEL).length;
+  const visibleLevelCounts = {};
+  results.forEach((row) => {
+    visibleLevelCounts[row[1]] = (visibleLevelCounts[row[1]] ?? 0) + 1;
+  });
+  const mixedCount = typeCounts['fraction-mixed'] ?? 0;
 
   return {
     payload: {
@@ -436,8 +368,7 @@ function simulate() {
     correctCount,
     total: TOTAL_ANSWERS,
     mixedCount,
-    mixedLevel5Count,
-    mixedLevel6Count,
+    visibleLevelCounts,
     typeCounts,
     maxDifficultyLevel,
   };
@@ -469,7 +400,7 @@ async function saveAnalysis(payload) {
   return row.id;
 }
 
-const DEFAULT_APP_BASE_URL = 'http://localhost:8000';
+const DEFAULT_APP_BASE_URL = 'http://localhost:3000';
 
 function buildShareUrl(id) {
   const appBase = (process.env.APP_BASE_URL ?? DEFAULT_APP_BASE_URL).replace(/\/$/, '');
@@ -481,8 +412,7 @@ const {
   correctCount,
   total,
   mixedCount,
-  mixedLevel5Count,
-  mixedLevel6Count,
+  visibleLevelCounts,
   typeCounts,
   maxDifficultyLevel,
 } = simulate();
@@ -491,6 +421,7 @@ const link = buildShareUrl(id);
 
 console.log(`Analýza: ${correctCount}/${total} (${Math.round((correctCount / total) * 100)} %)`);
 console.log(`Max. obtížnost: ${maxDifficultyLevel + 1}. úroveň`);
-console.log(`Smíšené úlohy celkem: ${mixedCount} (úroveň 5: ${mixedLevel5Count}, úroveň 6: ${mixedLevel6Count})`);
+console.log(`Smíšené úlohy: ${mixedCount}`);
+console.log('Zobrazené úrovně:', visibleLevelCounts);
 console.log('Typy úloh:', typeCounts);
 console.log(`Odkaz: ${link}`);
