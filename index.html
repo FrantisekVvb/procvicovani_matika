@@ -249,6 +249,11 @@
         Vytvořit úkol
       </label>
 
+      <label class="setup-assignment-toggle setup-option__label">
+        <input type="checkbox" id="create-pdf-checkbox">
+        Vytvořit PDF
+      </label>
+
       <div class="setup-assignment-options" id="setup-assignment-options" hidden>
         <label class="setup-assignment-options__field setup-assignment-options__field--count">
           <span class="setup-assignment-options__label">Počet úloh</span>
@@ -351,6 +356,11 @@
             </button>
           </div>
         </div>
+      </div>
+
+      <div class="setup-assignment-options setup-pdf-options" id="setup-pdf-options" hidden>
+        <p class="setup-pdf-options__intro">Počet úloh v jednotlivých úrovních</p>
+        <div class="setup-pdf-options__levels" id="pdf-level-counts"></div>
       </div>
 
       <p class="setup-feedback" id="setup-feedback" hidden aria-live="polite"></p>
@@ -549,8 +559,11 @@
         </table>
       </div>
       <div class="analysis__actions">
-        <button class="btn btn--secondary" type="button" id="analysis-download-btn" disabled>
+        <button class="btn btn--secondary" type="button" id="analysis-download-btn" disabled hidden>
           Stáhnout CSV
+        </button>
+        <button class="btn btn--secondary" type="button" id="analysis-download-pdf-btn" disabled>
+          Stáhnout PDF
         </button>
         <button class="btn btn--secondary" type="button" id="analysis-link-btn" disabled>
           Vygenerovat odkaz

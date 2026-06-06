@@ -20,6 +20,7 @@ const analysisTableBodyEl = document.getElementById('analysis-table-body');
 const analysisProblemViewEl = document.getElementById('analysis-problem-view');
 const analysisProblemViewButtons = [...document.querySelectorAll('[data-problem-view]')];
 const analysisDownloadBtn = document.getElementById('analysis-download-btn');
+const analysisDownloadPdfBtn = document.getElementById('analysis-download-pdf-btn');
 const analysisLinkBtn = document.getElementById('analysis-link-btn');
 const analysisLinkFeedbackEl = document.getElementById('analysis-link-feedback');
 const analysisLinkWrapEl = document.getElementById('analysis-link-wrap');
@@ -51,7 +52,10 @@ const exclusiveModeRadios = document.querySelectorAll('#exclusive-setup-panels i
 const requireBasicFormOptionEl = document.getElementById('require-basic-form-option');
 const requireBasicFormCheckbox = document.getElementById('require-basic-form-checkbox');
 const createAssignmentCheckboxEl = document.getElementById('create-assignment-checkbox');
+const createPdfCheckboxEl = document.getElementById('create-pdf-checkbox');
 const setupAssignmentOptionsEl = document.getElementById('setup-assignment-options');
+const setupPdfOptionsEl = document.getElementById('setup-pdf-options');
+const pdfLevelCountsEl = document.getElementById('pdf-level-counts');
 const assignmentCountInputEl = document.getElementById('assignment-count-input');
 const assignmentLinkFeedbackEl = document.getElementById('assignment-link-feedback');
 const assignmentLinkWrapEl = document.getElementById('assignment-link-wrap');
@@ -408,6 +412,10 @@ function isExclusiveSetupCategory() {
 
 function isAssignmentSetupCategory() {
   return createAssignmentCheckboxEl?.checked === true;
+}
+
+function isPdfSetupCategory() {
+  return createPdfCheckboxEl?.checked === true;
 }
 
 function getSelectedExclusiveMode() {
@@ -951,6 +959,7 @@ function updateSetupCategoryUi() {
   const combinable = isCombinableSetupCategory();
   const exclusive = isExclusiveSetupCategory();
   const assignment = isAssignmentSetupCategory();
+  const pdf = isPdfSetupCategory();
 
   if (combinableSetupPanelsEl) {
     combinableSetupPanelsEl.hidden = !combinable;
@@ -968,15 +977,46 @@ function updateSetupCategoryUi() {
     setupAssignmentOptionsEl.hidden = !assignment;
   }
 
-  startBtn.textContent = assignment ? 'Vytvořit úkol' : 'Spustit';
+  if (setupPdfOptionsEl) {
+    setupPdfOptionsEl.hidden = !pdf;
+  }
+
+  if (pdf) {
+    renderPdfLevelCountInputs();
+  }
+
+  startBtn.textContent = assignment ? 'Vytvořit úkol' : pdf ? 'Vytvořit PDF' : 'Spustit';
 }
 
 function handleCreateAssignmentChange() {
+  if (createAssignmentCheckboxEl?.checked && createPdfCheckboxEl) {
+    createPdfCheckboxEl.checked = false;
+  }
+
   hideAssignmentLinkUi();
   showSetupFeedback('');
   updateSetupCategoryUi();
   updateStartButton();
   updateTitle();
+}
+
+function handleCreatePdfChange() {
+  if (createPdfCheckboxEl?.checked && createAssignmentCheckboxEl) {
+    createAssignmentCheckboxEl.checked = false;
+    hideAssignmentLinkUi();
+  }
+
+  showSetupFeedback('');
+  updateSetupCategoryUi();
+  updateStartButton();
+  updateTitle();
+}
+
+function updatePdfSetupUi() {
+  if (isPdfSetupCategory()) {
+    renderPdfLevelCountInputs();
+  }
+  updateStartButton();
 }
 
 function hideAssignmentLinkUi() {
@@ -1106,16 +1146,16 @@ function handleSetupCategoryChange() {
   }
 
   hideAssignmentLinkUi();
-  updateSetupCategoryUi();
   showSetupFeedback('');
-  updateStartButton();
+  updateSetupCategoryUi();
+  updatePdfSetupUi();
   updateTitle();
 }
 
 function handleCombinableModeSelectionChange() {
   hideAssignmentLinkUi();
   showSetupFeedback('');
-  updateStartButton();
+  updatePdfSetupUi();
   updateTitle();
 }
 
@@ -1597,6 +1637,35 @@ function getSetupStartBlockReason() {
     const count = getAssignmentProblemCount();
     if (!Number.isInteger(count) || count < 1 || count > 200) {
       return 'Zadej počet úloh od 1 do 200.';
+    }
+  }
+
+  if (isPdfSetupCategory()) {
+    const levelCount = getWorksheetSetupLevelCount();
+    if (levelCount === 0) {
+      return 'Vyber alespoň jeden režim procvičování.';
+    }
+
+    const storedCounts = readStoredPdfLevelCounts();
+    let total = 0;
+
+    for (let index = 0; index < levelCount; index += 1) {
+      const rawValue = storedCounts[index] ?? (index === 0 ? 5 : 0);
+      const count = Number(rawValue);
+
+      if (!Number.isInteger(count) || count < 0 || count > 50) {
+        return 'Počet úloh na úrovni musí být celé číslo od 0 do 50.';
+      }
+
+      total += count;
+    }
+
+    if (total < 1) {
+      return 'Zadej alespoň jednu úlohu.';
+    }
+
+    if (total > 200) {
+      return 'Celkem může být nejvýše 200 úloh.';
     }
   }
 
@@ -17802,6 +17871,1397 @@ function sanitizeFilenamePart(text) {
   return cleaned.slice(0, 50);
 }
 
+function getAnalysisDownloadFilename(extension) {
+  const stamp = new Date().toISOString().slice(0, 10);
+  const namePart = getAnalysisName() ? `${sanitizeFilenamePart(getAnalysisName())}-` : '';
+  return `analyza-${namePart}${stamp}.${extension}`;
+}
+
+let pdfMakeLibraryPromise = null;
+
+function loadPdfMakeLibrary() {
+  if (window.pdfMake?.createPdf && window.pdfMake.vfs) {
+    return Promise.resolve();
+  }
+
+  if (!pdfMakeLibraryPromise) {
+    pdfMakeLibraryPromise = new Promise((resolve, reject) => {
+      const mainScript = document.createElement('script');
+      mainScript.src = 'https://cdn.jsdelivr.net/npm/pdfmake@0.2.10/build/pdfmake.min.js';
+      mainScript.async = true;
+      mainScript.onload = () => {
+        const fontScript = document.createElement('script');
+        fontScript.src = 'https://cdn.jsdelivr.net/npm/pdfmake@0.2.10/build/vfs_fonts.js';
+        fontScript.async = true;
+        fontScript.onload = () => resolve();
+        fontScript.onerror = () => reject(new Error('pdfmake-fonts-load-failed'));
+        document.head.appendChild(fontScript);
+      };
+      mainScript.onerror = () => reject(new Error('pdfmake-load-failed'));
+      document.head.appendChild(mainScript);
+    });
+  }
+
+  return pdfMakeLibraryPromise;
+}
+
+function buildAnalysisPdfDefinition(doc) {
+  const content = [
+    { text: doc.title, style: 'header' },
+    { text: `${doc.nameLabel}: ${doc.name || '—'}`, margin: [0, 4, 0, 0] },
+    { text: `${doc.overallLabel} ${doc.overall}`, margin: [0, 2, 0, 0] },
+    { text: `${doc.averageLevelLabel} ${doc.averageLevel}`, margin: [0, 2, 0, 0] },
+  ];
+
+  if (doc.modes.length > 0) {
+    content.push(
+      { text: doc.modesLabel, style: 'subheader', margin: [0, 10, 0, 4] },
+      { ul: doc.modes },
+    );
+  }
+
+  if (doc.levels.length > 0) {
+    content.push(
+      { text: doc.levelsHeading, style: 'subheader', margin: [0, 10, 0, 4] },
+      ...doc.levels.map((level) => ({ text: level.displayLabel, margin: [0, 0, 0, 2] })),
+    );
+  }
+
+  const tableBody = [
+    [
+      { text: '#', style: 'tableHeader' },
+      { text: 'Úloha', style: 'tableHeader' },
+      { text: 'Úroveň', style: 'tableHeader' },
+      { text: 'Tvá odpověď', style: 'tableHeader' },
+      { text: 'Správně', style: 'tableHeader' },
+      { text: 'Výsledek', style: 'tableHeader' },
+    ],
+    ...doc.rows.map((row) => [
+      { text: String(row.number), alignment: 'center' },
+      { text: row.uloha },
+      { text: String(row.uroven), alignment: 'center' },
+      { text: row.odpoved },
+      { text: row.spravne },
+      {
+        text: row.vysledek,
+        color: row.vysledek === 'špatně' ? '#cf222e' : '#222222',
+        bold: row.vysledek === 'špatně',
+      },
+    ]),
+  ];
+
+  content.push({
+    table: {
+      headerRows: 1,
+      widths: [18, '*', 28, 50, 50, 42],
+      body: tableBody,
+    },
+    layout: {
+      hLineWidth: () => 0.5,
+      vLineWidth: () => 0.5,
+      hLineColor: () => '#cccccc',
+      vLineColor: () => '#cccccc',
+      paddingLeft: () => 4,
+      paddingRight: () => 4,
+      paddingTop: () => 3,
+      paddingBottom: () => 3,
+      fillColor: (rowIndex) => (rowIndex === 0 ? '#f5f5f5' : null),
+    },
+    margin: [0, 12, 0, 0],
+  });
+
+  return {
+    pageOrientation: 'landscape',
+    pageMargins: [28, 28, 28, 28],
+    defaultStyle: {
+      font: 'Roboto',
+      fontSize: 9,
+      lineHeight: 1.25,
+    },
+    styles: {
+      header: { fontSize: 16, bold: true },
+      subheader: { fontSize: 10, bold: true },
+      tableHeader: { bold: true },
+    },
+    content,
+  };
+}
+
+function getWorksheetMaxInternalLevel() {
+  const mode = resolveActiveExerciseMode();
+  if (!mode) {
+    return -1;
+  }
+
+  if (mode === 'multi-mode') {
+    const pool = buildExerciseModePool();
+    if (pool.length === 0) {
+      return -1;
+    }
+
+    return Math.max(...pool.map(getMaxDifficultyLevelForMode));
+  }
+
+  return getMaxDifficultyLevelForMode(mode);
+}
+
+function getWorksheetPdfLevelSlotCount() {
+  const maxInternal = getWorksheetMaxInternalLevel();
+  if (maxInternal < 0) {
+    return 0;
+  }
+
+  return Math.min(maxInternal + 1, USER_VISIBLE_MAX_LEVEL);
+}
+
+function getWorksheetInternalLevelsForPdfSlot(slotIndex) {
+  const maxInternal = getWorksheetMaxInternalLevel();
+  if (maxInternal < 0) {
+    return [];
+  }
+
+  if (slotIndex < USER_VISIBLE_LEVEL_THRESHOLD) {
+    return slotIndex <= maxInternal ? [slotIndex] : [];
+  }
+
+  const bucketStart = USER_VISIBLE_LEVEL_THRESHOLD;
+  if (maxInternal < bucketStart) {
+    return [];
+  }
+
+  const levels = [];
+  for (let level = bucketStart; level <= maxInternal; level += 1) {
+    levels.push(level);
+  }
+
+  return levels;
+}
+
+function getWorksheetSetupLevelCount() {
+  return getWorksheetPdfLevelSlotCount();
+}
+
+function readStoredPdfLevelCounts() {
+  if (!pdfLevelCountsEl) {
+    return [];
+  }
+
+  return [...pdfLevelCountsEl.querySelectorAll('input')].map((input) => {
+    const value = Number(input.value);
+    return Number.isInteger(value) && value >= 0 ? value : 0;
+  });
+}
+
+function renderPdfLevelCountInputs() {
+  if (!pdfLevelCountsEl) {
+    return;
+  }
+
+  const levelCount = getWorksheetSetupLevelCount();
+  const previous = readStoredPdfLevelCounts();
+
+  if (levelCount === 0) {
+    pdfLevelCountsEl.innerHTML = '';
+    return;
+  }
+
+  pdfLevelCountsEl.innerHTML = Array.from({ length: levelCount }, (_, index) => {
+    const displayLevel = index + 1;
+    const defaultValue = previous[index] ?? (displayLevel === 1 ? 5 : 0);
+
+    return `<label class="setup-pdf-options__level">
+      <span class="setup-assignment-options__label">Úroveň ${displayLevel}</span>
+      <input
+        class="setup-assignment-options__input setup-assignment-options__input--count"
+        type="number"
+        inputmode="numeric"
+        min="0"
+        max="50"
+        value="${defaultValue}"
+        data-pdf-level="${displayLevel}"
+        aria-label="Počet úloh úroveň ${displayLevel}"
+      >
+    </label>`;
+  }).join('');
+
+  pdfLevelCountsEl.querySelectorAll('input').forEach((input) => {
+    input.addEventListener('input', updateStartButton);
+    input.addEventListener('change', updateStartButton);
+  });
+}
+
+function readPdfLevelCounts() {
+  const levelCount = getWorksheetSetupLevelCount();
+  if (levelCount === 0) {
+    return null;
+  }
+
+  const counts = readStoredPdfLevelCounts();
+  while (counts.length < levelCount) {
+    counts.push(0);
+  }
+
+  if (counts.length > levelCount) {
+    counts.length = levelCount;
+  }
+
+  for (const count of counts) {
+    if (!Number.isInteger(count) || count < 0 || count > 50) {
+      return null;
+    }
+  }
+
+  return counts;
+}
+
+function getWorksheetDownloadFilename() {
+  const stamp = new Date().toISOString().slice(0, 10);
+  const modes = captureSessionModeSelection();
+  const modePart = modes.length === 1
+    ? `${sanitizeFilenamePart(modes[0])}-`
+    : '';
+
+  return `procvicovani-${modePart}${stamp}.pdf`;
+}
+
+function formatWorksheetProblemText(problem) {
+  if (isCompareProblem(problem) && problem.variant === 'sign') {
+    return formatCompareSignText(problem, '');
+  }
+
+  return formatProblemText(problem);
+}
+
+function formatProblemCorrectAnswer(problem) {
+  if (isFractionAnswerProblem(problem)) {
+    return formatFraction(problem.answerNum, problem.answerDen);
+  }
+
+  if (isIntegerArithmeticProblem(problem)
+    || isPowersProblem(problem)
+    || isSqrtProblem(problem)
+    || isPowersSqrtCombinedProblem(problem)) {
+    return formatIntegerAnswer(problem.answer);
+  }
+
+  if (isLinearEquationProblem(problem)) {
+    return getLinearEquationCorrectAnswerLabel(problem);
+  }
+
+  if (isCompareProblem(problem)) {
+    return formatCompareCorrectAnswer(problem);
+  }
+
+  if (isFractionZlomekProblem(problem)) {
+    return formatFractionZlomekCorrectAnswer(problem);
+  }
+
+  if (isFractionExpandReduceProblem(problem)) {
+    return formatIntegerAnswer(problem.answer);
+  }
+
+  if (isDecimalFractionConvertProblem(problem)) {
+    if (problem.answerKind === 'fraction') {
+      return formatFraction(problem.answerNum, problem.answerDen);
+    }
+
+    return formatDecimal(problem.answer, problem.answerDecimals);
+  }
+
+  if (isLengthConvertProblem(problem)) {
+    if (problem.variant === 'convert') {
+      return formatDecimal(problem.answer, problem.answerDecimals);
+    }
+
+    return formatLengthConvertOrderListText(problem, problem.correctOrder);
+  }
+
+  if (isWeightConvertProblem(problem)) {
+    if (problem.variant === 'convert') {
+      return formatDecimal(problem.answer, problem.answerDecimals);
+    }
+
+    return formatWeightConvertOrderListText(problem, problem.correctOrder);
+  }
+
+  if (isAreaConvertProblem(problem)) {
+    if (problem.variant === 'convert') {
+      return formatDecimal(problem.answer, problem.answerDecimals);
+    }
+
+    return formatAreaConvertOrderListText(problem, problem.correctOrder);
+  }
+
+  if (isVolumeConvertProblem(problem)) {
+    if (problem.variant === 'convert') {
+      return formatDecimal(problem.answer, problem.answerDecimals);
+    }
+
+    return formatVolumeConvertOrderListText(problem, problem.correctOrder);
+  }
+
+  if (isPercentTaskProblem(problem)) {
+    return formatDecimal(problem.answer, problem.answerDecimals);
+  }
+
+  if (problem?.type === 'non-integer-add-subtract') {
+    if (getNonIntegerAnswerKind(problem) === 'decimal') {
+      return formatDecimal(problem.answer, 1);
+    }
+
+    return formatSignedFractionText({
+      num: problem.answerNum,
+      den: problem.answerDen,
+      negative: problem.answerNegative,
+    });
+  }
+
+  if (problem?.type === 'non-integer-multiply-divide') {
+    return formatSignedFractionText({
+      num: problem.answerNum,
+      den: problem.answerDen,
+      negative: problem.answerNegative,
+    });
+  }
+
+  if (problem?.type === 'non-integer-powers' || problem?.type === 'non-integer-sqrt') {
+    const correctFraction = problem.type === 'non-integer-powers'
+      ? getNonIntegerPowersCorrectFraction(problem)
+      : getNonIntegerSqrtCorrectFraction(problem);
+
+    if (problem.answerKind === 'decimal') {
+      return formatDecimal(problem.answer, problem.answerDecimals);
+    }
+
+    return formatFraction(correctFraction.num, correctFraction.den);
+  }
+
+  if (problem?.answer !== undefined) {
+    return formatDecimal(problem.answer, problem.answerDecimals ?? 0);
+  }
+
+  return '—';
+}
+
+function getWorksheetProblemKey(problem) {
+  return `${formatWorksheetProblemText(problem)}|${formatProblemCorrectAnswer(problem)}`;
+}
+
+function createWorksheetProblem(resolvedMode, internalLevel) {
+  if (resolvedMode === 'multi-mode') {
+    const pool = buildExerciseModePool();
+    const mode = pool[Math.floor(Math.random() * pool.length)];
+    return createProblemForExerciseMode(mode, internalLevel);
+  }
+
+  return createProblemForExerciseMode(resolvedMode, internalLevel);
+}
+
+function createWorksheetProblemForPdfSlot(resolvedMode, slotIndex) {
+  const levels = getWorksheetInternalLevelsForPdfSlot(slotIndex);
+  if (levels.length === 0) {
+    throw new Error(`worksheet-invalid-slot-${slotIndex}`);
+  }
+
+  const internalLevel = levels[Math.floor(Math.random() * levels.length)];
+  return createWorksheetProblem(resolvedMode, internalLevel);
+}
+
+function generateUniqueWorksheetProblemsForSlot(resolvedMode, slotIndex, count) {
+  const seen = new Set();
+  const problems = [];
+  const maxAttempts = Math.max(count * 200, 200);
+  const displayLevel = slotIndex + 1;
+
+  for (let attempt = 0; problems.length < count && attempt < maxAttempts; attempt += 1) {
+    const problem = createWorksheetProblemForPdfSlot(resolvedMode, slotIndex);
+    const key = getWorksheetProblemKey(problem);
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    problems.push(problem);
+  }
+
+  if (problems.length < count) {
+    throw new Error(`Nepodařilo se vygenerovat ${count} různých úloh pro úroveň ${displayLevel}.`);
+  }
+
+  return problems;
+}
+
+function buildWorksheetData() {
+  const resolvedMode = resolveActiveExerciseMode();
+  const counts = readPdfLevelCounts();
+  if (!resolvedMode || !counts) {
+    throw new Error('worksheet-invalid-setup');
+  }
+
+  const sections = [];
+
+  counts.forEach((count, index) => {
+    if (count <= 0) {
+      return;
+    }
+
+    const displayLevel = index + 1;
+    const problems = generateUniqueWorksheetProblemsForSlot(resolvedMode, index, count);
+
+    sections.push({
+      level: displayLevel,
+      items: problems.map((problem, itemIndex) => ({
+        number: itemIndex + 1,
+        text: formatWorksheetProblemText(problem),
+        answer: formatProblemCorrectAnswer(problem),
+        pdfContent: formatWorksheetProblemPdfContent(problem),
+        pdfAnswer: formatWorksheetAnswerPdfContent(problem),
+      })),
+    });
+  });
+
+  if (sections.length === 0) {
+    throw new Error('worksheet-empty');
+  }
+
+  return {
+    modes: captureSessionModeSelection(),
+    sections,
+  };
+}
+
+const PDF_FRACTION_FONT_SIZE = 9;
+const PDF_FRACTION_LINE_HEIGHT = 1.05;
+
+function getPdfFractionBarWidth(numText, denText) {
+  return Math.max(String(numText).length, String(denText).length) * 5.2 + 2;
+}
+
+function getPdfFractionBarCenterOffset(fontSize = PDF_FRACTION_FONT_SIZE) {
+  return fontSize * PDF_FRACTION_LINE_HEIGHT + 0.25;
+}
+
+function formatPdfAlignedWithFractionBar(text, options = {}) {
+  const fontSize = options.fontSize ?? PDF_FRACTION_FONT_SIZE;
+  const left = options.left ?? 0;
+  const right = options.right ?? 0;
+  const topSpacer = Math.max(0, getPdfFractionBarCenterOffset(fontSize) - fontSize * 0.5);
+
+  return {
+    width: 'auto',
+    text: String(text),
+    fontSize,
+    lineHeight: 1,
+    margin: [left, topSpacer, right, 0],
+  };
+}
+
+function formatPdfPlainText(text, margin = [0, 0, 0, 0]) {
+  return { width: 'auto', text: String(text), margin };
+}
+
+function formatPdfOperator(symbol, options = {}) {
+  return formatPdfAlignedWithFractionBar(symbol, {
+    left: 3,
+    right: 3,
+    ...options,
+  });
+}
+
+function formatPdfEquals(options = {}) {
+  return formatPdfAlignedWithFractionBar('=', {
+    left: 3,
+    right: 0,
+    ...options,
+  });
+}
+
+function formatPdfEquationEquals() {
+  return formatPdfAlignedWithFractionBar('=', { left: 4, right: 2 });
+}
+
+function formatPdfInline(parts) {
+  return { columns: parts.filter(Boolean), columnGap: 0 };
+}
+
+function formatPdfExpression(parts) {
+  return formatPdfInline([...parts, formatPdfEquals()]);
+}
+
+function formatPdfFractionSlotDisplay(text) {
+  const value = String(text ?? '');
+  return value === '' ? '\u00A0' : value;
+}
+
+function formatPdfFractionFromTexts(numText, denText, options = {}) {
+  const fontSize = options.fontSize ?? PDF_FRACTION_FONT_SIZE;
+  const barWidth = getPdfFractionBarWidth(numText, denText);
+  const fractionStack = {
+    width: 'auto',
+    stack: [
+      { text: formatPdfFractionSlotDisplay(numText), alignment: 'center', fontSize, lineHeight: PDF_FRACTION_LINE_HEIGHT },
+      {
+        canvas: [{ type: 'line', x1: 0, y1: 0, x2: barWidth, y2: 0, lineWidth: 0.5 }],
+        margin: [0, 0, 0, 0],
+      },
+      { text: formatPdfFractionSlotDisplay(denText), alignment: 'center', fontSize, lineHeight: PDF_FRACTION_LINE_HEIGHT },
+    ],
+  };
+
+  if (options.isNegative) {
+    return {
+      width: 'auto',
+      columns: [
+        formatPdfAlignedWithFractionBar('−', { right: 1 }),
+        fractionStack,
+      ],
+      columnGap: 0,
+    };
+  }
+
+  return fractionStack;
+}
+
+function formatPdfFraction(num, den, options = {}) {
+  return formatPdfFractionFromTexts(Math.abs(num), Math.abs(den), {
+    ...options,
+    isNegative: options.isNegative ?? num < 0,
+  });
+}
+
+function formatPdfSignedFraction(fraction) {
+  const normalized = normalizeSignedFraction(fraction);
+  return formatPdfFraction(normalized.num, normalized.den, { isNegative: normalized.negative });
+}
+
+function formatPdfUnknownNumeratorFraction(den) {
+  return formatPdfFractionFromTexts('?', Math.abs(den));
+}
+
+function formatPdfUnknownDenominatorFraction(num) {
+  return formatPdfFractionFromTexts(Math.abs(num), '?');
+}
+
+function formatPdfExpandReduceSide(num, den, unknownPosition, side) {
+  if (unknownPosition === `${side}-num`) {
+    return formatPdfFractionFromTexts('', Math.abs(den));
+  }
+
+  if (unknownPosition === `${side}-den`) {
+    return formatPdfFractionFromTexts(Math.abs(num), '');
+  }
+
+  return formatPdfFraction(num, den);
+}
+
+function formatPdfMixedTerm(term) {
+  if (term.kind === 'decimal') {
+    let parts = [formatPdfAlignedWithFractionBar(formatDecimal(term.value, term.decimals))];
+
+    if (term.wholeFactor != null) {
+      parts.push(formatPdfOperator('·'));
+      parts.push(formatPdfAlignedWithFractionBar(String(term.wholeFactor)));
+    }
+
+    return formatPdfInline(parts);
+  }
+
+  if (term.kind === 'fraction') {
+    return formatPdfFraction(term.num, term.den);
+  }
+
+  if (term.kind === 'whole') {
+    return formatPdfAlignedWithFractionBar(String(term.value));
+  }
+
+  if (term.kind === 'compound') {
+    return formatPdfNestedCompoundPart(term.numerator, term.denominator);
+  }
+
+  return formatPdfPlainText(String(term.value));
+}
+
+function formatPdfNonIntegerTerm(term) {
+  if (term.kind === 'decimal') {
+    const value = getNonIntegerTermValue(term);
+    const text = term.wrapped && value < 0
+      ? `(${formatDecimal(value, 1)})`
+      : formatDecimal(value, 1);
+
+    return formatPdfPlainText(text);
+  }
+
+  const value = getNonIntegerTermValue(term);
+  const fraction = formatPdfFraction(term.num, term.den, { isNegative: value < 0 });
+
+  if (term.wrapped && value < 0) {
+    return formatPdfInline([
+      formatPdfPlainText('(', [0, 3, 0, 0]),
+      fraction,
+      formatPdfPlainText(')', [0, 3, 0, 0]),
+    ]);
+  }
+
+  return fraction;
+}
+
+function formatPdfCompareOperand(problem, operand) {
+  if (isIntegerCompareProblem(problem)) {
+    return formatPdfPlainText(formatIntegerAnswer(operand.value));
+  }
+
+  if (isNonIntegerCompareProblem(problem) || isFractionCompareProblem(problem)) {
+    return formatPdfNonIntegerTerm(operand);
+  }
+
+  return formatPdfPlainText(formatDecimal(operand.value, operand.decimals));
+}
+
+function formatPdfCompoundExprPart(part) {
+  if (part.type === 'fraction-expr') {
+    const parts = [formatPdfFraction(part.terms[0].num, part.terms[0].den)];
+    part.operators.forEach((operator, index) => {
+      parts.push(formatPdfOperator(formatFractionOperatorSymbol(operator)));
+      const term = part.terms[index + 1];
+      parts.push(formatPdfFraction(term.num, term.den));
+    });
+    return formatPdfInline(parts);
+  }
+
+  if (part.type === 'mixed-expr') {
+    const parts = [formatPdfMixedTerm(part.terms[0])];
+    part.operators.forEach((operator, index) => {
+      parts.push(formatPdfOperator(formatFractionOperatorSymbol(operator)));
+      parts.push(formatPdfMixedTerm(part.terms[index + 1]));
+    });
+    return formatPdfInline(parts);
+  }
+
+  return formatPdfCompoundPart(part);
+}
+
+function formatPdfCompoundPart(part) {
+  if (part.type === 'fraction') {
+    return formatPdfFraction(part.num, part.den);
+  }
+
+  if (part.type === 'whole') {
+    return formatPdfPlainText(String(part.value));
+  }
+
+  if (part.type === 'compound') {
+    return formatPdfNestedCompoundPart(part.numerator, part.denominator);
+  }
+
+  return formatPdfCompoundExprPart(part);
+}
+
+function formatPdfNestedCompoundPart(numerator, denominator) {
+  const numPart = formatPdfCompoundPart(numerator);
+  const denPart = formatPdfCompoundPart(denominator);
+  const barWidth = Math.max(
+    formatCompoundPartText(numerator).length,
+    formatCompoundPartText(denominator).length,
+  ) * 4.5 + 8;
+
+  return {
+    width: 'auto',
+    stack: [
+      { columns: [numPart], columnGap: 0 },
+      {
+        canvas: [{ type: 'line', x1: 0, y1: 0, x2: barWidth, y2: 0, lineWidth: 0.5 }],
+        margin: [0, 0, 0, 0],
+      },
+      { columns: [denPart], columnGap: 0 },
+    ],
+  };
+}
+
+function formatFractionAddPdfContent(problem) {
+  const parts = problem.terms.map((term) => formatPdfFraction(term.num, term.den));
+
+  if (problem.wholeAddend != null) {
+    parts.push(formatPdfPlainText(String(problem.wholeAddend)));
+  }
+
+  return formatPdfExpression(parts.reduce((acc, part, index) => {
+    if (index > 0) {
+      acc.push(formatPdfOperator('+'));
+    }
+    acc.push(part);
+    return acc;
+  }, []));
+}
+
+function formatFractionSubtractPdfContent(problem) {
+  if (problem.wholeMinuend != null) {
+    return formatPdfExpression([
+      formatPdfPlainText(String(problem.wholeMinuend)),
+      formatPdfOperator('−'),
+      formatPdfFraction(problem.terms[0].num, problem.terms[0].den),
+    ]);
+  }
+
+  const parts = [formatPdfFraction(problem.terms[0].num, problem.terms[0].den)];
+  problem.terms.slice(1).forEach((term) => {
+    parts.push(formatPdfOperator('−'));
+    parts.push(formatPdfFraction(term.num, term.den));
+  });
+
+  if (problem.wholeSubtrahend != null) {
+    parts.push(formatPdfOperator('−'));
+    parts.push(formatPdfPlainText(String(problem.wholeSubtrahend)));
+  }
+
+  return formatPdfExpression(parts);
+}
+
+function formatFractionMixedPdfContent(problem) {
+  if (problem.terms.length === 3 && problem.parenthesesGroup != null) {
+    const f0 = formatPdfFraction(problem.terms[0].num, problem.terms[0].den);
+    const f1 = formatPdfFraction(problem.terms[1].num, problem.terms[1].den);
+    const f2 = formatPdfFraction(problem.terms[2].num, problem.terms[2].den);
+    const op0 = formatPdfOperator(formatFractionOperatorSymbol(problem.operators[0]));
+    const op1 = formatPdfOperator(formatFractionOperatorSymbol(problem.operators[1]));
+
+    if (problem.parenthesesGroup === 0) {
+      return formatPdfExpression([
+        formatPdfPlainText('(', [0, 3, 0, 0]),
+        f0,
+        op0,
+        f1,
+        formatPdfPlainText(')', [0, 3, 0, 0]),
+        op1,
+        f2,
+      ]);
+    }
+
+    return formatPdfExpression([
+      f0,
+      op0,
+      formatPdfPlainText('(', [0, 3, 0, 0]),
+      f1,
+      op1,
+      f2,
+      formatPdfPlainText(')', [0, 3, 0, 0]),
+    ]);
+  }
+
+  const parts = [formatPdfFraction(problem.terms[0].num, problem.terms[0].den)];
+  problem.operators.forEach((operator, index) => {
+    const term = problem.terms[index + 1];
+    parts.push(formatPdfOperator(formatFractionOperatorSymbol(operator)));
+    parts.push(formatPdfFraction(term.num, term.den));
+  });
+
+  return formatPdfExpression(parts);
+}
+
+function formatFractionMultiplyPdfContent(problem) {
+  const parts = problem.terms.map((term) => formatPdfFraction(term.num, term.den));
+
+  if (problem.wholeFactor != null) {
+    parts.push(formatPdfPlainText(String(problem.wholeFactor)));
+  }
+
+  return formatPdfExpression(parts.reduce((acc, part, index) => {
+    if (index > 0) {
+      acc.push(formatPdfOperator('·'));
+    }
+    acc.push(part);
+    return acc;
+  }, []));
+}
+
+function formatFractionDividePdfContent(problem) {
+  const parts = [];
+
+  if (problem.variant === 'fraction-whole') {
+    parts.push(formatPdfFraction(problem.dividendTerm.num, problem.dividendTerm.den));
+    parts.push(formatPdfOperator(':'));
+    parts.push(formatPdfPlainText(String(problem.wholeDivisor)));
+  } else if (problem.variant === 'whole-fraction') {
+    parts.push(formatPdfPlainText(String(problem.wholeDividend)));
+    parts.push(formatPdfOperator(':'));
+    parts.push(formatPdfFraction(problem.divisorTerm.num, problem.divisorTerm.den));
+  } else {
+    parts.push(formatPdfFraction(problem.dividendTerm.num, problem.dividendTerm.den));
+    parts.push(formatPdfOperator(':'));
+    parts.push(formatPdfFraction(problem.divisorTerm.num, problem.divisorTerm.den));
+  }
+
+  return formatPdfExpression(parts);
+}
+
+function formatCompoundFractionPdfContent(problem) {
+  return formatPdfExpression([formatPdfNestedCompoundPart(problem.numerator, problem.denominator)]);
+}
+
+function formatDecimalFractionMixedPdfContent(problem) {
+  if (problem.terms.length === 3 && problem.parenthesesGroup != null) {
+    const t0 = formatPdfMixedTerm(problem.terms[0]);
+    const t1 = formatPdfMixedTerm(problem.terms[1]);
+    const t2 = formatPdfMixedTerm(problem.terms[2]);
+    const op0 = formatPdfOperator(formatFractionOperatorSymbol(problem.operators[0]));
+    const op1 = formatPdfOperator(formatFractionOperatorSymbol(problem.operators[1]));
+
+    if (problem.parenthesesGroup === 0) {
+      return formatPdfExpression([
+        formatPdfPlainText('(', [0, 3, 0, 0]),
+        t0,
+        op0,
+        t1,
+        formatPdfPlainText(')', [0, 3, 0, 0]),
+        op1,
+        t2,
+      ]);
+    }
+
+    return formatPdfExpression([
+      t0,
+      op0,
+      formatPdfPlainText('(', [0, 3, 0, 0]),
+      t1,
+      op1,
+      t2,
+      formatPdfPlainText(')', [0, 3, 0, 0]),
+    ]);
+  }
+
+  const parts = [formatPdfMixedTerm(problem.terms[0])];
+  problem.operators.forEach((operator, index) => {
+    parts.push(formatPdfOperator(formatFractionOperatorSymbol(operator)));
+    parts.push(formatPdfMixedTerm(problem.terms[index + 1]));
+  });
+
+  return formatPdfExpression(parts);
+}
+
+function formatCrossPanelMixedPdfContent(problem) {
+  const operators = getCrossPanelMixedOperators(problem);
+  const parts = [problem.terms[0].kind === 'fraction'
+    ? formatPdfFraction(problem.terms[0].num, problem.terms[0].den)
+    : formatPdfPlainText(formatCrossPanelMixedTermText(problem.terms[0]))];
+
+  operators.forEach((operator, index) => {
+    const term = problem.terms[index + 1];
+    parts.push(formatPdfOperator(formatIntegerArithmeticOperatorSymbol(operator)));
+    parts.push(term.kind === 'fraction'
+      ? formatPdfFraction(term.num, term.den)
+      : formatPdfPlainText(formatCrossPanelMixedTermText(term, operator)));
+  });
+
+  return formatPdfExpression(parts);
+}
+
+function formatNonIntegerAddSubtractPdfContent(problem) {
+  const parts = [formatPdfNonIntegerTerm(problem.terms[0])];
+
+  if (problem.level === 1 && problem.terms.length === 2) {
+    const resolved = resolveSingleOperatorDisplay(
+      problem.operators[0],
+      problem.terms[1],
+      getNonIntegerTermValue,
+    );
+    parts.push(formatPdfOperator(formatIntegerOperatorSymbol(resolved.operator)));
+    parts.push(formatPdfNonIntegerTerm(resolved.term));
+    return formatPdfExpression(parts);
+  }
+
+  problem.operators.forEach((operator, index) => {
+    parts.push(formatPdfOperator(formatIntegerOperatorSymbol(operator)));
+    parts.push(formatPdfNonIntegerTerm(problem.terms[index + 1]));
+  });
+
+  return formatPdfExpression(parts);
+}
+
+function formatNonIntegerMultiplyDividePdfContent(problem) {
+  const parts = [formatPdfNonIntegerTerm(problem.terms[0])];
+  problem.operators.forEach((operator, index) => {
+    parts.push(formatPdfOperator(formatIntegerOperatorSymbol(operator)));
+    parts.push(formatPdfNonIntegerTerm(problem.terms[index + 1]));
+  });
+
+  return formatPdfExpression(parts);
+}
+
+function formatCompareSignPdfContent(problem, sign = '') {
+  return formatPdfInline([
+    formatPdfCompareOperand(problem, problem.left),
+    formatPdfPlainText(sign === '' ? '  ' : ` ${sign} `, [4, 3, 4, 0]),
+    formatPdfCompareOperand(problem, problem.right),
+  ]);
+}
+
+function formatCompareOrderPdfContent(problem, options = {}) {
+  const order = options.order ?? problem.displayOrder ?? shuffleIndices(problem.operands.length);
+  const parts = [];
+
+  if (!options.omitLabel) {
+    parts.push(formatPdfPlainText('Uspořádej: ', [0, 3, 0, 0]));
+  }
+
+  order.forEach((index, itemIndex) => {
+    if (itemIndex > 0) {
+      parts.push(formatPdfPlainText('; ', [2, 3, 2, 0]));
+    }
+    parts.push(formatPdfCompareOperand(problem, problem.operands[index]));
+  });
+
+  return formatPdfInline(parts);
+}
+
+function formatFractionZlomekPdfContent(problem) {
+  if (problem.variant === 'of-number') {
+    return formatPdfInline([
+      formatPdfPlainText('Kolik je ', [0, 3, 0, 0]),
+      formatPdfFraction(problem.promptNum, problem.promptDen),
+      formatPdfPlainText(` z ${problem.quantity}?`, [0, 3, 0, 0]),
+    ]);
+  }
+
+  if (problem.variant === 'unit') {
+    return formatPdfInline([
+      formatPdfPlainText(`${problem.unitValue} ${problem.unitMeasure} = `, [0, 3, 0, 0]),
+      formatPdfUnknownNumeratorFraction(problem.promptDen),
+      formatPdfPlainText(` ${problem.unitLabel}. Doplň čitatele zlomku.`, [0, 3, 0, 0]),
+    ]);
+  }
+
+  if (problem.variant === 'find-whole') {
+    return formatPdfInline([
+      formatPdfPlainText(`Na tyči bylo natřeno ${problem.partValue} cm, což je `, [0, 3, 0, 0]),
+      formatPdfFraction(problem.promptNum, problem.promptDen),
+      formatPdfPlainText(' celé délky. Jak dlouhá je celá tyč v cm?', [0, 3, 0, 0]),
+    ]);
+  }
+
+  if (problem.variant === 'equals-whole') {
+    return formatPdfInline([
+      formatPdfPlainText('Kolik je ', [0, 3, 0, 0]),
+      formatPdfFraction(problem.promptNum, problem.promptDen),
+      formatPdfPlainText('?', [0, 3, 0, 0]),
+    ]);
+  }
+
+  return { text: problem.prompt };
+}
+
+function formatFractionExpandReducePdfContent(problem) {
+  return formatPdfInline([
+    formatPdfExpandReduceSide(problem.leftNum, problem.leftDen, problem.unknownPosition, 'left'),
+    formatPdfAlignedWithFractionBar('=', { left: 4, right: 4 }),
+    formatPdfExpandReduceSide(problem.rightNum, problem.rightDen, problem.unknownPosition, 'right'),
+  ]);
+}
+
+function formatDecimalFractionConvertPdfContent(problem) {
+  if (problem.direction === 'decimal-to-fraction') {
+    return formatPdfExpression([formatPdfPlainText(formatDecimal(problem.decimalValue, problem.decimalPlaces))]);
+  }
+
+  return formatPdfExpression([formatPdfFraction(problem.num, problem.den)]);
+}
+
+function formatPdfAlgebraicFraction(k, a, den) {
+  return formatPdfFractionFromTexts(formatLinearFractionNumeratorText(k, a), den);
+}
+
+function formatPdfLinearFractionRight(right) {
+  if (right.m === 0 && right.f === 1) {
+    return formatPdfAlignedWithFractionBar(String(right.e).replace('-', '−'));
+  }
+
+  return formatPdfAlgebraicFraction(right.m, right.e, right.f);
+}
+
+function formatLinearFractionEquationPdfContent(leftTerms, right) {
+  const parts = [];
+
+  leftTerms.forEach((term, index) => {
+    if (index > 0) {
+      parts.push(formatPdfOperator(term.sign < 0 ? '−' : '+'));
+    } else if (term.sign < 0) {
+      parts.push(formatPdfAlignedWithFractionBar('−'));
+    }
+
+    parts.push(formatPdfAlgebraicFraction(term.k, term.a, term.b));
+  });
+
+  return formatPdfInline([
+    ...parts,
+    formatPdfEquationEquals(),
+    formatPdfLinearFractionRight(right),
+  ]);
+}
+
+function formatLinearEquationFractionLevel2PdfContent(leftTerm, constant = null) {
+  const parts = [
+    formatPdfAlgebraicFraction(leftTerm.k, leftTerm.a, leftTerm.b),
+    formatPdfEquationEquals(),
+    formatPdfAlgebraicFraction(leftTerm.k, leftTerm.a, leftTerm.b),
+  ];
+
+  if (constant !== null && constant !== 0) {
+    parts.push(formatPdfOperator(constant > 0 ? '+' : '−'));
+    parts.push(formatPdfAlignedWithFractionBar(String(Math.abs(constant))));
+  }
+
+  return formatPdfInline(parts);
+}
+
+function formatLinearEquationFractionLevel3PdfContent(leftTerm, subTerm, constant) {
+  const parts = [
+    formatPdfAlgebraicFraction(leftTerm.k, leftTerm.a, leftTerm.b),
+    formatPdfEquationEquals(),
+    formatPdfAlgebraicFraction(subTerm.k, subTerm.a, subTerm.b),
+  ];
+
+  if (constant !== 0) {
+    parts.push(formatPdfOperator(constant > 0 ? '+' : '−'));
+    parts.push(formatPdfAlignedWithFractionBar(String(Math.abs(constant))));
+  }
+
+  return formatPdfInline(parts);
+}
+
+function formatPdfLinearEquationFractionTermFromText(termText) {
+  const trimmed = termText.trim();
+
+  if (/^-?\d+$/.test(trimmed)) {
+    return formatPdfAlignedWithFractionBar(trimmed.replace('-', '−'));
+  }
+
+  const fractionMatch = trimmed.match(/^(.+)\/(\d+)$/);
+  if (!fractionMatch) {
+    return null;
+  }
+
+  return formatPdfFractionFromTexts(fractionMatch[1], fractionMatch[2]);
+}
+
+function formatPdfLinearEquationFractionSideParts(side) {
+  let text = side.trim();
+
+  if (text === '') {
+    return null;
+  }
+
+  let leadingNegative = false;
+  if (text.startsWith('−')) {
+    leadingNegative = true;
+    text = text.slice(1).trim();
+  }
+
+  const terms = splitLinearEquationFractionSideTerms(text);
+  if (leadingNegative && terms.length > 0) {
+    terms[0].op = '−';
+  }
+
+  const parts = [];
+
+  terms.forEach((term, index) => {
+    const termPart = formatPdfLinearEquationFractionTermFromText(term.text);
+    if (!termPart) {
+      return;
+    }
+
+    if (index === 0) {
+      if (term.op === '−') {
+        parts.push(formatPdfAlignedWithFractionBar('−'));
+      }
+      parts.push(termPart);
+      return;
+    }
+
+    parts.push(formatPdfOperator(term.op));
+    parts.push(termPart);
+  });
+
+  return parts.length > 0 ? parts : null;
+}
+
+function formatLinearEquationFractionUlohaPdfContent(uloha) {
+  const equalsIndex = uloha.indexOf(' = ');
+  if (equalsIndex === -1) {
+    return { text: uloha };
+  }
+
+  const leftParts = formatPdfLinearEquationFractionSideParts(uloha.slice(0, equalsIndex));
+  const rightParts = formatPdfLinearEquationFractionSideParts(uloha.slice(equalsIndex + 3));
+
+  if (!leftParts || !rightParts) {
+    return { text: uloha };
+  }
+
+  return formatPdfInline([
+    ...leftParts,
+    formatPdfEquationEquals(),
+    ...rightParts,
+  ]);
+}
+
+function formatLinearEquationFractionPdfContent(problem) {
+  if (problem.leftTerms && problem.right) {
+    if (problem.variant === 2 && problem.leftTerms.length === 1) {
+      return formatLinearFractionEquationPdfContent(problem.leftTerms, problem.right);
+    }
+
+    if (problem.variant === 2 && problem.leftTerms.length === 2 && problem.right.m === 0 && problem.right.f === 1) {
+      return formatLinearEquationFractionLevel2PdfContent(
+        problem.leftTerms[0],
+        problem.solutionType === 'none' ? problem.right.e : null,
+      );
+    }
+
+    if (problem.variant === 3 && problem.leftTerms.length === 2 && problem.right.m === 0 && problem.right.f === 1) {
+      return formatLinearEquationFractionLevel3PdfContent(
+        problem.leftTerms[0],
+        problem.leftTerms[1],
+        problem.right.e,
+      );
+    }
+
+    return formatLinearFractionEquationPdfContent(problem.leftTerms, problem.right);
+  }
+
+  return formatLinearEquationFractionUlohaPdfContent(`${problem.displayLeft} = ${problem.displayRight}`);
+}
+
+function formatWorksheetProblemPdfContent(problem) {
+  if (problem.type === 'basic-form') {
+    return formatPdfExpression([formatPdfFraction(problem.givenNum, problem.givenDen)]);
+  }
+
+  if (problem.type === 'fraction-add') {
+    return formatFractionAddPdfContent(problem);
+  }
+
+  if (problem.type === 'fraction-subtract') {
+    return formatFractionSubtractPdfContent(problem);
+  }
+
+  if (problem.type === 'fraction-mixed') {
+    return formatFractionMixedPdfContent(problem);
+  }
+
+  if (problem.type === 'fraction-multiply') {
+    return formatFractionMultiplyPdfContent(problem);
+  }
+
+  if (problem.type === 'fraction-divide') {
+    return formatFractionDividePdfContent(problem);
+  }
+
+  if (problem.type === 'fraction-compound') {
+    return formatCompoundFractionPdfContent(problem);
+  }
+
+  if (problem.type === 'decimal-fraction-mixed') {
+    return formatDecimalFractionMixedPdfContent(problem);
+  }
+
+  if (problem.type === 'cross-panel-mixed') {
+    return formatCrossPanelMixedPdfContent(problem);
+  }
+
+  if (problem.type === 'non-integer-add-subtract') {
+    return formatNonIntegerAddSubtractPdfContent(problem);
+  }
+
+  if (problem.type === 'non-integer-multiply-divide') {
+    return formatNonIntegerMultiplyDividePdfContent(problem);
+  }
+
+  if (isCompareProblem(problem)) {
+    if (problem.variant === 'sign') {
+      return formatCompareSignPdfContent(problem, '');
+    }
+
+    return formatCompareOrderPdfContent(problem);
+  }
+
+  if (problem.type === 'fraction-zlomek') {
+    return formatFractionZlomekPdfContent(problem);
+  }
+
+  if (problem.type === 'fraction-expand-reduce') {
+    return formatFractionExpandReducePdfContent(problem);
+  }
+
+  if (problem.type === 'decimal-fraction-convert') {
+    return formatDecimalFractionConvertPdfContent(problem);
+  }
+
+  if (problem.type === 'linear-equation-fraction') {
+    return formatLinearEquationFractionPdfContent(problem);
+  }
+
+  return { text: formatWorksheetProblemText(problem) };
+}
+
+function formatWorksheetAnswerPdfContent(problem) {
+  if (isFractionAnswerProblem(problem)) {
+    return formatPdfFraction(problem.answerNum, problem.answerDen);
+  }
+
+  if (isCompareProblem(problem)) {
+    if (problem.variant === 'sign') {
+      return formatCompareSignPdfContent(problem, problem.answerSign);
+    }
+
+    return formatCompareOrderPdfContent(problem, { order: problem.correctOrder, omitLabel: true });
+  }
+
+  if (problem?.type === 'non-integer-add-subtract' && getNonIntegerAnswerKind(problem) !== 'decimal') {
+    return formatPdfSignedFraction({
+      num: problem.answerNum,
+      den: problem.answerDen,
+      negative: problem.answerNegative,
+    });
+  }
+
+  if (problem?.type === 'non-integer-multiply-divide') {
+    return formatPdfSignedFraction({
+      num: problem.answerNum,
+      den: problem.answerDen,
+      negative: problem.answerNegative,
+    });
+  }
+
+  if (problem?.type === 'non-integer-powers' || problem?.type === 'non-integer-sqrt') {
+    if (problem.answerKind !== 'decimal') {
+      const correctFraction = problem.type === 'non-integer-powers'
+        ? getNonIntegerPowersCorrectFraction(problem)
+        : getNonIntegerSqrtCorrectFraction(problem);
+
+      return formatPdfFraction(correctFraction.num, correctFraction.den);
+    }
+  }
+
+  if (isFractionZlomekProblem(problem) && problem.answerKind !== 'number') {
+    return formatPdfFraction(problem.answerNum, problem.answerDen);
+  }
+
+  if (isDecimalFractionConvertProblem(problem) && problem.answerKind === 'fraction') {
+    return formatPdfFraction(problem.answerNum, problem.answerDen);
+  }
+
+  if (isLinearEquationProblem(problem)) {
+    if (problem.solutionType === 'unique' && problem.answerKind === 'fraction') {
+      return formatPdfSignedFraction({
+        num: problem.answerNum,
+        den: problem.answerDen,
+        negative: problem.answerNegative,
+      });
+    }
+
+    return { text: getLinearEquationCorrectAnswerLabel(problem) };
+  }
+
+  return { text: formatProblemCorrectAnswer(problem) };
+}
+
+function buildWorksheetPdfDefinition(worksheet) {
+  const content = [
+    { text: 'Procvičování matematiky', style: 'header' },
+  ];
+
+  if (worksheet.modes.length > 0) {
+    content.push({
+      text: worksheet.modes.join(', '),
+      margin: [0, 4, 0, 12],
+    });
+  }
+
+  let globalNumber = 1;
+
+  worksheet.sections.forEach((section) => {
+    content.push({
+      text: `Úroveň ${section.level}`,
+      style: 'subheader',
+      margin: [0, 8, 0, 4],
+    });
+
+    section.items.forEach((item) => {
+      content.push({
+        columns: [
+          { width: 22, text: `${globalNumber}.`, bold: true },
+          { width: '*', ...item.pdfContent },
+        ],
+        columnGap: 6,
+        margin: [0, 0, 0, 8],
+      });
+      globalNumber += 1;
+    });
+  });
+
+  content.push({
+    text: 'Klíč odpovědí',
+    style: 'header',
+    pageBreak: 'before',
+    margin: [0, 0, 0, 8],
+  });
+
+  globalNumber = 1;
+
+  worksheet.sections.forEach((section) => {
+    content.push({
+      text: `Úroveň ${section.level}`,
+      style: 'subheader',
+      margin: [0, 8, 0, 4],
+    });
+
+    section.items.forEach((item) => {
+      content.push({
+        columns: [
+          { width: 22, text: `${globalNumber}.`, bold: true },
+          { width: '*', ...item.pdfAnswer },
+        ],
+        columnGap: 6,
+        margin: [0, 0, 0, 6],
+      });
+      globalNumber += 1;
+    });
+  });
+
+  return {
+    pageOrientation: 'portrait',
+    pageMargins: [40, 40, 40, 40],
+    defaultStyle: {
+      font: 'Roboto',
+      fontSize: 10,
+      lineHeight: 1.3,
+    },
+    styles: {
+      header: { fontSize: 16, bold: true },
+      subheader: { fontSize: 11, bold: true },
+    },
+    content,
+  };
+}
+
+async function createWorksheetPdf() {
+  startBtn.disabled = true;
+  const originalLabel = startBtn.textContent;
+  startBtn.textContent = 'Generuji PDF…';
+
+  try {
+    await loadPdfMakeLibrary();
+    const worksheet = buildWorksheetData();
+    window.pdfMake.createPdf(buildWorksheetPdfDefinition(worksheet))
+      .download(getWorksheetDownloadFilename());
+    showSetupFeedback('PDF bylo staženo.');
+  } catch {
+    showSetupFeedback('PDF se nepodařilo vygenerovat.');
+  } finally {
+    startBtn.textContent = originalLabel;
+    updateStartButton();
+  }
+}
+
 function buildDepotLinkHtmlFile(depotUrl) {
   const safeAttr = escapeHtml(depotUrl);
   const safeJs = JSON.stringify(depotUrl);
@@ -17977,9 +19437,6 @@ function downloadAnalysisCsv() {
     return;
   }
 
-  const stamp = new Date().toISOString().slice(0, 10);
-  const name = getAnalysisName();
-  const namePart = name ? `${sanitizeFilenamePart(name)}-` : '';
   const csvBody = new TextEncoder().encode(buildAnalysisCsv());
   const bom = new Uint8Array([0xef, 0xbb, 0xbf]);
   const bytes = new Uint8Array(bom.length + csvBody.length);
@@ -17989,9 +19446,35 @@ function downloadAnalysisCsv() {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `analyza-${namePart}${stamp}.csv`;
+  link.download = getAnalysisDownloadFilename('csv');
   link.click();
   URL.revokeObjectURL(url);
+}
+
+async function downloadAnalysisPdf() {
+  if (sessionResults.length === 0 || !analysisDownloadPdfBtn) {
+    return;
+  }
+
+  analysisDownloadPdfBtn.disabled = true;
+  const originalLabel = analysisDownloadPdfBtn.textContent;
+  analysisDownloadPdfBtn.textContent = 'Generuji PDF…';
+
+  try {
+    await loadPdfMakeLibrary();
+    const doc = buildAnalysisDocument();
+    window.pdfMake.createPdf(buildAnalysisPdfDefinition(doc))
+      .download(getAnalysisDownloadFilename('pdf'));
+  } catch {
+    if (analysisLinkFeedbackEl) {
+      analysisLinkFeedbackEl.textContent = 'PDF se nepodařilo vygenerovat.';
+      analysisLinkFeedbackEl.classList.add('analysis__link-feedback--error');
+      analysisLinkFeedbackEl.hidden = false;
+    }
+  } finally {
+    analysisDownloadPdfBtn.textContent = originalLabel;
+    analysisDownloadPdfBtn.disabled = sessionResults.length === 0;
+  }
 }
 
 function renderAnalysis() {
@@ -18001,6 +19484,9 @@ function renderAnalysis() {
     analysisTableBodyEl.innerHTML = '';
     analysisProblemViewEl.hidden = true;
     analysisDownloadBtn.disabled = true;
+    if (analysisDownloadPdfBtn) {
+      analysisDownloadPdfBtn.disabled = true;
+    }
     analysisLinkBtn.disabled = true;
     hideAnalysisLinkUi();
     updateAnalysisNameField();
@@ -18033,6 +19519,9 @@ function renderAnalysis() {
   renderAnalysisTableRows();
 
   analysisDownloadBtn.disabled = false;
+  if (analysisDownloadPdfBtn) {
+    analysisDownloadPdfBtn.disabled = false;
+  }
   updateAnalysisLinkButton();
   updateAnalysisNameField();
 }
@@ -19464,6 +20953,11 @@ function updateTitle() {
       return;
     }
 
+    if (isPdfSetupCategory()) {
+      appTitleEl.textContent = 'Vytvořit PDF';
+      return;
+    }
+
     appTitleEl.textContent = APP_TITLE;
     return;
   }
@@ -19809,7 +21303,7 @@ function handleExclusiveModeSelectionChange(event) {
 
   hideAssignmentLinkUi();
   showSetupFeedback('');
-  updateStartButton();
+  updatePdfSetupUi();
   updateTitle();
 }
 
@@ -20488,6 +21982,12 @@ startBtn.addEventListener('click', async () => {
     return;
   }
 
+  if (isPdfSetupCategory()) {
+    showSetupFeedback('');
+    await createWorksheetPdf();
+    return;
+  }
+
   showSetupFeedback('');
   showExerciseScreen();
 });
@@ -20570,6 +22070,7 @@ depotRefreshBtn?.addEventListener('click', () => {
 });
 
 analysisDownloadBtn.addEventListener('click', downloadAnalysisCsv);
+analysisDownloadPdfBtn?.addEventListener('click', downloadAnalysisPdf);
 
 analysisLinkBtn.addEventListener('click', () => {
   handleAnalysisLinkButtonClick();
@@ -20608,6 +22109,7 @@ setupCategoryRadios.forEach((radio) => {
 });
 
 createAssignmentCheckboxEl?.addEventListener('change', handleCreateAssignmentChange);
+createPdfCheckboxEl?.addEventListener('change', handleCreatePdfChange);
 
 exclusiveModeRadios.forEach((radio) => {
   radio.addEventListener('click', handleExclusiveModeSelectionChange);

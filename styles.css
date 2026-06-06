@@ -217,6 +217,24 @@ body {
   max-width: 120px;
 }
 
+.setup-pdf-options__intro {
+  font-size: 0.875rem;
+  line-height: 1.35;
+  margin: 0 0 12px;
+}
+
+.setup-pdf-options__levels {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 10px;
+}
+
+.setup-pdf-options__level {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .setup-assignment-options__feedback {
   margin: 12px 0 0;
 }
