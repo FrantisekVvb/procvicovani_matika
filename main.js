@@ -378,6 +378,7 @@ let activeAssignmentConfig = null;
 let pendingAssignmentDepotId = null;
 let awaitingAssignmentSubmission = false;
 let activeDepotId = null;
+let analysisReturnDepotId = null;
 let activeFractionInputEl = null;
 let fractionAnswerInputShape = 'fraction';
 let analysisProblemDisplayMode = 'text';
@@ -16709,7 +16710,7 @@ async function loadDepotSubmissions(depotId) {
     .select('id, created_at, payload')
     .eq('payload->>t', 'submission')
     .eq('payload->>d', depotId)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: true });
 
   if (error) {
     throw new Error('load-failed');
@@ -17119,6 +17120,23 @@ function showDepotScreen() {
   appEl.classList.remove('app--exercise', 'app--decimal-fraction-convert', 'app--length-convert', 'app--weight-convert', 'app--area-convert', 'app--volume-convert', 'app--percent-part', 'app--fraction-expand-reduce');
   appEl.classList.add('app--wide');
   updateTitle();
+}
+
+async function returnToDepotScreen(depotId) {
+  activeDepotId = depotId;
+  viewingSharedAnalysis = false;
+  history.replaceState(null, '', buildDepotShareUrl(depotId));
+
+  try {
+    const submissions = await loadDepotSubmissions(depotId);
+    showDepotScreen();
+    renderDepot(submissions);
+  } catch {
+    activeDepotId = null;
+    analysisReturnDepotId = null;
+    showSetupScreen({ preserveDepotHash: true });
+    showSetupFeedback('Depozitář se nepodařilo načíst.');
+  }
 }
 
 async function loadDepotFromUrl() {
@@ -19223,6 +19241,7 @@ function showSetupScreen({ preserveAnalysisHash = false, preserveAssignmentHash 
   activeExerciseMode = null;
   currentAnswerInputMode = null;
   activeDepotId = null;
+  analysisReturnDepotId = null;
   pendingAssignmentDepotId = null;
   awaitingAssignmentSubmission = false;
   clearActiveAssignment();
@@ -20039,7 +20058,16 @@ finishBtn.addEventListener('click', () => {
 
 backBtn.addEventListener('click', showSetupScreen);
 
-analysisBackBtn.addEventListener('click', showSetupScreen);
+analysisBackBtn.addEventListener('click', async () => {
+  if (analysisReturnDepotId) {
+    const depotId = analysisReturnDepotId;
+    analysisReturnDepotId = null;
+    await returnToDepotScreen(depotId);
+    return;
+  }
+
+  showSetupScreen();
+});
 
 depotRefreshBtn?.addEventListener('click', () => {
   refreshDepotScreen();
@@ -20122,6 +20150,9 @@ async function navigateFromAppHash() {
 
   const analysisLoaded = await loadAnalysisFromUrl();
   if (analysisLoaded) {
+    if (activeDepotId) {
+      analysisReturnDepotId = activeDepotId;
+    }
     showAnalysisScreen();
     return;
   }
