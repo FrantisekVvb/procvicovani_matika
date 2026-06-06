@@ -566,6 +566,104 @@ body {
   gap: 0.15em;
 }
 
+.pdf-render-host {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  pointer-events: none;
+  z-index: -1;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  color: #222222;
+  line-height: 1;
+}
+
+.pdf-render-host__slot {
+  display: inline-block;
+  padding: 1px 0;
+}
+
+.pdf-render-host .problem-prompt {
+  margin: 0;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.pdf-render-host .problem-expression--plain {
+  line-height: 1.3;
+}
+
+.pdf-render-host .problem-expression--compound-flat {
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto auto;
+  column-gap: 0.35em;
+  row-gap: 0;
+  align-items: center;
+  vertical-align: middle;
+}
+
+.pdf-render-host .compound-fraction-flat__num {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  justify-content: center;
+  justify-self: stretch;
+  line-height: 1;
+}
+
+.pdf-render-host .compound-fraction-flat__bar {
+  grid-column: 1;
+  grid-row: 2;
+  width: 100%;
+  justify-self: stretch;
+  align-self: center;
+  border-top: 0.14em solid currentColor;
+  height: 0;
+  min-width: 1.8em;
+  margin: 0.05em 0;
+  padding: 0;
+}
+
+.pdf-render-host .compound-fraction-flat__den {
+  grid-column: 1;
+  grid-row: 3;
+  display: flex;
+  justify-content: center;
+  justify-self: stretch;
+  line-height: 1;
+}
+
+.pdf-render-host .problem-expression--compound-flat > .problem-expression__equals {
+  grid-column: 2;
+  grid-row: 2;
+  align-self: center;
+  line-height: 1;
+}
+
+.pdf-render-host .compound-fraction-flat__num .fraction .fraction__bar,
+.pdf-render-host .compound-fraction-flat__den .fraction .fraction__bar {
+  width: 72%;
+  min-width: 1em;
+  border-top-width: 0.06em;
+  margin: 0.04em 0;
+  justify-self: center;
+}
+
+.pdf-render-host .compound-fraction-flat__num .compound-fraction--nested,
+.pdf-render-host .compound-fraction-flat__den .compound-fraction--nested {
+  font-size: 0.85em;
+}
+
+.pdf-render-host .compound-fraction-flat__num .compound-fraction--nested > .fraction__bar,
+.pdf-render-host .compound-fraction-flat__den .compound-fraction--nested > .fraction__bar {
+  width: 72%;
+  min-width: 1em;
+  border-top-width: 0.06em;
+  margin: 0.04em 0;
+  justify-self: center;
+}
+
 .fraction {
   display: inline-grid;
   grid-template-rows: auto auto auto;

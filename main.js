@@ -1006,6 +1006,10 @@ function handleCreatePdfChange() {
     hideAssignmentLinkUi();
   }
 
+  if (createPdfCheckboxEl?.checked && pdfLevelCountsEl) {
+    pdfLevelCountsEl.innerHTML = '';
+  }
+
   showSetupFeedback('');
   updateSetupCategoryUi();
   updateStartButton();
@@ -1650,7 +1654,7 @@ function getSetupStartBlockReason() {
     let total = 0;
 
     for (let index = 0; index < levelCount; index += 1) {
-      const rawValue = storedCounts[index] ?? (index === 0 ? 5 : 0);
+      const rawValue = storedCounts[index] ?? 0;
       const count = Number(rawValue);
 
       if (!Number.isInteger(count) || count < 0 || count > 50) {
@@ -16076,6 +16080,13 @@ function formatCompoundFractionDisplayHtml(problem) {
   return `<span class="problem-expression problem-expression--compound"><span class="fraction compound-fraction"><span class="fraction__num">${numeratorHtml}</span><span class="fraction__bar compound-fraction__main-bar" aria-hidden="true"></span><span class="fraction__den">${denominatorHtml}</span></span><span class="problem-expression__equals">=</span></span>`;
 }
 
+function formatCompoundFractionPdfRenderHtml(problem) {
+  const numeratorHtml = formatCompoundPartHtml(problem.numerator);
+  const denominatorHtml = formatCompoundPartHtml(problem.denominator);
+
+  return `<span class="problem-expression problem-expression--compound problem-expression--compound-flat"><span class="compound-fraction-flat__num">${numeratorHtml}</span><span class="compound-fraction-flat__bar" aria-hidden="true"></span><span class="compound-fraction-flat__den">${denominatorHtml}</span><span class="problem-expression__equals">=</span></span>`;
+}
+
 function formatCompoundFractionProblemText(problem) {
   return `${formatCompoundPartText(problem.numerator)}/${formatCompoundPartText(problem.denominator)} =`;
 }
@@ -17905,6 +17916,202 @@ function loadPdfMakeLibrary() {
   return pdfMakeLibraryPromise;
 }
 
+let html2CanvasLibraryPromise = null;
+let pdfRenderHostEl = null;
+
+const PDF_RENDER_FONT_SIZE_PX = 14;
+const PDF_RENDER_CANVAS_SCALE = 2;
+const PDF_RENDER_PX_TO_PT = 72 / 96;
+
+function loadHtml2CanvasLibrary() {
+  if (window.html2canvas) {
+    return Promise.resolve();
+  }
+
+  if (!html2CanvasLibraryPromise) {
+    html2CanvasLibraryPromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('html2canvas-load-failed'));
+      document.head.appendChild(script);
+    });
+  }
+
+  return html2CanvasLibraryPromise;
+}
+
+function getPdfRenderHostElement() {
+  if (!pdfRenderHostEl) {
+    pdfRenderHostEl = document.createElement('div');
+    pdfRenderHostEl.className = 'pdf-render-host';
+    pdfRenderHostEl.style.fontSize = `${PDF_RENDER_FONT_SIZE_PX}px`;
+    pdfRenderHostEl.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(pdfRenderHostEl);
+  }
+
+  return pdfRenderHostEl;
+}
+
+async function waitForPdfRenderLayout() {
+  if (document.fonts?.ready) {
+    await document.fonts.ready;
+  }
+
+  await new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  });
+}
+
+function canvasHasVisiblePixels(canvas) {
+  const context = canvas.getContext('2d');
+  if (!context) {
+    return false;
+  }
+
+  const { width, height } = canvas;
+  if (width <= 0 || height <= 0) {
+    return false;
+  }
+
+  const pixels = context.getImageData(0, 0, width, height).data;
+
+  for (let index = 0; index < pixels.length; index += 4) {
+    const red = pixels[index];
+    const green = pixels[index + 1];
+    const blue = pixels[index + 2];
+    const alpha = pixels[index + 3];
+
+    if (alpha > 0 && (red < 250 || green < 250 || blue < 250)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+async function renderExpressionHtmlToPdfImage(html) {
+  const host = getPdfRenderHostElement();
+  const slot = document.createElement('div');
+  slot.className = 'pdf-render-host__slot';
+  slot.innerHTML = html;
+
+  const previousLeft = host.style.left;
+  const previousTop = host.style.top;
+  host.style.left = '0';
+  host.style.top = '0';
+  host.appendChild(slot);
+
+  try {
+    await waitForPdfRenderLayout();
+
+    const layoutRect = slot.getBoundingClientRect();
+    const canvas = await window.html2canvas(slot, {
+      backgroundColor: '#ffffff',
+      scale: PDF_RENDER_CANVAS_SCALE,
+      logging: false,
+      width: Math.max(1, Math.ceil(layoutRect.width)),
+      height: Math.max(1, Math.ceil(layoutRect.height)),
+    });
+
+    if (!canvasHasVisiblePixels(canvas)) {
+      throw new Error('pdf-render-empty');
+    }
+
+    const layoutWidth = layoutRect.width || canvas.width / PDF_RENDER_CANVAS_SCALE;
+    const layoutHeight = layoutRect.height || canvas.height / PDF_RENDER_CANVAS_SCALE;
+    const pdfWidth = Math.max(layoutWidth * PDF_RENDER_PX_TO_PT, 12);
+    const pdfHeight = Math.max(layoutHeight * PDF_RENDER_PX_TO_PT, 8);
+
+    return {
+      stack: [{
+        image: canvas.toDataURL('image/png'),
+        width: pdfWidth,
+        height: pdfHeight,
+      }],
+    };
+  } finally {
+    host.removeChild(slot);
+    host.style.left = previousLeft;
+    host.style.top = previousTop;
+  }
+}
+
+function shouldUseWorksheetPdfImageRendering() {
+  return isCombinableSetupCategory();
+}
+
+function formatPlainPdfRenderHtml(text) {
+  return `<span class="problem-expression problem-expression--plain">${escapeHtml(text)}</span>`;
+}
+
+function getProblemPdfRenderHtml(problem) {
+  if (problem.type === 'fraction-compound') {
+    return formatCompoundFractionPdfRenderHtml(problem);
+  }
+
+  return formatProblemDisplayHtml(problem);
+}
+
+function getProblemAnswerPdfRenderHtml(problem) {
+  if (isFractionAnswerProblem(problem)) {
+    return formatSingleFractionHtml(problem.answerNum, problem.answerDen);
+  }
+
+  if (isCompareProblem(problem)) {
+    if (problem.variant === 'sign') {
+      return formatCompareSignHtml(problem, problem.answerSign);
+    }
+
+    return formatPlainPdfRenderHtml(formatCompareOrderListText(problem, problem.correctOrder));
+  }
+
+  if (problem?.type === 'non-integer-add-subtract' && getNonIntegerAnswerKind(problem) !== 'decimal') {
+    return formatSingleFractionHtml(problem.answerNum, problem.answerDen, problem.answerNegative);
+  }
+
+  if (problem?.type === 'non-integer-multiply-divide') {
+    return formatSingleFractionHtml(problem.answerNum, problem.answerDen, problem.answerNegative);
+  }
+
+  if (problem?.type === 'non-integer-powers' || problem?.type === 'non-integer-sqrt') {
+    if (problem.answerKind !== 'decimal') {
+      const correctFraction = problem.type === 'non-integer-powers'
+        ? getNonIntegerPowersCorrectFraction(problem)
+        : getNonIntegerSqrtCorrectFraction(problem);
+
+      return formatSingleFractionHtml(correctFraction.num, correctFraction.den);
+    }
+  }
+
+  if (isFractionZlomekProblem(problem) && problem.answerKind !== 'number') {
+    return formatSingleFractionHtml(problem.answerNum, problem.answerDen);
+  }
+
+  if (isDecimalFractionConvertProblem(problem) && problem.answerKind === 'fraction') {
+    return formatSingleFractionHtml(problem.answerNum, problem.answerDen);
+  }
+
+  if (isLinearEquationProblem(problem)) {
+    if (problem.solutionType === 'unique' && problem.answerKind === 'fraction') {
+      return formatSingleFractionHtml(problem.answerNum, problem.answerDen, problem.answerNegative);
+    }
+
+    return formatPlainPdfRenderHtml(getLinearEquationCorrectAnswerLabel(problem));
+  }
+
+  return formatPlainPdfRenderHtml(formatProblemCorrectAnswer(problem));
+}
+
+async function renderProblemPdfImage(problem) {
+  return renderExpressionHtmlToPdfImage(getProblemPdfRenderHtml(problem));
+}
+
+async function renderProblemAnswerPdfImage(problem) {
+  return renderExpressionHtmlToPdfImage(getProblemAnswerPdfRenderHtml(problem));
+}
+
 function buildAnalysisPdfDefinition(doc) {
   const content = [
     { text: doc.title, style: 'header' },
@@ -18067,7 +18274,7 @@ function renderPdfLevelCountInputs() {
 
   pdfLevelCountsEl.innerHTML = Array.from({ length: levelCount }, (_, index) => {
     const displayLevel = index + 1;
-    const defaultValue = previous[index] ?? (displayLevel === 1 ? 5 : 0);
+    const defaultValue = previous[index] ?? 0;
 
     return `<label class="setup-pdf-options__level">
       <span class="setup-assignment-options__label">Úroveň ${displayLevel}</span>
@@ -18292,14 +18499,14 @@ function generateUniqueWorksheetProblemsForSlot(resolvedMode, slotIndex, count) 
   return problems;
 }
 
-function buildWorksheetData() {
+async function buildWorksheetData() {
   const resolvedMode = resolveActiveExerciseMode();
   const counts = readPdfLevelCounts();
   if (!resolvedMode || !counts) {
     throw new Error('worksheet-invalid-setup');
   }
 
-  const sections = [];
+  const pendingSections = [];
 
   counts.forEach((count, index) => {
     if (count <= 0) {
@@ -18309,20 +18516,49 @@ function buildWorksheetData() {
     const displayLevel = index + 1;
     const problems = generateUniqueWorksheetProblemsForSlot(resolvedMode, index, count);
 
-    sections.push({
-      level: displayLevel,
-      items: problems.map((problem, itemIndex) => ({
+    pendingSections.push({ level: displayLevel, problems });
+  });
+
+  if (pendingSections.length === 0) {
+    throw new Error('worksheet-empty');
+  }
+
+  const usePdfImages = shouldUseWorksheetPdfImageRendering();
+
+  if (usePdfImages) {
+    await loadHtml2CanvasLibrary();
+  }
+
+  const sections = [];
+
+  for (const { level, problems } of pendingSections) {
+    const items = [];
+
+    for (let itemIndex = 0; itemIndex < problems.length; itemIndex += 1) {
+      const problem = problems[itemIndex];
+      let pdfContent = formatWorksheetProblemPdfContent(problem);
+      let pdfAnswer = formatWorksheetAnswerPdfContent(problem);
+
+      if (usePdfImages) {
+        try {
+          pdfContent = await renderProblemPdfImage(problem);
+          pdfAnswer = await renderProblemAnswerPdfImage(problem);
+        } catch {
+          pdfContent = formatWorksheetProblemPdfContent(problem);
+          pdfAnswer = formatWorksheetAnswerPdfContent(problem);
+        }
+      }
+
+      items.push({
         number: itemIndex + 1,
         text: formatWorksheetProblemText(problem),
         answer: formatProblemCorrectAnswer(problem),
-        pdfContent: formatWorksheetProblemPdfContent(problem),
-        pdfAnswer: formatWorksheetAnswerPdfContent(problem),
-      })),
-    });
-  });
+        pdfContent,
+        pdfAnswer,
+      });
+    }
 
-  if (sections.length === 0) {
-    throw new Error('worksheet-empty');
+    sections.push({ level, items });
   }
 
   return {
@@ -18518,24 +18754,100 @@ function formatPdfCompareOperand(problem, operand) {
   return formatPdfPlainText(formatDecimal(operand.value, operand.decimals));
 }
 
+function formatPdfCompoundInlineText(text, margin = [0, 0, 0, 0]) {
+  return {
+    width: 'auto',
+    text: String(text),
+    fontSize: PDF_FRACTION_FONT_SIZE,
+    lineHeight: 1,
+    margin,
+  };
+}
+
+function formatPdfCompoundInlineDecimal(text) {
+  const topSpacer = Math.max(0, getPdfFractionBarCenterOffset() - PDF_FRACTION_FONT_SIZE * 0.5);
+  return formatPdfCompoundInlineText(text, [0, topSpacer, 0, 0]);
+}
+
+function formatPdfCompoundInlineOperator(symbol) {
+  const topSpacer = Math.max(0, getPdfFractionBarCenterOffset() - PDF_FRACTION_FONT_SIZE * 0.5);
+  return formatPdfCompoundInlineText(symbol, [2, topSpacer, 2, 0]);
+}
+
+function formatPdfCompoundInline(parts) {
+  const cells = parts.filter(Boolean);
+
+  if (cells.length === 0) {
+    return { text: '' };
+  }
+
+  if (cells.length === 1) {
+    return cells[0];
+  }
+
+  return {
+    width: 'auto',
+    table: {
+      widths: cells.map(() => 'auto'),
+      body: [cells],
+    },
+    layout: {
+      defaultBorder: false,
+      hLineWidth: () => 0,
+      vLineWidth: () => 0,
+      paddingLeft: () => 1,
+      paddingRight: () => 1,
+      paddingTop: () => 0,
+      paddingBottom: () => 0,
+    },
+  };
+}
+
+function formatPdfCompoundInlineMixedTerm(term) {
+  if (term.kind === 'decimal') {
+    const parts = [formatPdfCompoundInlineDecimal(formatDecimal(term.value, term.decimals))];
+
+    if (term.wholeFactor != null) {
+      parts.push(formatPdfCompoundInlineOperator('·'));
+      parts.push(formatPdfCompoundInlineDecimal(String(term.wholeFactor)));
+    }
+
+    return formatPdfCompoundInline(parts);
+  }
+
+  if (term.kind === 'fraction') {
+    return formatPdfFraction(term.num, term.den);
+  }
+
+  if (term.kind === 'whole') {
+    return formatPdfCompoundInlineDecimal(String(term.value));
+  }
+
+  if (term.kind === 'compound') {
+    return formatPdfNestedCompoundPart(term.numerator, term.denominator);
+  }
+
+  return formatPdfCompoundInlineDecimal(String(term.value));
+}
+
 function formatPdfCompoundExprPart(part) {
   if (part.type === 'fraction-expr') {
     const parts = [formatPdfFraction(part.terms[0].num, part.terms[0].den)];
     part.operators.forEach((operator, index) => {
-      parts.push(formatPdfOperator(formatFractionOperatorSymbol(operator)));
+      parts.push(formatPdfCompoundInlineOperator(formatFractionOperatorSymbol(operator)));
       const term = part.terms[index + 1];
       parts.push(formatPdfFraction(term.num, term.den));
     });
-    return formatPdfInline(parts);
+    return formatPdfCompoundInline(parts);
   }
 
   if (part.type === 'mixed-expr') {
-    const parts = [formatPdfMixedTerm(part.terms[0])];
+    const parts = [formatPdfCompoundInlineMixedTerm(part.terms[0])];
     part.operators.forEach((operator, index) => {
-      parts.push(formatPdfOperator(formatFractionOperatorSymbol(operator)));
-      parts.push(formatPdfMixedTerm(part.terms[index + 1]));
+      parts.push(formatPdfCompoundInlineOperator(formatFractionOperatorSymbol(operator)));
+      parts.push(formatPdfCompoundInlineMixedTerm(part.terms[index + 1]));
     });
-    return formatPdfInline(parts);
+    return formatPdfCompoundInline(parts);
   }
 
   return formatPdfCompoundPart(part);
@@ -18547,7 +18859,7 @@ function formatPdfCompoundPart(part) {
   }
 
   if (part.type === 'whole') {
-    return formatPdfPlainText(String(part.value));
+    return formatPdfCompoundInlineText(String(part.value));
   }
 
   if (part.type === 'compound') {
@@ -18557,25 +18869,201 @@ function formatPdfCompoundPart(part) {
   return formatPdfCompoundExprPart(part);
 }
 
-function formatPdfNestedCompoundPart(numerator, denominator) {
-  const numPart = formatPdfCompoundPart(numerator);
-  const denPart = formatPdfCompoundPart(denominator);
-  const barWidth = Math.max(
-    formatCompoundPartText(numerator).length,
-    formatCompoundPartText(denominator).length,
-  ) * 4.5 + 8;
+function estimatePdfCompoundMixedTermWidth(term) {
+  if (term.kind === 'decimal') {
+    return formatDecimal(term.value, term.decimals).length * 5.5 + 2;
+  }
+
+  if (term.kind === 'fraction') {
+    return Math.max(String(term.num).length, String(term.den).length) * 5.2 + 2;
+  }
+
+  if (term.kind === 'whole') {
+    return String(term.value).length * 5.5 + 2;
+  }
+
+  if (term.kind === 'compound') {
+    return Math.max(
+      estimatePdfCompoundPartWidth(term.numerator),
+      estimatePdfCompoundPartWidth(term.denominator),
+    ) + 6;
+  }
+
+  return 10;
+}
+
+function estimatePdfCompoundMixedTermHeight(term) {
+  if (term.kind === 'decimal' || term.kind === 'whole') {
+    const topSpacer = Math.max(0, getPdfFractionBarCenterOffset() - PDF_FRACTION_FONT_SIZE * 0.5);
+    return topSpacer + PDF_FRACTION_FONT_SIZE + 2;
+  }
+
+  if (term.kind === 'fraction') {
+    return PDF_FRACTION_FONT_SIZE * PDF_FRACTION_LINE_HEIGHT * 2 + 1;
+  }
+
+  if (term.kind === 'compound') {
+    return estimatePdfCompoundPartHeight(term.numerator)
+      + estimatePdfCompoundPartHeight(term.denominator) + 5;
+  }
+
+  return PDF_FRACTION_FONT_SIZE + 2;
+}
+
+function getPdfCompoundEqualsMarginTop(numeratorPart) {
+  const numHeight = estimatePdfCompoundPartHeight(numeratorPart ?? {});
+  const barCenterY = numHeight + 1.5;
+  return Math.max(0, barCenterY - PDF_FRACTION_FONT_SIZE * 0.38);
+}
+
+function estimatePdfCompoundPartWidth(part) {
+  if (part.type === 'fraction') {
+    return Math.max(String(part.num).length, String(part.den).length) * 5.2 + 2;
+  }
+
+  if (part.type === 'whole') {
+    return String(part.value).length * 5.5 + 2;
+  }
+
+  if (part.type === 'compound') {
+    return Math.max(
+      estimatePdfCompoundPartWidth(part.numerator),
+      estimatePdfCompoundPartWidth(part.denominator),
+    ) + 6;
+  }
+
+  if (part.type === 'fraction-expr') {
+    let width = 6;
+    part.terms.forEach((term, index) => {
+      if (index > 0) {
+        width += 10;
+      }
+      width += Math.max(String(term.num).length, String(term.den).length) * 5.2 + 2;
+    });
+    return width;
+  }
+
+  if (part.type === 'mixed-expr') {
+    let width = 0;
+    part.terms.forEach((term, index) => {
+      if (index > 0) {
+        width += 10;
+      }
+      width += estimatePdfCompoundMixedTermWidth(term);
+    });
+    return width + 4;
+  }
+
+  return 16;
+}
+
+function estimatePdfCompoundPartHeight(part) {
+  if (part.type === 'fraction') {
+    return PDF_FRACTION_FONT_SIZE * PDF_FRACTION_LINE_HEIGHT * 2 + 1;
+  }
+
+  if (part.type === 'whole') {
+    return PDF_FRACTION_FONT_SIZE + 2;
+  }
+
+  if (part.type === 'compound') {
+    return estimatePdfCompoundPartHeight(part.numerator)
+      + estimatePdfCompoundPartHeight(part.denominator) + 5;
+  }
+
+  if (part.type === 'fraction-expr') {
+    return PDF_FRACTION_FONT_SIZE * PDF_FRACTION_LINE_HEIGHT * 2 + 1;
+  }
+
+  if (part.type === 'mixed-expr') {
+    let maxHeight = PDF_FRACTION_FONT_SIZE + 2;
+    part.terms.forEach((term) => {
+      maxHeight = Math.max(maxHeight, estimatePdfCompoundMixedTermHeight(term));
+    });
+    return maxHeight;
+  }
+
+  return PDF_FRACTION_FONT_SIZE + 2;
+}
+
+function wrapPdfColumnContent(content) {
+  if (!content) {
+    return { text: '' };
+  }
+
+  if (content.columns || content.stack || content.table) {
+    return content;
+  }
+
+  return { columns: [content], columnGap: 0 };
+}
+
+function pdfTableCenterCell(content) {
+  const wrapped = (content?.columns || content?.table || content?.stack)
+    ? content
+    : wrapPdfColumnContent(content);
 
   return {
-    width: 'auto',
-    stack: [
-      { columns: [numPart], columnGap: 0 },
-      {
-        canvas: [{ type: 'line', x1: 0, y1: 0, x2: barWidth, y2: 0, lineWidth: 0.5 }],
-        margin: [0, 0, 0, 0],
-      },
-      { columns: [denPart], columnGap: 0 },
-    ],
+    alignment: 'center',
+    stack: [wrapped],
   };
+}
+
+function formatPdfStackedFractionBarRow(barWidth) {
+  return {
+    canvas: [{ type: 'line', x1: 0, y1: 0, x2: barWidth, y2: 0, lineWidth: 0.5 }],
+    margin: [0, 1, 0, 1],
+  };
+}
+
+function formatPdfStackedFraction(numPart, denPart, options = {}, numeratorPart = null, denominatorPart = null) {
+  const barWidth = Math.max(
+    estimatePdfCompoundPartWidth(numeratorPart ?? {}),
+    estimatePdfCompoundPartWidth(denominatorPart ?? {}),
+    12,
+  );
+  const fractionStack = {
+    width: 'auto',
+    table: {
+      widths: [barWidth],
+      body: [
+        [pdfTableCenterCell(numPart)],
+        [formatPdfStackedFractionBarRow(barWidth)],
+        [pdfTableCenterCell(denPart)],
+      ],
+    },
+    layout: 'noBorders',
+  };
+
+  if (!options.showEquals) {
+    return fractionStack;
+  }
+
+  const equalsMarginTop = getPdfCompoundEqualsMarginTop(numeratorPart);
+
+  return {
+    columns: [
+      fractionStack,
+      {
+        width: 'auto',
+        stack: [
+          { text: '', margin: [4, equalsMarginTop, 0, 0] },
+          { text: '=', fontSize: PDF_FRACTION_FONT_SIZE, lineHeight: 1 },
+        ],
+      },
+    ],
+    columnGap: 0,
+  };
+}
+
+function formatPdfNestedCompoundPart(numerator, denominator) {
+  return formatPdfStackedFraction(
+    formatPdfCompoundPart(numerator),
+    formatPdfCompoundPart(denominator),
+    {},
+    numerator,
+    denominator,
+  );
 }
 
 function formatFractionAddPdfContent(problem) {
@@ -18695,7 +19183,13 @@ function formatFractionDividePdfContent(problem) {
 }
 
 function formatCompoundFractionPdfContent(problem) {
-  return formatPdfExpression([formatPdfNestedCompoundPart(problem.numerator, problem.denominator)]);
+  return formatPdfStackedFraction(
+    formatPdfCompoundPart(problem.numerator),
+    formatPdfCompoundPart(problem.denominator),
+    { showEquals: true },
+    problem.numerator,
+    problem.denominator,
+  );
 }
 
 function formatDecimalFractionMixedPdfContent(problem) {
@@ -19250,7 +19744,7 @@ async function createWorksheetPdf() {
 
   try {
     await loadPdfMakeLibrary();
-    const worksheet = buildWorksheetData();
+    const worksheet = await buildWorksheetData();
     window.pdfMake.createPdf(buildWorksheetPdfDefinition(worksheet))
       .download(getWorksheetDownloadFilename());
     showSetupFeedback('PDF bylo staženo.');
