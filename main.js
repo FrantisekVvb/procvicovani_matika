@@ -160,9 +160,14 @@ const INTEGER_ANSWER_MIN = -100;
 const INTEGER_ANSWER_MAX = 100;
 const NON_INTEGER_ADD_SUBTRACT_MAX_LEVEL = 4;
 const NON_INTEGER_MULTIPLY_DIVIDE_MAX_LEVEL = 2;
+const NON_INTEGER_COMBINED_MAX_LEVEL = 4;
+const NON_INTEGER_COMBINED_MIXED_START_LEVEL = 3;
+const NON_INTEGER_COMBINED_CROSS_OPS_DISPLAY_LEVEL = 4;
+const NEGATIVE_NUMBERS_CROSS_MIXED_DISPLAY_LEVEL = 5;
 const NON_INTEGER_DECIMAL_MIN = 0.1;
 const NON_INTEGER_DECIMAL_MAX = 9.9;
 const NON_INTEGER_FRACTION_DEN_MAX = 12;
+const NON_INTEGER_MIXED_FRACTION_DENS = [2, 5, 10];
 const NON_INTEGER_ANSWER_MIN = -100;
 const NON_INTEGER_ANSWER_MAX = 100;
 const BASIC_FORM_PRIMES = [2, 3, 5, 7];
@@ -639,6 +644,35 @@ function hasNonIntegerMultiplyDivideMode(selected = getSelectedIntegerModes()) {
 
 function hasIntegerArithmeticCombinedModes(selected = getSelectedIntegerModes()) {
   return hasIntegerAddSubtractMode(selected) && hasIntegerMultiplyDivideMode(selected);
+}
+
+function hasNonIntegerArithmeticCombinedModes(selected = getSelectedIntegerModes()) {
+  return hasNonIntegerAddSubtractMode(selected) && hasNonIntegerMultiplyDivideMode(selected);
+}
+
+function getSelectedNonIntegerArithmeticOperations(selected = getSelectedIntegerModes()) {
+  const operations = [];
+
+  if (hasNonIntegerAddSubtractMode(selected)) {
+    operations.push('add', 'subtract');
+  }
+
+  if (hasNonIntegerMultiplyDivideMode(selected)) {
+    operations.push('multiply', 'divide');
+  }
+
+  return operations;
+}
+
+function hasNegativeNumbersCrossTypeCombination(selected = getSelectedIntegerModes()) {
+  return hasIntegerArithmeticCombinedModes(selected) && hasNonIntegerArithmeticCombinedModes(selected);
+}
+
+function getNegativeNumbersCrossArithmeticOperations(selected = getSelectedIntegerModes()) {
+  return [...new Set([
+    ...getSelectedIntegerArithmeticOperations(selected),
+    ...getSelectedNonIntegerArithmeticOperations(selected),
+  ])];
 }
 
 function getSelectedIntegerArithmeticOperations(selected = getSelectedIntegerModes()) {
@@ -1507,6 +1541,10 @@ function resolveIntegerExerciseModeFromSelection(integerModes = getSelectedInteg
     return null;
   }
 
+  if (hasNonIntegerArithmeticCombinedModes(integerModes)) {
+    return 'non-integer-combined';
+  }
+
   if (hasNonIntegerMultiplyDivideMode(integerModes) && !hasNonIntegerAddSubtractMode(integerModes)) {
     return 'non-integer-multiply-divide';
   }
@@ -1570,11 +1608,37 @@ function hasPowersSqrtCombinedSelection() {
   return hasPowersMode() && hasSqrtMode();
 }
 
-function buildExerciseModePool() {
-  if (hasCrossTypeSelection()) {
-    return ['decimal-fraction-combined'];
+function buildMultiModeIndividualIntegerModes() {
+  const modes = [];
+
+  if (hasIntegerArithmeticCombinedModes()) {
+    modes.push('integer-combined');
+  } else {
+    if (hasIntegerAddSubtractMode()) {
+      modes.push('integer-add-subtract');
+    }
+
+    if (hasIntegerMultiplyDivideMode()) {
+      modes.push('integer-multiply-divide');
+    }
   }
 
+  if (hasNonIntegerArithmeticCombinedModes()) {
+    modes.push('non-integer-combined');
+  } else {
+    if (hasNonIntegerAddSubtractMode()) {
+      modes.push('non-integer-add-subtract');
+    }
+
+    if (hasNonIntegerMultiplyDivideMode()) {
+      modes.push('non-integer-multiply-divide');
+    }
+  }
+
+  return modes;
+}
+
+function buildExerciseModePool() {
   const pool = [];
 
   if (hasPowersSqrtCombinedSelection()) {
@@ -1597,10 +1661,7 @@ function buildExerciseModePool() {
     pool.push('non-integer-sqrt');
   }
 
-  const integerMode = resolveIntegerExerciseModeFromSelection();
-  if (integerMode) {
-    pool.push(integerMode);
-  }
+  pool.push(...buildMultiModeIndividualIntegerModes());
 
   if (getSelectedOperations().length > 0) {
     pool.push('decimal');
@@ -1715,6 +1776,7 @@ function isFractionExerciseMode() {
     && !isIntegerExerciseMode()
     && activeExerciseMode !== 'non-integer-add-subtract'
     && activeExerciseMode !== 'non-integer-multiply-divide'
+    && activeExerciseMode !== 'non-integer-combined'
     && activeExerciseMode !== 'non-integer-powers'
     && activeExerciseMode !== 'non-integer-sqrt'
     && activeExerciseMode !== 'powers'
@@ -1769,6 +1831,14 @@ function usesSignedFractionAnswerInput() {
   }
 
   if (currentProblem?.type === 'non-integer-multiply-divide') {
+    return true;
+  }
+
+  if (currentProblem?.type === 'non-integer-mixed') {
+    return true;
+  }
+
+  if (currentProblem?.type === 'negative-numbers-cross-mixed') {
     return true;
   }
 
@@ -1843,6 +1913,14 @@ function getExerciseModeForProblem(problem) {
 
   if (problem?.type === 'non-integer-multiply-divide') {
     return 'non-integer-multiply-divide';
+  }
+
+  if (problem?.type === 'non-integer-mixed') {
+    return 'non-integer-combined';
+  }
+
+  if (problem?.type === 'negative-numbers-cross-mixed') {
+    return 'non-integer-combined';
   }
 
   if (problem?.type === 'decimal-fraction-mixed') {
@@ -1982,6 +2060,8 @@ function canAnswerProblem(problem) {
     || isPowersSqrtCombinedProblem(problem)
     || problem?.type === 'non-integer-add-subtract'
     || problem?.type === 'non-integer-multiply-divide'
+    || problem?.type === 'non-integer-mixed'
+    || problem?.type === 'negative-numbers-cross-mixed'
     || problem?.type === 'non-integer-powers'
     || problem?.type === 'non-integer-sqrt'
     || isLinearEquationProblem(problem)
@@ -2056,7 +2136,8 @@ function isIntegerExerciseMode() {
 
 function isNonIntegerExerciseMode() {
   return activeExerciseMode === 'non-integer-add-subtract'
-    || activeExerciseMode === 'non-integer-multiply-divide';
+    || activeExerciseMode === 'non-integer-multiply-divide'
+    || activeExerciseMode === 'non-integer-combined';
 }
 
 function isNonIntegerMultiplyDivideExerciseMode() {
@@ -2077,6 +2158,8 @@ function isNonIntegerDecimalAnswerProblem(problem) {
 
 function isNonIntegerFractionAnswerProblem(problem) {
   return problem?.type === 'non-integer-multiply-divide'
+    || problem?.type === 'non-integer-mixed'
+    || problem?.type === 'negative-numbers-cross-mixed'
     || getNonIntegerAnswerKind(problem) === 'fraction';
 }
 
@@ -2179,7 +2262,9 @@ function isNonIntegerMultiplyDivideFractionAnswerInputShape() {
   return isFractionAnswerInputShape()
     && (isNonIntegerMultiplyDivideAnswerInputMode()
       || isNonIntegerMultiplyDivideExerciseMode()
-      || currentProblem?.type === 'non-integer-multiply-divide');
+      || currentProblem?.type === 'non-integer-multiply-divide'
+      || currentProblem?.type === 'non-integer-mixed'
+      || currentProblem?.type === 'negative-numbers-cross-mixed');
 }
 
 function usesFractionAnswerFields() {
@@ -10667,6 +10752,10 @@ function getMaxDifficultyLevelForMode(mode) {
     return NON_INTEGER_MULTIPLY_DIVIDE_MAX_LEVEL;
   }
 
+  if (mode === 'non-integer-combined') {
+    return NON_INTEGER_COMBINED_MAX_LEVEL;
+  }
+
   if (mode === 'powers') {
     return POWER_MAX_LEVEL;
   }
@@ -10776,10 +10865,6 @@ function getActiveExercisePanels() {
 }
 
 function buildMultiModeIndividualQueue() {
-  if (hasCrossTypeSelection()) {
-    return ['decimal-fraction-combined'];
-  }
-
   const queue = [];
 
   if (hasPowersMode()) {
@@ -10798,10 +10883,7 @@ function buildMultiModeIndividualQueue() {
     queue.push('non-integer-sqrt');
   }
 
-  const integerMode = resolveIntegerExerciseModeFromSelection();
-  if (integerMode) {
-    queue.push(integerMode);
-  }
+  queue.push(...buildMultiModeIndividualIntegerModes());
 
   if (getSelectedOperations().length > 0) {
     queue.push('decimal');
@@ -10834,6 +10916,10 @@ function buildMultiModeWithinPanelQueue() {
     queue.push('integer');
   }
 
+  if (hasNonIntegerArithmeticCombinedModes()) {
+    queue.push('non-integer');
+  }
+
   if (getSelectedOperations().length > 1) {
     queue.push('decimal');
   }
@@ -10842,6 +10928,10 @@ function buildMultiModeWithinPanelQueue() {
 }
 
 function hasMultiModeCrossPanelCombination() {
+  if (hasNegativeNumbersCrossTypeCombination()) {
+    return true;
+  }
+
   const panels = getActiveExercisePanels();
 
   if (panels.length < 2) {
@@ -10870,6 +10960,10 @@ function hasMultiModeCrossPanelCombination() {
   }
 
   if (hasDecimal && hasInteger) {
+    return true;
+  }
+
+  if (hasDecimal && hasFractionOps) {
     return true;
   }
 
@@ -10919,28 +11013,7 @@ function pickWithinPanelForNextProblem() {
 }
 
 function createMultiModeWithinPanelProblem(panel) {
-  const difficultyLevel = getMultiModeIndividualMaxDifficulty();
-
-  if (panel === 'powers') {
-    return createPowersSqrtCombinedProblem(POWERS_SQRT_COMBINED_MAX_LEVEL);
-  }
-
-  if (panel === 'fraction') {
-    return createFractionCombinedMixedProblem(
-      getSelectedFractionOperations(),
-      FRACTION_MIXED_DISPLAY_LEVEL - 1,
-    );
-  }
-
-  if (panel === 'integer') {
-    return createIntegerCombinedMixedProblem(
-      getSelectedIntegerArithmeticOperations(),
-      INTEGER_COMBINED_MAX_LEVEL - 1,
-    );
-  }
-
-  const selected = getSelectedOperations();
-  return createMultiOperationProblem(selected, getDecimalMaxLevelForSelection());
+  return createMultiModeWithinPanelProblemAtLevel(panel, getMultiModeIndividualMaxDifficulty());
 }
 
 function createRandomCrossPanelPowerTerm() {
@@ -10961,6 +11034,17 @@ function createRandomCrossPanelPowerTerm() {
     options.push(() => createRandomPowerTermForLevel4());
   }
 
+  if (hasNonIntegerPowersMode()) {
+    options.push(() => createFractionPowerTerm('whole', 2, 3));
+    options.push(() => createFractionPowerTerm('whole', 1, 2));
+    options.push(() => createRandomFractionPowerTerm());
+  }
+
+  if (hasNonIntegerSqrtMode()) {
+    options.push(() => createDecimalSqrtTerm());
+    options.push(() => createRandomFractionSqrtTerm());
+  }
+
   if (options.length === 0) {
     return createSqrtTerm(4);
   }
@@ -10968,9 +11052,56 @@ function createRandomCrossPanelPowerTerm() {
   return pickRandomItem(options)();
 }
 
+function getCrossPanelTermCategory(term) {
+  if (term.kind === 'fraction') {
+    return 'fraction';
+  }
+
+  if (term.kind === 'decimal') {
+    return 'decimal';
+  }
+
+  if (term.kind === 'integer') {
+    return 'integer';
+  }
+
+  if (term.kind === 'decimal-power' || term.kind === 'fraction-power') {
+    return 'power';
+  }
+
+  if (term.kind === 'decimal-sqrt' || term.kind === 'fraction-sqrt') {
+    return 'power';
+  }
+
+  return 'power';
+}
+
 function crossPanelTermToRational(term) {
   if (term.kind === 'fraction') {
     return [term.num, term.den];
+  }
+
+  if (term.kind === 'decimal') {
+    const rational = mixedTermToRational(term);
+    return [rational.num, rational.den];
+  }
+
+  if (term.kind === 'integer') {
+    return [term.sign * term.magnitude, 1];
+  }
+
+  if (term.kind === 'decimal-power' || term.kind === 'fraction-power') {
+    const rational = getNonIntegerPowerTermRational(term);
+    return [rational.num, rational.den];
+  }
+
+  if (term.kind === 'decimal-sqrt' || term.kind === 'fraction-sqrt') {
+    const rational = getNonIntegerSqrtTermRational(term);
+    if (!rational) {
+      return null;
+    }
+
+    return [rational.num, rational.den];
   }
 
   const value = getCombinedPowerSqrtTermValue(term);
@@ -10986,14 +11117,103 @@ function createCrossPanelFractionTerm() {
   return { kind: 'fraction', num: properFraction.num, den: properFraction.den };
 }
 
+function createCrossPanelDecimalTerm() {
+  return randomMixedDecimalTerm();
+}
+
+function createCrossPanelIntegerTerm() {
+  return {
+    kind: 'integer',
+    magnitude: randomWhole(1, 12),
+    sign: Math.random() < 0.35 ? -1 : 1,
+    wrapped: false,
+  };
+}
+
+function hasCrossPanelCategoryMix(terms, categoryA, categoryB) {
+  const categories = new Set(terms.map(getCrossPanelTermCategory));
+  return categories.has(categoryA) && categories.has(categoryB);
+}
+
 function hasCrossPanelTermMix(terms) {
-  const hasFraction = terms.some((term) => term.kind === 'fraction');
-  const hasPower = terms.some((term) => term.kind !== 'fraction');
-  return hasFraction && hasPower;
+  return hasCrossPanelCategoryMix(terms, 'fraction', 'power');
+}
+
+function getCrossPanelArithmeticOperators() {
+  const ops = new Set();
+
+  getRegularOperations().forEach((operation) => {
+    if (operation === 'add' || operation === 'subtract' || operation === 'multiply' || operation === 'divide') {
+      ops.add(operation);
+    }
+  });
+
+  getSelectedFractionOperations().forEach((operation) => {
+    ops.add(operation);
+  });
+
+  getSelectedIntegerArithmeticOperations().forEach((operation) => {
+    ops.add(operation);
+  });
+
+  if (ops.size === 0) {
+    return ['add', 'subtract', 'multiply'];
+  }
+
+  return [...ops];
+}
+
+function pickCrossPanelArithmeticOperators(difficultyLevel, operandCount) {
+  return pickFractionCombinedOperators(
+    difficultyLevel,
+    getCrossPanelArithmeticOperators(),
+    operandCount,
+  );
 }
 
 function pickCrossPanelOperators(operandCount) {
   return pickSqrtOperators(operandCount);
+}
+
+function createCategoryPairCrossPanelProblem(
+  difficultyLevel,
+  categoryA,
+  categoryB,
+  createTermA,
+  createTermB,
+  fallbackTerms,
+  fallbackOperators,
+) {
+  const displayLevel = difficultyLevel + 1;
+  const termCount = Math.random() < 0.5 ? 3 : 4;
+
+  for (let attempt = 0; attempt < 300; attempt += 1) {
+    const terms = [
+      Math.random() < 0.5 ? createTermA() : createTermB(),
+      Math.random() < 0.5 ? createTermA() : createTermB(),
+    ];
+
+    while (terms.length < termCount) {
+      terms.push(Math.random() < 0.5 ? createTermA() : createTermB());
+    }
+
+    if (Math.random() < 0.6) {
+      shuffleArray(terms);
+    }
+
+    if (!hasCrossPanelCategoryMix(terms, categoryA, categoryB)) {
+      continue;
+    }
+
+    const operators = pickCrossPanelArithmeticOperators(difficultyLevel, terms.length);
+    const problem = buildCrossPanelMixedProblem(terms, operators, displayLevel);
+
+    if (problem && gcd(problem.answerNum, problem.answerDen) === 1) {
+      return problem;
+    }
+  }
+
+  return buildCrossPanelMixedProblem(fallbackTerms, fallbackOperators, displayLevel);
 }
 
 function evaluateCrossPanelMultiTermExpression(terms, operators) {
@@ -11062,45 +11282,82 @@ function buildCrossPanelMixedProblem(terms, operators, displayLevel) {
 }
 
 function createFractionPowersCrossPanelProblem(difficultyLevel) {
-  const displayLevel = difficultyLevel + 1;
-  const termCount = Math.random() < 0.5 ? 3 : 4;
-
-  for (let attempt = 0; attempt < 300; attempt += 1) {
-    const terms = [];
-    const firstFromFraction = Math.random() < 0.5;
-    terms.push(firstFromFraction ? createCrossPanelFractionTerm() : createRandomCrossPanelPowerTerm());
-    terms.push(firstFromFraction ? createRandomCrossPanelPowerTerm() : createCrossPanelFractionTerm());
-
-    while (terms.length < termCount) {
-      terms.push(Math.random() < 0.5
-        ? createCrossPanelFractionTerm()
-        : createRandomCrossPanelPowerTerm());
-    }
-
-    if (Math.random() < 0.6) {
-      shuffleArray(terms);
-    }
-
-    if (!hasCrossPanelTermMix(terms)) {
-      continue;
-    }
-
-    const operators = pickCrossPanelOperators(terms.length);
-    const problem = buildCrossPanelMixedProblem(terms, operators, displayLevel);
-
-    if (problem) {
-      return problem;
-    }
-  }
-
-  return buildCrossPanelMixedProblem(
+  return createCategoryPairCrossPanelProblem(
+    difficultyLevel,
+    'fraction',
+    'power',
+    createCrossPanelFractionTerm,
+    createRandomCrossPanelPowerTerm,
     [
       { kind: 'fraction', num: 1, den: 2 },
       createPositiveSquareTerm(2),
       { kind: 'fraction', num: 1, den: 3 },
     ],
     ['add', 'multiply'],
-    displayLevel,
+  );
+}
+
+function createDecimalIntegerCrossPanelProblem(difficultyLevel) {
+  return createCategoryPairCrossPanelProblem(
+    difficultyLevel,
+    'decimal',
+    'integer',
+    createCrossPanelDecimalTerm,
+    createCrossPanelIntegerTerm,
+    [
+      { kind: 'decimal', value: 0.5, decimals: 1 },
+      { kind: 'integer', magnitude: 3, sign: 1, wrapped: false },
+      { kind: 'integer', magnitude: 2, sign: 1, wrapped: false },
+    ],
+    ['add', 'add'],
+  );
+}
+
+function createDecimalPowersCrossPanelProblem(difficultyLevel) {
+  return createCategoryPairCrossPanelProblem(
+    difficultyLevel,
+    'decimal',
+    'power',
+    createCrossPanelDecimalTerm,
+    createRandomCrossPanelPowerTerm,
+    [
+      { kind: 'decimal', value: 1.2, decimals: 1 },
+      createPositiveSquareTerm(2),
+      { kind: 'decimal', value: 0.5, decimals: 1 },
+    ],
+    ['add', 'multiply'],
+  );
+}
+
+function createIntegerFractionCrossPanelProblem(difficultyLevel) {
+  return createCategoryPairCrossPanelProblem(
+    difficultyLevel,
+    'integer',
+    'fraction',
+    createCrossPanelIntegerTerm,
+    createCrossPanelFractionTerm,
+    [
+      { kind: 'integer', magnitude: 5, sign: 1, wrapped: false },
+      { kind: 'fraction', num: 1, den: 4 },
+      { kind: 'integer', magnitude: 2, sign: 1, wrapped: false },
+    ],
+    ['subtract', 'add'],
+  );
+}
+
+function createIntegerPowersCrossPanelProblem(difficultyLevel) {
+  return createCategoryPairCrossPanelProblem(
+    difficultyLevel,
+    'integer',
+    'power',
+    createCrossPanelIntegerTerm,
+    createRandomCrossPanelPowerTerm,
+    [
+      { kind: 'integer', magnitude: 4, sign: 1, wrapped: false },
+      createPositiveSquareTerm(3),
+      { kind: 'integer', magnitude: 2, sign: 1, wrapped: false },
+    ],
+    ['add', 'multiply'],
   );
 }
 
@@ -11108,29 +11365,95 @@ function createDecimalFractionCrossPanelProblem(difficultyLevel) {
   return createDecimalFractionMixedProblem(difficultyLevel);
 }
 
-function buildMultiModeCrossPanelGenerators() {
-  const maxDifficulty = getMultiModeIndividualMaxDifficulty();
+function hasPowersPanelSelection() {
+  return hasPowersMode()
+    || hasSqrtMode()
+    || hasNonIntegerPowersMode()
+    || hasNonIntegerSqrtMode();
+}
+
+function buildMultiModeCrossPanelGenerators(difficultyLevel = getMultiModeIndividualMaxDifficulty()) {
   const generators = [];
 
-  if (getSelectedFractionOperations().length > 0 && (hasPowersMode() || hasSqrtMode())) {
-    generators.push(() => createFractionPowersCrossPanelProblem(maxDifficulty));
+  if (hasNegativeNumbersCrossTypeCombination()) {
+    generators.push(() => createNegativeNumbersCrossMixedProblem(difficultyLevel));
+  }
+
+  if (getSelectedFractionOperations().length > 0 && hasPowersPanelSelection()) {
+    generators.push(() => createFractionPowersCrossPanelProblem(difficultyLevel));
   }
 
   if (getSelectedOperations().length > 0 && getSelectedFractionOperations().length > 0) {
-    generators.push(() => createDecimalFractionCrossPanelProblem(maxDifficulty));
+    generators.push(() => createDecimalFractionCrossPanelProblem(difficultyLevel));
+  }
+
+  if (getSelectedOperations().length > 0 && getSelectedIntegerModes().length > 0) {
+    generators.push(() => createDecimalIntegerCrossPanelProblem(difficultyLevel));
+  }
+
+  if (getSelectedOperations().length > 0 && hasPowersPanelSelection()) {
+    generators.push(() => createDecimalPowersCrossPanelProblem(difficultyLevel));
+  }
+
+  if (getSelectedIntegerModes().length > 0 && getSelectedFractionOperations().length > 0) {
+    generators.push(() => createIntegerFractionCrossPanelProblem(difficultyLevel));
+  }
+
+  if (getSelectedIntegerModes().length > 0 && hasPowersPanelSelection()) {
+    generators.push(() => createIntegerPowersCrossPanelProblem(difficultyLevel));
   }
 
   return generators;
 }
 
-function createMultiModeCrossPanelProblem() {
-  const generators = buildMultiModeCrossPanelGenerators();
+function createMultiModeCrossPanelProblemAtLevel(difficultyLevel) {
+  const generators = buildMultiModeCrossPanelGenerators(difficultyLevel);
 
   if (generators.length === 0) {
-    throw new Error('Chybí generátor pro kombinaci režimů z různých panelů.');
+    return null;
   }
 
   return pickRandomItem(generators)();
+}
+
+function createMultiModeWithinPanelProblemAtLevel(panel, difficultyLevel) {
+  if (panel === 'powers') {
+    return createPowersSqrtCombinedProblem(POWERS_SQRT_COMBINED_MAX_LEVEL);
+  }
+
+  if (panel === 'fraction') {
+    return createFractionCombinedMixedProblem(
+      getSelectedFractionOperations(),
+      Math.min(difficultyLevel, FRACTION_MIXED_DISPLAY_LEVEL - 1),
+    );
+  }
+
+  if (panel === 'integer') {
+    return createIntegerCombinedMixedProblem(
+      getSelectedIntegerArithmeticOperations(),
+      Math.min(difficultyLevel, INTEGER_COMBINED_MAX_LEVEL - 1),
+    );
+  }
+
+  if (panel === 'non-integer') {
+    return createNonIntegerCombinedMixedProblem(
+      getSelectedNonIntegerArithmeticOperations(),
+      Math.min(difficultyLevel, NON_INTEGER_COMBINED_MAX_LEVEL - 1),
+    );
+  }
+
+  const selected = getSelectedOperations();
+  return createMultiOperationProblem(selected, Math.min(difficultyLevel, getDecimalMaxLevelForSelection()));
+}
+
+function createMultiModeCrossPanelProblem() {
+  const problem = createMultiModeCrossPanelProblemAtLevel(getMultiModeIndividualMaxDifficulty());
+
+  if (!problem) {
+    throw new Error('Chybí generátor pro kombinaci režimů z různých panelů.');
+  }
+
+  return problem;
 }
 
 function canUseMultiModeWithinPanelCombination() {
@@ -11312,6 +11635,14 @@ function integerTermNeedsParensAfterOperator(term, precedingOperator) {
   return getIntegerTermValue(term) < 0;
 }
 
+function nonIntegerTermNeedsParensAfterOperator(term, precedingOperator) {
+  if (!precedingOperator || term.wrapped) {
+    return false;
+  }
+
+  return getNonIntegerTermValue(term) < 0;
+}
+
 function formatIntegerTermText(term, precedingOperator = null) {
   const value = getIntegerTermValue(term);
 
@@ -11431,17 +11762,18 @@ function formatIntegerAnswer(value) {
   return String(value);
 }
 
-function formatNonIntegerDecimalTermText(term) {
+function formatNonIntegerDecimalTermText(term, precedingOperator = null) {
   const value = getNonIntegerTermValue(term);
+  const formatted = formatDecimal(value, 1);
 
-  if (term.wrapped && value < 0) {
-    return `(${formatDecimal(value, 1)})`;
+  if (value < 0 && (term.wrapped || nonIntegerTermNeedsParensAfterOperator(term, precedingOperator))) {
+    return `(${formatted})`;
   }
 
-  return formatDecimal(value, 1);
+  return formatted;
 }
 
-function formatNonIntegerFractionTermText(term) {
+function formatNonIntegerFractionTermText(term, precedingOperator = null) {
   const value = getNonIntegerTermValue(term);
   const signedText = formatSignedFractionText({
     num: term.num,
@@ -11449,64 +11781,66 @@ function formatNonIntegerFractionTermText(term) {
     negative: value < 0,
   });
 
-  if (term.wrapped && value < 0) {
+  if (value < 0 && (term.wrapped || nonIntegerTermNeedsParensAfterOperator(term, precedingOperator))) {
     return `(${signedText})`;
   }
 
   return signedText;
 }
 
-function formatNonIntegerTermText(term) {
+function formatNonIntegerTermText(term, precedingOperator = null) {
   if (term.kind === 'decimal') {
-    return formatNonIntegerDecimalTermText(term);
+    return formatNonIntegerDecimalTermText(term, precedingOperator);
   }
 
-  return formatNonIntegerFractionTermText(term);
+  return formatNonIntegerFractionTermText(term, precedingOperator);
 }
 
-function formatNonIntegerFractionSignHtml() {
-  return '<span class="problem-expression__operator" aria-hidden="true">−</span>';
-}
-
-function formatNonIntegerFractionTermHtml(term) {
+function formatNonIntegerFractionTermHtml(term, precedingOperator = null) {
   const value = getNonIntegerTermValue(term);
-  const fractionHtml = formatSingleFractionHtml(term.num, term.den, false);
   const isNegative = value < 0;
+  const fractionHtml = formatSingleFractionHtml(term.num, term.den, false);
+  let content = fractionHtml;
 
-  if (term.wrapped && isNegative) {
-    return `<span class="problem-expression__term">(${formatNonIntegerFractionSignHtml()}${fractionHtml})</span>`;
+  if (isNegative) {
+    content = `<span class="problem-expression__operator" aria-hidden="true">−</span>${fractionHtml}`;
+  }
+
+  if (term.wrapped || (isNegative && nonIntegerTermNeedsParensAfterOperator(term, precedingOperator))) {
+    return `<span class="problem-expression__term">(${content})</span>`;
   }
 
   if (isNegative) {
-    return `${formatNonIntegerFractionSignHtml()}${fractionHtml}`;
+    return `<span class="problem-expression__term">${content}</span>`;
   }
 
-  return fractionHtml;
+  return `<span class="problem-expression__term">${fractionHtml}</span>`;
 }
 
-function formatNonIntegerTermHtml(term) {
+function formatNonIntegerTermHtml(term, precedingOperator = null) {
   if (term.kind === 'decimal') {
-    return `<span class="problem-expression__term">${escapeHtml(formatNonIntegerDecimalTermText(term))}</span>`;
+    return `<span class="problem-expression__term">${escapeHtml(formatNonIntegerDecimalTermText(term, precedingOperator))}</span>`;
   }
 
-  return formatNonIntegerFractionTermHtml(term);
+  return formatNonIntegerFractionTermHtml(term, precedingOperator);
 }
 
 function formatNonIntegerAddSubtractDisplayHtml(problem) {
   let html = formatNonIntegerTermHtml(problem.terms[0]);
-
-  if (problem.level === 1 && problem.terms.length === 2) {
-    const resolved = resolveSingleOperatorDisplay(
-      problem.operators[0],
-      problem.terms[1],
-      getNonIntegerTermValue,
-    );
-    html += `<span class="problem-expression__operator">${formatIntegerOperatorSymbol(resolved.operator)}</span>${formatNonIntegerTermHtml(resolved.term)}`;
-    return `<span class="problem-expression">${html}<span class="problem-expression__equals">=</span></span>`;
-  }
+  const resolveOperators = problem.level === 1 || problem.level === 2;
 
   problem.operators.forEach((operator, index) => {
-    html += `<span class="problem-expression__operator">${formatIntegerOperatorSymbol(operator)}</span>${formatNonIntegerTermHtml(problem.terms[index + 1])}`;
+    if (resolveOperators) {
+      const resolved = resolveSingleOperatorDisplay(
+        operator,
+        problem.terms[index + 1],
+        getNonIntegerTermValue,
+      );
+      html += `<span class="problem-expression__operator">${formatIntegerArithmeticOperatorSymbol(resolved.operator)}</span>${formatNonIntegerTermHtml(resolved.term, operator)}`;
+      return;
+    }
+
+    html += `<span class="problem-expression__operator">${formatIntegerArithmeticOperatorSymbol(operator)}</span>${formatNonIntegerTermHtml(problem.terms[index + 1], operator)}`;
   });
 
   return `<span class="problem-expression">${html}<span class="problem-expression__equals">=</span></span>`;
@@ -11514,19 +11848,20 @@ function formatNonIntegerAddSubtractDisplayHtml(problem) {
 
 function formatNonIntegerAddSubtractProblemText(problem) {
   let text = formatNonIntegerTermText(problem.terms[0]);
-
-  if (problem.level === 1 && problem.terms.length === 2) {
-    const resolved = resolveSingleOperatorDisplay(
-      problem.operators[0],
-      problem.terms[1],
-      getNonIntegerTermValue,
-    );
-    text += `${formatIntegerOperatorSymbol(resolved.operator, true)}${formatNonIntegerTermText(resolved.term)}`;
-    return `${text} =`;
-  }
+  const resolveOperators = problem.level === 1 || problem.level === 2;
 
   problem.operators.forEach((operator, index) => {
-    text += `${formatIntegerOperatorSymbol(operator, true)}${formatNonIntegerTermText(problem.terms[index + 1])}`;
+    if (resolveOperators) {
+      const resolved = resolveSingleOperatorDisplay(
+        operator,
+        problem.terms[index + 1],
+        getNonIntegerTermValue,
+      );
+      text += `${formatIntegerArithmeticOperatorSymbol(resolved.operator, true)}${formatNonIntegerTermText(resolved.term, operator)}`;
+      return;
+    }
+
+    text += `${formatIntegerArithmeticOperatorSymbol(operator, true)}${formatNonIntegerTermText(problem.terms[index + 1], operator)}`;
   });
 
   return `${text} =`;
@@ -12305,6 +12640,23 @@ function pickIntegerOperandCount(displayLevel) {
   return Math.random() < 0.5 ? 3 : 4;
 }
 
+function pickNonIntegerAddSubtractOperandCount(displayLevel) {
+  if (displayLevel === 2) {
+    return 3;
+  }
+
+  return pickIntegerOperandCount(displayLevel);
+}
+
+function pickNonIntegerAddSubtractOperators(displayLevel, operandCount) {
+  if (displayLevel === 2) {
+    const operator = pickIntegerOperator(displayLevel);
+    return Array.from({ length: operandCount - 1 }, () => operator);
+  }
+
+  return Array.from({ length: operandCount - 1 }, () => pickIntegerOperator(displayLevel));
+}
+
 function integerLevelRequiresWrapped(displayLevel) {
   return displayLevel === 3;
 }
@@ -12864,8 +13216,10 @@ function createNonIntegerDecimalTerm(sign, wrapped = false) {
   };
 }
 
-function createNonIntegerFractionTerm(sign, wrapped = false) {
-  const den = randomWhole(2, NON_INTEGER_FRACTION_DEN_MAX);
+function createNonIntegerFractionTerm(sign, wrapped = false, useSimpleDenominators = false) {
+  const den = useSimpleDenominators
+    ? pickRandomItem(NON_INTEGER_MIXED_FRACTION_DENS)
+    : randomWhole(2, NON_INTEGER_FRACTION_DEN_MAX);
   const num = randomWhole(1, den - 1);
 
   return {
@@ -12877,12 +13231,12 @@ function createNonIntegerFractionTerm(sign, wrapped = false) {
   };
 }
 
-function createNonIntegerTermWithKind(termKind, sign, wrapped = false) {
+function createNonIntegerTermWithKind(termKind, sign, wrapped = false, useSimpleDenominators = false) {
   if (termKind === 'decimal') {
     return createNonIntegerDecimalTerm(sign, wrapped);
   }
 
-  return createNonIntegerFractionTerm(sign, wrapped);
+  return createNonIntegerFractionTerm(sign, wrapped, useSimpleDenominators);
 }
 
 function createNonIntegerTerm(operandKind, sign, wrapped = false) {
@@ -12987,6 +13341,51 @@ function evaluateNonIntegerRationalExpression(terms, operators) {
   }
 
   return current;
+}
+
+function applyNonIntegerRationalBinaryOperation(left, right, operator) {
+  if (operator === 'add') {
+    return reduceFraction(
+      left.num * right.den + right.num * left.den,
+      left.den * right.den,
+    );
+  }
+
+  if (operator === 'subtract') {
+    return reduceFraction(
+      left.num * right.den - right.num * left.den,
+      left.den * right.den,
+    );
+  }
+
+  if (operator === 'multiply') {
+    return reduceFraction(left.num * right.num, left.den * right.den);
+  }
+
+  if (operator === 'divide') {
+    if (right.num === 0) {
+      return null;
+    }
+
+    return reduceFraction(left.num * right.den, left.den * right.num);
+  }
+
+  return null;
+}
+
+function evaluateNonIntegerArithmeticExpression(terms, operators) {
+  const values = terms.map(rationalFromNonIntegerTerm);
+  const result = evaluateExpressionWithOperatorPrecedence(
+    values,
+    operators,
+    applyNonIntegerRationalBinaryOperation,
+  );
+
+  if (!result) {
+    return null;
+  }
+
+  return result;
 }
 
 function nonIntegerRationalFitsTenths(answer) {
@@ -13124,6 +13523,8 @@ function isValidNonIntegerAddSubtractProblem(terms, operators, displayLevel, ope
 }
 
 function generateNonIntegerLevel4Terms(operandCount, operandKind) {
+  const useSimpleDenominators = operandKind === 'mixed';
+
   for (let attempt = 0; attempt < 200; attempt += 1) {
     const termKinds = buildTermKindsForProblem(operandCount, operandKind);
     const terms = [
@@ -13131,11 +13532,12 @@ function generateNonIntegerLevel4Terms(operandCount, operandKind) {
         termKinds[0],
         Math.random() < 0.5 ? -1 : 1,
         false,
+        useSimpleDenominators,
       ),
     ];
 
     for (let i = 1; i < operandCount; i += 1) {
-      terms.push(createNonIntegerTermWithKind(termKinds[i], -1, true));
+      terms.push(createNonIntegerTermWithKind(termKinds[i], -1, true, useSimpleDenominators));
     }
 
     const operators = Array.from({ length: operandCount - 1 }, () => 'add');
@@ -13151,6 +13553,8 @@ function generateNonIntegerTerms(displayLevel, operandCount, operandKind) {
   if (integerLevelRequiresWrappedBetweenAllPairs(displayLevel)) {
     return generateNonIntegerLevel4Terms(operandCount, operandKind);
   }
+
+  const useSimpleDenominators = operandKind === 'mixed';
 
   for (let attempt = 0; attempt < 200; attempt += 1) {
     const termKinds = buildTermKindsForProblem(operandCount, operandKind);
@@ -13171,18 +13575,15 @@ function generateNonIntegerTerms(displayLevel, operandCount, operandKind) {
         hasWrapped = true;
       }
 
-      terms.push(createNonIntegerTermWithKind(termKinds[i], sign, wrapped));
+      terms.push(createNonIntegerTermWithKind(termKinds[i], sign, wrapped, useSimpleDenominators));
     }
 
     if (integerLevelRequiresWrapped(displayLevel) && !hasWrapped) {
       const index = randomWhole(1, operandCount - 1);
-      terms[index] = createNonIntegerTermWithKind(termKinds[index], -1, true);
+      terms[index] = createNonIntegerTermWithKind(termKinds[index], -1, true, useSimpleDenominators);
     }
 
-    const operators = Array.from(
-      { length: operandCount - 1 },
-      () => pickIntegerOperator(displayLevel),
-    );
+    const operators = pickNonIntegerAddSubtractOperators(displayLevel, operandCount);
 
     if (isValidNonIntegerAddSubtractProblem(terms, operators, displayLevel, operandKind)) {
       return { terms, operators };
@@ -13349,10 +13750,391 @@ function createNonIntegerMultiplyDivideProblem(difficultyLevel, allowedOps = ['m
   return fallbacks[displayLevel];
 }
 
+function buildNonIntegerMixedProblem(terms, operators, displayLevel) {
+  const answer = normalizeSignedFraction(evaluateNonIntegerArithmeticExpression(terms, operators));
+
+  return {
+    type: 'non-integer-mixed',
+    terms,
+    operators,
+    answerNum: answer.num,
+    answerDen: answer.den,
+    answerNegative: answer.negative,
+    level: displayLevel,
+    isRetry: false,
+  };
+}
+
+function shouldUseNonIntegerCombinedMixedProblem(difficultyLevel, selectedOps) {
+  return difficultyLevel + 1 >= NON_INTEGER_COMBINED_MIXED_START_LEVEL && selectedOps.length >= 2;
+}
+
+function isValidNonIntegerCombinedProblem(terms, operators, displayLevel) {
+  if (displayLevel === NON_INTEGER_COMBINED_CROSS_OPS_DISPLAY_LEVEL
+    && !integerOperatorsCombineBothKinds(operators)) {
+    return false;
+  }
+
+  const onlyAddSubtract = operators.every((operator) => operator === 'add' || operator === 'subtract');
+
+  if (onlyAddSubtract) {
+    return isValidNonIntegerAddSubtractProblem(terms, operators, displayLevel, 'fraction');
+  }
+
+  const onlyMultiplyDivide = operators.every((operator) => operator === 'multiply' || operator === 'divide');
+
+  if (onlyMultiplyDivide) {
+    return isValidNonIntegerMultiplyDivideProblem(terms, operators);
+  }
+
+  if (terms.some((term) => term.kind !== 'fraction' || term.num === 0)) {
+    return false;
+  }
+
+  const answer = evaluateNonIntegerArithmeticExpression(terms, operators);
+  if (!answer) {
+    return false;
+  }
+
+  const normalized = normalizeSignedFraction(answer);
+  const answerValue = normalized.negative
+    ? -normalized.num / normalized.den
+    : normalized.num / normalized.den;
+
+  if (!Number.isFinite(answerValue)
+    || answerValue < NON_INTEGER_ANSWER_MIN
+    || answerValue > NON_INTEGER_ANSWER_MAX) {
+    return false;
+  }
+
+  if (normalized.num > FRACTION_ADD_ANSWER_MAX || normalized.den > FRACTION_ADD_ANSWER_MAX) {
+    return false;
+  }
+
+  if (!nonIntegerExpressionHasNegativeValue(terms) && answerValue >= 0) {
+    return false;
+  }
+
+  return true;
+}
+
+function generateNonIntegerCombinedTerms(displayLevel, selectedOps) {
+  const operandCount = pickIntegerCombinedOperandCount(displayLevel);
+  const operators = pickIntegerCombinedOperators(displayLevel, selectedOps, operandCount);
+  const onlyAddSubtract = operators.every((operator) => operator === 'add' || operator === 'subtract');
+  const onlyMultiplyDivide = operators.every((operator) => operator === 'multiply' || operator === 'divide');
+  const requiresCrossOps = displayLevel === NON_INTEGER_COMBINED_CROSS_OPS_DISPLAY_LEVEL;
+
+  if (onlyAddSubtract && !requiresCrossOps) {
+    return generateNonIntegerTerms(displayLevel, operandCount, 'fraction');
+  }
+
+  if (onlyMultiplyDivide && !requiresCrossOps) {
+    return generateNonIntegerMultiplyDivideTerms(displayLevel, ['multiply', 'divide']);
+  }
+
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const terms = Array.from({ length: operandCount }, () => createNonIntegerFractionTerm(
+      Math.random() < 0.5 ? -1 : 1,
+    ));
+
+    if (isValidNonIntegerCombinedProblem(terms, operators, displayLevel)) {
+      return { terms, operators };
+    }
+  }
+
+  return null;
+}
+
+function createNonIntegerCombinedMixedProblem(selectedOps, difficultyLevel) {
+  const displayLevel = difficultyLevel + 1;
+  const generated = generateNonIntegerCombinedTerms(displayLevel, selectedOps);
+
+  if (generated) {
+    return buildNonIntegerMixedProblem(generated.terms, generated.operators, displayLevel);
+  }
+
+  if (displayLevel === NON_INTEGER_COMBINED_CROSS_OPS_DISPLAY_LEVEL) {
+    return buildNonIntegerMixedProblem(
+      [
+        createNonIntegerFractionTerm(-1),
+        createNonIntegerFractionTerm(1),
+        createNonIntegerFractionTerm(1),
+        createNonIntegerFractionTerm(-1),
+      ],
+      ['multiply', 'subtract', 'add'],
+      displayLevel,
+    );
+  }
+
+  return buildNonIntegerMixedProblem(
+    [
+      createNonIntegerFractionTerm(-1),
+      createNonIntegerFractionTerm(1),
+      createNonIntegerFractionTerm(-1),
+    ],
+    ['multiply', 'subtract'],
+    displayLevel,
+  );
+}
+
+function createNonIntegerCombinedProblem(difficultyLevel) {
+  const selectedOps = getSelectedNonIntegerArithmeticOperations();
+
+  if (shouldUseNonIntegerCombinedMixedProblem(difficultyLevel, selectedOps)) {
+    return createNonIntegerCombinedMixedProblem(selectedOps, difficultyLevel);
+  }
+
+  const operation = pickRandomItem(selectedOps);
+
+  if (operation === 'add' || operation === 'subtract') {
+    return createNonIntegerAddSubtractProblem(difficultyLevel, [operation]);
+  }
+
+  return createNonIntegerMultiplyDivideProblem(difficultyLevel, [operation]);
+}
+
+function createNegativeNumbersCrossIntegerTerm(sign) {
+  return {
+    kind: 'integer',
+    magnitude: randomWhole(INTEGER_OPERAND_MIN, INTEGER_OPERAND_MAX),
+    sign,
+    wrapped: false,
+  };
+}
+
+function createNegativeNumbersCrossTerm(kind, sign) {
+  if (kind === 'integer') {
+    return createNegativeNumbersCrossIntegerTerm(sign);
+  }
+
+  if (kind === 'decimal') {
+    return createNonIntegerDecimalTerm(sign);
+  }
+
+  return createNonIntegerFractionTerm(sign, false, true);
+}
+
+function cloneNegativeNumbersCrossTerm(term) {
+  if (term.kind === 'integer') {
+    return {
+      kind: 'integer',
+      magnitude: term.magnitude,
+      sign: term.sign,
+      wrapped: term.wrapped ?? false,
+    };
+  }
+
+  return { ...term };
+}
+
+function rationalFromNegativeNumbersCrossTerm(term) {
+  if (term.kind === 'integer') {
+    return reduceFraction(term.sign * term.magnitude, 1);
+  }
+
+  return rationalFromNonIntegerTerm(term);
+}
+
+function evaluateNegativeNumbersCrossExpression(terms, operators) {
+  const values = terms.map(rationalFromNegativeNumbersCrossTerm);
+  const result = evaluateExpressionWithOperatorPrecedence(
+    values,
+    operators,
+    applyNonIntegerRationalBinaryOperation,
+  );
+
+  if (!result) {
+    return null;
+  }
+
+  return result;
+}
+
+function hasNegativeNumbersCrossTermMix(terms) {
+  const hasInteger = terms.some((term) => term.kind === 'integer');
+  const hasDecimal = terms.some((term) => term.kind === 'decimal');
+  const hasFraction = terms.some((term) => term.kind === 'fraction');
+
+  return hasInteger && hasDecimal && hasFraction;
+}
+
+function pickNegativeNumbersCrossTermKinds(operandCount) {
+  const termKinds = ['integer', 'decimal', 'fraction'];
+
+  while (termKinds.length < operandCount) {
+    termKinds.push(pickRandomItem(['integer', 'decimal', 'fraction']));
+  }
+
+  return shuffleArray(termKinds);
+}
+
+function isValidNegativeNumbersCrossMixedProblem(terms, operators, displayLevel) {
+  if (!hasNegativeNumbersCrossTermMix(terms)) {
+    return false;
+  }
+
+  if (displayLevel === NEGATIVE_NUMBERS_CROSS_MIXED_DISPLAY_LEVEL
+    && !integerOperatorsCombineBothKinds(operators)) {
+    return false;
+  }
+
+  if (terms.some((term) => (term.kind === 'integer' && term.magnitude === 0)
+    || (term.kind === 'fraction' && term.num === 0))) {
+    return false;
+  }
+
+  const answer = evaluateNegativeNumbersCrossExpression(terms, operators);
+  if (!answer) {
+    return false;
+  }
+
+  const normalized = normalizeSignedFraction(answer);
+  const answerValue = normalized.negative
+    ? -normalized.num / normalized.den
+    : normalized.num / normalized.den;
+
+  if (!Number.isFinite(answerValue)
+    || answerValue < NON_INTEGER_ANSWER_MIN
+    || answerValue > NON_INTEGER_ANSWER_MAX) {
+    return false;
+  }
+
+  if (normalized.num > FRACTION_ADD_ANSWER_MAX || normalized.den > FRACTION_ADD_ANSWER_MAX) {
+    return false;
+  }
+
+  const hasNegativeTerm = terms.some((term) => {
+    if (term.kind === 'integer') {
+      return getIntegerTermValue(term) < 0;
+    }
+
+    return getNonIntegerTermValue(term) < 0;
+  });
+
+  if (!hasNegativeTerm && answerValue >= 0) {
+    return false;
+  }
+
+  return true;
+}
+
+function generateNegativeNumbersCrossMixedTerms(displayLevel, selectedOps) {
+  const operandCount = pickIntegerCombinedOperandCount(displayLevel);
+  const operators = pickIntegerCombinedOperators(displayLevel, selectedOps, operandCount);
+
+  for (let attempt = 0; attempt < 300; attempt += 1) {
+    const termKinds = pickNegativeNumbersCrossTermKinds(operandCount);
+    const terms = termKinds.map((kind) => createNegativeNumbersCrossTerm(
+      kind,
+      Math.random() < 0.5 ? -1 : 1,
+    ));
+
+    if (isValidNegativeNumbersCrossMixedProblem(terms, operators, displayLevel)) {
+      return { terms, operators };
+    }
+  }
+
+  return null;
+}
+
+function buildNegativeNumbersCrossMixedProblem(terms, operators, displayLevel) {
+  const answer = normalizeSignedFraction(evaluateNegativeNumbersCrossExpression(terms, operators));
+
+  return {
+    type: 'negative-numbers-cross-mixed',
+    terms,
+    operators,
+    answerNum: answer.num,
+    answerDen: answer.den,
+    answerNegative: answer.negative,
+    level: displayLevel,
+    isRetry: false,
+  };
+}
+
+function createNegativeNumbersCrossMixedProblem(difficultyLevel) {
+  const displayLevel = difficultyLevel + 1;
+  const selectedOps = getNegativeNumbersCrossArithmeticOperations();
+  const generated = displayLevel >= NEGATIVE_NUMBERS_CROSS_MIXED_DISPLAY_LEVEL
+    ? generateNegativeNumbersCrossMixedTerms(displayLevel, selectedOps)
+    : null;
+
+  if (generated) {
+    return buildNegativeNumbersCrossMixedProblem(generated.terms, generated.operators, displayLevel);
+  }
+
+  return buildNegativeNumbersCrossMixedProblem(
+    [
+      createNegativeNumbersCrossIntegerTerm(-1),
+      createNonIntegerDecimalTerm(1),
+      createNonIntegerFractionTerm(1),
+      createNegativeNumbersCrossIntegerTerm(-1),
+    ],
+    ['multiply', 'subtract', 'add'],
+    Math.max(displayLevel, NEGATIVE_NUMBERS_CROSS_MIXED_DISPLAY_LEVEL),
+  );
+}
+
+function formatNegativeNumbersCrossTermText(term, precedingOperator = null) {
+  if (term.kind === 'integer') {
+    return formatIntegerTermText(term, precedingOperator);
+  }
+
+  return formatNonIntegerTermText(term, precedingOperator);
+}
+
+function formatNegativeNumbersCrossTermHtml(term, precedingOperator = null) {
+  if (term.kind === 'integer') {
+    return formatIntegerTermHtml(term, precedingOperator);
+  }
+
+  return formatNonIntegerTermHtml(term, precedingOperator);
+}
+
+function formatNegativeNumbersCrossMixedProblemText(problem) {
+  let text = formatNegativeNumbersCrossTermText(problem.terms[0]);
+
+  problem.operators.forEach((operator, index) => {
+    text += `${formatIntegerArithmeticOperatorSymbol(operator, true)}${formatNegativeNumbersCrossTermText(problem.terms[index + 1], operator)}`;
+  });
+
+  return `${text} =`;
+}
+
+function formatNegativeNumbersCrossMixedDisplayHtml(problem) {
+  let html = formatNegativeNumbersCrossTermHtml(problem.terms[0]);
+
+  problem.operators.forEach((operator, index) => {
+    html += `<span class="problem-expression__operator">${formatIntegerArithmeticOperatorSymbol(operator)}</span>${formatNegativeNumbersCrossTermHtml(problem.terms[index + 1], operator)}`;
+  });
+
+  return `<span class="problem-expression">${html}<span class="problem-expression__equals">=</span></span>`;
+}
+
+function formatNegativeNumbersCrossMixedPdfContent(problem) {
+  const parts = [formatPdfNegativeNumbersCrossTerm(problem.terms[0])];
+
+  problem.operators.forEach((operator, index) => {
+    parts.push(formatPdfOperator(formatIntegerArithmeticOperatorSymbol(operator)));
+    parts.push(formatPdfNegativeNumbersCrossTerm(problem.terms[index + 1], operator));
+  });
+
+  return formatPdfExpression(parts);
+}
+
+function formatPdfNegativeNumbersCrossTerm(term, precedingOperator = null) {
+  if (term.kind === 'integer') {
+    return formatPdfPlainText(formatIntegerTermText(term, precedingOperator));
+  }
+
+  return formatPdfNonIntegerTerm(term);
+}
+
 function createNonIntegerAddSubtractProblem(difficultyLevel) {
   const displayLevel = difficultyLevel + 1;
   const operandKind = pickNonIntegerProblemStyle(displayLevel);
-  const operandCount = pickIntegerOperandCount(displayLevel);
+  const operandCount = pickNonIntegerAddSubtractOperandCount(displayLevel);
   const generated = generateNonIntegerTerms(displayLevel, operandCount, operandKind);
 
   if (generated) {
@@ -13409,7 +14191,7 @@ function createNonIntegerAddSubtractProblem(difficultyLevel) {
       mixed: buildNonIntegerAddSubtractProblem(
         [
           { kind: 'decimal', magnitude: 0.5, sign: -1, wrapped: false },
-          { kind: 'fraction', num: 1, den: 4, sign: 1, wrapped: false },
+          { kind: 'fraction', num: 1, den: 2, sign: 1, wrapped: false },
           { kind: 'decimal', magnitude: 0.2, sign: -1, wrapped: false },
         ],
         ['add', 'add'],
@@ -13439,7 +14221,7 @@ function createNonIntegerAddSubtractProblem(difficultyLevel) {
       mixed: buildNonIntegerAddSubtractProblem(
         [
           { kind: 'decimal', magnitude: 0.5, sign: 1, wrapped: false },
-          { kind: 'fraction', num: 1, den: 4, sign: -1, wrapped: true },
+          { kind: 'fraction', num: 1, den: 2, sign: -1, wrapped: true },
         ],
         ['add'],
         3,
@@ -13585,7 +14367,7 @@ function formatPowerExponentText(exponent) {
 }
 
 function formatPowerExponentHtml(exponent) {
-  return `<sup>${exponent}</sup>`;
+  return `<sup>${escapeHtml(exponent)}</sup>`;
 }
 
 function powerTermNeedsParensAfterOperator(term, precedingOperator) {
@@ -15498,6 +16280,10 @@ function createProblemForExerciseMode(mode, level) {
     return createNonIntegerMultiplyDivideProblem(level);
   }
 
+  if (mode === 'non-integer-combined') {
+    return createNonIntegerCombinedProblem(level);
+  }
+
   if (mode === 'powers') {
     return createPowersProblem(level);
   }
@@ -15628,11 +16414,11 @@ function getRegimeCombinationLevelBoost(problem) {
     return 0;
   }
 
-  if (problem.type === 'decimal-fraction-mixed' || problem.type === 'cross-panel-mixed') {
+  if (problem.type === 'decimal-fraction-mixed' || problem.type === 'cross-panel-mixed' || problem.type === 'negative-numbers-cross-mixed') {
     return WITHIN_PANEL_COMBINATION_LEVEL_BOOST;
   }
 
-  if (problem.type === 'fraction-mixed' || problem.type === 'integer-mixed') {
+  if (problem.type === 'fraction-mixed' || problem.type === 'integer-mixed' || problem.type === 'non-integer-mixed') {
     return WITHIN_PANEL_COMBINATION_LEVEL_BOOST;
   }
 
@@ -16074,10 +16860,7 @@ function formatCompoundPartText(part) {
 }
 
 function formatCompoundFractionDisplayHtml(problem) {
-  const numeratorHtml = formatCompoundPartHtml(problem.numerator);
-  const denominatorHtml = formatCompoundPartHtml(problem.denominator);
-
-  return `<span class="problem-expression problem-expression--compound"><span class="fraction compound-fraction"><span class="fraction__num">${numeratorHtml}</span><span class="fraction__bar compound-fraction__main-bar" aria-hidden="true"></span><span class="fraction__den">${denominatorHtml}</span></span><span class="problem-expression__equals">=</span></span>`;
+  return formatCompoundFractionPdfRenderHtml(problem);
 }
 
 function formatCompoundFractionPdfRenderHtml(problem) {
@@ -16104,12 +16887,44 @@ function formatCrossPanelMixedTermText(term, precedingOperator = null) {
     return `${term.num}/${term.den}`;
   }
 
+  if (term.kind === 'decimal') {
+    return formatMixedTermText(term);
+  }
+
+  if (term.kind === 'integer') {
+    return formatIntegerTermText(term, precedingOperator);
+  }
+
+  if (term.kind === 'decimal-power' || term.kind === 'fraction-power') {
+    return formatNonIntegerPowerTermText(term);
+  }
+
+  if (term.kind === 'decimal-sqrt' || term.kind === 'fraction-sqrt') {
+    return formatNonIntegerSqrtTermText(term);
+  }
+
   return formatCombinedPowerSqrtTermText(term, precedingOperator);
 }
 
 function formatCrossPanelMixedTermHtml(term, precedingOperator = null) {
   if (term.kind === 'fraction') {
     return formatSingleFractionHtml(term.num, term.den);
+  }
+
+  if (term.kind === 'decimal') {
+    return formatMixedTermHtml(term);
+  }
+
+  if (term.kind === 'integer') {
+    return formatIntegerTermHtml(term, precedingOperator);
+  }
+
+  if (term.kind === 'decimal-power' || term.kind === 'fraction-power') {
+    return formatNonIntegerPowerTermHtml(term);
+  }
+
+  if (term.kind === 'decimal-sqrt' || term.kind === 'fraction-sqrt') {
+    return formatNonIntegerSqrtTermHtml(term);
   }
 
   return formatCombinedPowerSqrtTermHtml(term, precedingOperator);
@@ -16160,6 +16975,14 @@ function formatProblemText(problem) {
 
   if (problem.type === 'non-integer-multiply-divide') {
     return formatNonIntegerMultiplyDivideProblemText(problem);
+  }
+
+  if (problem.type === 'non-integer-mixed') {
+    return formatNonIntegerAddSubtractProblemText(problem);
+  }
+
+  if (problem.type === 'negative-numbers-cross-mixed') {
+    return formatNegativeNumbersCrossMixedProblemText(problem);
   }
 
   if (problem.type === 'powers') {
@@ -16329,6 +17152,14 @@ function formatProblemDisplayHtml(problem) {
 
   if (problem.type === 'non-integer-multiply-divide') {
     return formatNonIntegerMultiplyDivideDisplayHtml(problem);
+  }
+
+  if (problem.type === 'non-integer-mixed') {
+    return formatNonIntegerAddSubtractDisplayHtml(problem);
+  }
+
+  if (problem.type === 'negative-numbers-cross-mixed') {
+    return formatNegativeNumbersCrossMixedDisplayHtml(problem);
   }
 
   if (problem.type === 'powers') {
@@ -16621,7 +17452,9 @@ function recordSessionAnswer(userAnswer, isCorrect) {
     return;
   }
 
-  if (currentProblem?.type === 'non-integer-multiply-divide') {
+  if (currentProblem?.type === 'non-integer-multiply-divide'
+    || currentProblem?.type === 'non-integer-mixed'
+    || currentProblem?.type === 'negative-numbers-cross-mixed') {
     if (isNumberAnswerInputShape()) {
       sessionResults.push(createSessionResultEntry(
         formatDecimal(
@@ -16891,6 +17724,278 @@ function formatLinearEquationFractionUlohaHtml(uloha) {
   return `<span class="problem-expression problem-expression--linear-equation">${leftHtml}<span class="problem-expression__equals">=</span>${rightHtml}</span>`;
 }
 
+function splitTopLevelFractionText(text) {
+  let depth = 0;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+
+    if (char === '(') {
+      depth += 1;
+    } else if (char === ')') {
+      depth -= 1;
+    } else if (char === '/' && depth === 0) {
+      return [text.slice(0, index), text.slice(index + 1)];
+    }
+  }
+
+  return null;
+}
+
+function formatAnalysisSimpleFractionTextToHtml(text) {
+  const match = String(text).trim().match(/^(-?\d+)\/(-?\d+)$/);
+
+  if (!match) {
+    return null;
+  }
+
+  const num = Number(match[1]);
+  const den = Number(match[2]);
+
+  return formatSingleFractionHtml(Math.abs(num), Math.abs(den), num < 0);
+}
+
+function formatAnalysisPlainTermTextToHtml(text) {
+  const trimmed = String(text).trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  return `<span class="problem-expression__term">${escapeHtml(trimmed)}</span>`;
+}
+
+function formatNestedCompoundPartHtmlFromRenderedParts(numeratorHtml, denominatorHtml) {
+  return `<span class="fraction compound-fraction compound-fraction--nested"><span class="fraction__num">${numeratorHtml}</span><span class="fraction__bar" aria-hidden="true"></span><span class="fraction__den">${denominatorHtml}</span></span>`;
+}
+
+function formatAnalysisCompoundPartTextToHtml(partText) {
+  const trimmed = String(partText).trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  if (trimmed.startsWith('(') && trimmed.endsWith(')')) {
+    const inner = trimmed.slice(1, -1);
+    const nestedParts = splitTopLevelFractionText(inner);
+
+    if (nestedParts) {
+      const numeratorHtml = formatAnalysisCompoundPartTextToHtml(nestedParts[0]);
+      const denominatorHtml = formatAnalysisCompoundPartTextToHtml(nestedParts[1]);
+
+      if (numeratorHtml && denominatorHtml) {
+        return formatNestedCompoundPartHtmlFromRenderedParts(numeratorHtml, denominatorHtml);
+      }
+    }
+
+    const simpleFraction = formatAnalysisSimpleFractionTextToHtml(inner);
+
+    if (simpleFraction) {
+      return simpleFraction;
+    }
+
+    const expressionHtml = formatAnalysisExpressionTextToHtml(inner, { appendEquals: false });
+
+    if (expressionHtml) {
+      return expressionHtml;
+    }
+  }
+
+  const simpleFraction = formatAnalysisSimpleFractionTextToHtml(trimmed);
+
+  if (simpleFraction) {
+    return simpleFraction;
+  }
+
+  if (/^-?\d+$/.test(trimmed) || /^\(-?\d+\)$/.test(trimmed)) {
+    return formatAnalysisPlainTermTextToHtml(trimmed);
+  }
+
+  if (/^-?\d+,\d+$/.test(trimmed)) {
+    return formatAnalysisPlainTermTextToHtml(trimmed);
+  }
+
+  return formatAnalysisExpressionTextToHtml(trimmed, { appendEquals: false });
+}
+
+function formatAnalysisOperatorTextToHtml(operatorText) {
+  const symbol = String(operatorText).trim();
+
+  if (symbol === '+') {
+    return '<span class="problem-expression__operator">+</span>';
+  }
+
+  if (symbol === '-') {
+    return '<span class="problem-expression__operator">−</span>';
+  }
+
+  if (symbol === '·' || symbol === '*') {
+    return '<span class="problem-expression__operator">·</span>';
+  }
+
+  if (symbol === ':') {
+    return '<span class="problem-expression__operator">:</span>';
+  }
+
+  return null;
+}
+
+function splitAnalysisExpressionTokens(text) {
+  const tokens = [];
+  let current = '';
+  let depth = 0;
+
+  const pushTerm = () => {
+    const value = current.trim();
+
+    if (value) {
+      tokens.push({ type: 'term', value });
+    }
+
+    current = '';
+  };
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+
+    if (char === '(') {
+      depth += 1;
+      current += char;
+      continue;
+    }
+
+    if (char === ')') {
+      depth -= 1;
+      current += char;
+      continue;
+    }
+
+    if (depth === 0) {
+      const threeChar = text.slice(index, index + 3);
+
+      if (threeChar === ' + ' || threeChar === ' - ' || threeChar === ' · ' || threeChar === ' : ') {
+        pushTerm();
+        tokens.push({ type: 'operator', value: threeChar.trim() });
+        index += 2;
+        continue;
+      }
+    }
+
+    current += char;
+  }
+
+  pushTerm();
+  return tokens;
+}
+
+function analysisTermNeedsParensAfterOperator(termText, precedingOperator) {
+  if (!precedingOperator || precedingOperator === '·' || precedingOperator === ':') {
+    return false;
+  }
+
+  const trimmed = String(termText).trim();
+
+  if (!trimmed || trimmed.startsWith('(')) {
+    return false;
+  }
+
+  return /^-\d+\/\d+$/.test(trimmed)
+    || /^-\d+,\d+$/.test(trimmed)
+    || /^-\d+$/.test(trimmed);
+}
+
+function formatAnalysisExpressionTextToHtml(text, options = {}) {
+  const appendEquals = options.appendEquals !== false;
+  const tokens = splitAnalysisExpressionTokens(String(text).trim());
+
+  if (tokens.length === 0) {
+    return null;
+  }
+
+  if (tokens.length === 1 && tokens[0].type === 'term') {
+    return formatAnalysisCompoundPartTextToHtml(tokens[0].value);
+  }
+
+  let html = '';
+  let precedingOperator = null;
+
+  tokens.forEach((token) => {
+    if (token.type === 'operator') {
+      html += formatAnalysisOperatorTextToHtml(token.value) ?? '';
+      precedingOperator = token.value;
+      return;
+    }
+
+    let termHtml = formatAnalysisCompoundPartTextToHtml(token.value);
+
+    if (termHtml && analysisTermNeedsParensAfterOperator(token.value, precedingOperator)) {
+      termHtml = `<span class="problem-expression__term">(${termHtml})</span>`;
+    }
+
+    precedingOperator = null;
+
+    if (termHtml) {
+      html += termHtml;
+    }
+  });
+
+  if (!html) {
+    return null;
+  }
+
+  if (!appendEquals) {
+    return `<span class="problem-expression__inline-expr">${html}</span>`;
+  }
+
+  return `<span class="problem-expression">${html}<span class="problem-expression__equals">=</span></span>`;
+}
+
+function formatAnalysisCompoundFractionTextToHtml(text) {
+  const parts = splitTopLevelFractionText(String(text).trim());
+
+  if (!parts) {
+    return null;
+  }
+
+  const numeratorHtml = formatAnalysisCompoundPartTextToHtml(parts[0]);
+  const denominatorHtml = formatAnalysisCompoundPartTextToHtml(parts[1]);
+
+  if (!numeratorHtml || !denominatorHtml) {
+    return null;
+  }
+
+  return `<span class="problem-expression problem-expression--compound problem-expression--compound-flat"><span class="compound-fraction-flat__num">${numeratorHtml}</span><span class="compound-fraction-flat__bar" aria-hidden="true"></span><span class="compound-fraction-flat__den">${denominatorHtml}</span><span class="problem-expression__equals">=</span></span>`;
+}
+
+function formatAnalysisProblemTextToHtml(uloha) {
+  const text = String(uloha).trim().replace(/\s+=\s*$/, '');
+
+  if (!text) {
+    return '';
+  }
+
+  const compoundHtml = formatAnalysisCompoundFractionTextToHtml(text);
+
+  if (compoundHtml) {
+    return compoundHtml;
+  }
+
+  const expressionHtml = formatAnalysisExpressionTextToHtml(text);
+
+  if (expressionHtml) {
+    return expressionHtml;
+  }
+
+  const simpleFraction = formatAnalysisSimpleFractionTextToHtml(text);
+
+  if (simpleFraction) {
+    return `<span class="problem-expression">${simpleFraction}<span class="problem-expression__equals">=</span></span>`;
+  }
+
+  return '';
+}
+
 function reconstructAnalysisProblemHtml(uloha, modes = []) {
   const isLinearEquationFractionMode = modes.some((mode) => mode === LINEAR_EQUATION_FRACTION_APP_TITLE
     || mode === 'Lineární rovnice se zlomky'
@@ -16903,7 +18008,7 @@ function reconstructAnalysisProblemHtml(uloha, modes = []) {
     }
   }
 
-  return '';
+  return formatAnalysisProblemTextToHtml(uloha);
 }
 
 function buildAnalysisSharePayload() {
@@ -18075,6 +19180,14 @@ function getProblemAnswerPdfRenderHtml(problem) {
     return formatSingleFractionHtml(problem.answerNum, problem.answerDen, problem.answerNegative);
   }
 
+  if (problem?.type === 'non-integer-mixed') {
+    return formatSingleFractionHtml(problem.answerNum, problem.answerDen, problem.answerNegative);
+  }
+
+  if (problem?.type === 'negative-numbers-cross-mixed') {
+    return formatSingleFractionHtml(problem.answerNum, problem.answerDen, problem.answerNegative);
+  }
+
   if (problem?.type === 'non-integer-powers' || problem?.type === 'non-integer-sqrt') {
     if (problem.answerKind !== 'decimal') {
       const correctFraction = problem.type === 'non-integer-powers'
@@ -18431,6 +19544,22 @@ function formatProblemCorrectAnswer(problem) {
     });
   }
 
+  if (problem?.type === 'non-integer-mixed') {
+    return formatSignedFractionText({
+      num: problem.answerNum,
+      den: problem.answerDen,
+      negative: problem.answerNegative,
+    });
+  }
+
+  if (problem?.type === 'negative-numbers-cross-mixed') {
+    return formatSignedFractionText({
+      num: problem.answerNum,
+      den: problem.answerDen,
+      negative: problem.answerNegative,
+    });
+  }
+
   if (problem?.type === 'non-integer-powers' || problem?.type === 'non-integer-sqrt') {
     const correctFraction = problem.type === 'non-integer-powers'
       ? getNonIntegerPowersCorrectFraction(problem)
@@ -18454,11 +19583,88 @@ function getWorksheetProblemKey(problem) {
   return `${formatWorksheetProblemText(problem)}|${formatProblemCorrectAnswer(problem)}`;
 }
 
-function createWorksheetProblem(resolvedMode, internalLevel) {
+function captureExerciseStateForWorksheetPdf() {
+  return {
+    activeExerciseMode,
+    activeExerciseModePool: [...activeExerciseModePool],
+    multiModeIndividualQueue: [...multiModeIndividualQueue],
+    multiModeWithinPanelQueue: [...multiModeWithinPanelQueue],
+  };
+}
+
+function prepareExerciseStateForWorksheetPdf(resolvedMode) {
+  activeExerciseMode = resolvedMode;
+  activeExerciseModePool = resolvedMode === 'multi-mode'
+    ? buildExerciseModePool()
+    : [resolvedMode];
+
   if (resolvedMode === 'multi-mode') {
+    initMultiModeProgress();
+  }
+}
+
+function restoreExerciseStateForWorksheetPdf(saved) {
+  activeExerciseMode = saved.activeExerciseMode;
+  activeExerciseModePool = saved.activeExerciseModePool;
+  multiModeIndividualQueue = saved.multiModeIndividualQueue;
+  multiModeWithinPanelQueue = saved.multiModeWithinPanelQueue;
+}
+
+function isWorksheetTopCombinationPdfSlot(slotIndex) {
+  if (resolveActiveExerciseMode() !== 'multi-mode') {
+    return false;
+  }
+
+  const maxInternal = getWorksheetMaxInternalLevel();
+  if (maxInternal < USER_VISIBLE_LEVEL_THRESHOLD) {
+    return false;
+  }
+
+  return slotIndex >= USER_VISIBLE_LEVEL_THRESHOLD;
+}
+
+function canGenerateWorksheetCombinationProblem() {
+  return canUseMultiModeWithinPanelCombination() || hasMultiModeCrossPanelCombination();
+}
+
+function createWorksheetMultiModeCombinationProblem(internalLevel) {
+  const difficultyLevel = Math.min(internalLevel, getMultiModeIndividualMaxDifficulty());
+  const canWithin = canUseMultiModeWithinPanelCombination();
+  const canCross = hasMultiModeCrossPanelCombination();
+
+  if (canWithin && canCross) {
+    return Math.random() < 0.5
+      ? createMultiModeCrossPanelProblemAtLevel(difficultyLevel)
+      : createMultiModeWithinPanelProblemAtLevel(pickWithinPanelForNextProblem(), difficultyLevel);
+  }
+
+  if (canCross) {
+    return createMultiModeCrossPanelProblemAtLevel(difficultyLevel);
+  }
+
+  if (canWithin) {
+    return createMultiModeWithinPanelProblemAtLevel(pickWithinPanelForNextProblem(), difficultyLevel);
+  }
+
+  return null;
+}
+
+function createWorksheetProblem(resolvedMode, internalLevel, slotIndex = null) {
+  if (resolvedMode === 'multi-mode') {
+    if (slotIndex != null
+      && isWorksheetTopCombinationPdfSlot(slotIndex)
+      && canGenerateWorksheetCombinationProblem()
+      && Math.random() < 0.35) {
+      const combined = createWorksheetMultiModeCombinationProblem(internalLevel);
+      if (combined) {
+        return combined;
+      }
+    }
+
     const pool = buildExerciseModePool();
     const mode = pool[Math.floor(Math.random() * pool.length)];
-    return createProblemForExerciseMode(mode, internalLevel);
+    const clampedLevel = Math.min(internalLevel, getMaxDifficultyLevelForMode(mode));
+    return createProblemForExerciseMode(mode, clampedLevel);
   }
 
   return createProblemForExerciseMode(resolvedMode, internalLevel);
@@ -18471,7 +19677,7 @@ function createWorksheetProblemForPdfSlot(resolvedMode, slotIndex) {
   }
 
   const internalLevel = levels[Math.floor(Math.random() * levels.length)];
-  return createWorksheetProblem(resolvedMode, internalLevel);
+  return createWorksheetProblem(resolvedMode, internalLevel, slotIndex);
 }
 
 function generateUniqueWorksheetProblemsForSlot(resolvedMode, slotIndex, count) {
@@ -18482,6 +19688,10 @@ function generateUniqueWorksheetProblemsForSlot(resolvedMode, slotIndex, count) 
 
   for (let attempt = 0; problems.length < count && attempt < maxAttempts; attempt += 1) {
     const problem = createWorksheetProblemForPdfSlot(resolvedMode, slotIndex);
+    if (!problem) {
+      continue;
+    }
+
     const key = getWorksheetProblemKey(problem);
 
     if (seen.has(key)) {
@@ -18539,7 +19749,7 @@ async function buildWorksheetData() {
       let pdfContent = formatWorksheetProblemPdfContent(problem);
       let pdfAnswer = formatWorksheetAnswerPdfContent(problem);
 
-      if (usePdfImages) {
+      if (shouldRenderWorksheetProblemAsPdfImage(problem)) {
         try {
           pdfContent = await renderProblemPdfImage(problem);
           pdfAnswer = await renderProblemAnswerPdfImage(problem);
@@ -18565,6 +19775,99 @@ async function buildWorksheetData() {
     modes: captureSessionModeSelection(),
     sections,
   };
+}
+
+function buildCombinationDemoWorksheetData() {
+  const difficultyLevel = getMultiModeIndividualMaxDifficulty();
+  const demoEntries = [
+    {
+      label: 'Desetinná + zlomky',
+      enabled: () => getSelectedOperations().length > 0 && getSelectedFractionOperations().length > 0,
+      create: () => createDecimalFractionCrossPanelProblem(difficultyLevel),
+    },
+    {
+      label: 'Zlomky + mocniny a odmocniny',
+      enabled: () => getSelectedFractionOperations().length > 0 && hasPowersPanelSelection(),
+      create: () => createFractionPowersCrossPanelProblem(difficultyLevel),
+    },
+    {
+      label: 'Celá + necelá čísla',
+      enabled: () => hasNegativeNumbersCrossTypeCombination(),
+      create: () => createNegativeNumbersCrossMixedProblem(difficultyLevel),
+    },
+    {
+      label: 'Desetinná + celá čísla',
+      enabled: () => getSelectedOperations().length > 0 && getSelectedIntegerModes().length > 0,
+      create: () => createDecimalIntegerCrossPanelProblem(difficultyLevel),
+    },
+    {
+      label: 'Desetinná + mocniny a odmocniny',
+      enabled: () => getSelectedOperations().length > 0 && hasPowersPanelSelection(),
+      create: () => createDecimalPowersCrossPanelProblem(difficultyLevel),
+    },
+    {
+      label: 'Celá čísla + zlomky',
+      enabled: () => getSelectedIntegerModes().length > 0 && getSelectedFractionOperations().length > 0,
+      create: () => createIntegerFractionCrossPanelProblem(difficultyLevel),
+    },
+    {
+      label: 'Celá čísla + mocniny a odmocniny',
+      enabled: () => getSelectedIntegerModes().length > 0 && hasPowersPanelSelection(),
+      create: () => createIntegerPowersCrossPanelProblem(difficultyLevel),
+    },
+  ].filter((entry) => entry.enabled());
+
+  const items = [];
+
+  demoEntries.forEach((entry) => {
+    const problem = entry.create();
+    if (!problem) {
+      return;
+    }
+
+    const pdfContent = formatWorksheetProblemPdfContent(problem);
+    const pdfAnswer = formatWorksheetAnswerPdfContent(problem);
+
+    items.push({
+      number: items.length + 1,
+      text: `${entry.label}: ${formatWorksheetProblemText(problem)}`,
+      answer: formatProblemCorrectAnswer(problem),
+      pdfContent: {
+        stack: [
+          { text: entry.label, bold: true, margin: [0, 0, 0, 4] },
+          pdfContent,
+        ],
+      },
+      pdfAnswer,
+    });
+  });
+
+  return {
+    modes: captureSessionModeSelection(),
+    sections: items.length > 0 ? [{ level: 5, items }] : [],
+  };
+}
+
+async function buildCombinationDemoWorksheetPdfBuffer() {
+  await loadPdfMakeLibrary();
+  const worksheet = buildCombinationDemoWorksheetData();
+
+  if (worksheet.sections.length === 0) {
+    throw new Error('worksheet-empty');
+  }
+
+  return new Promise((resolve, reject) => {
+    window.pdfMake.createPdf(buildWorksheetPdfDefinition(worksheet, {
+      title: 'Procvičování matematiky — ukázka kombinací režimů',
+    })).getBuffer((buffer) => {
+      if (!buffer) {
+        reject(new Error('pdf-empty'));
+        return;
+      }
+
+      resolve(buffer);
+    }, reject);
+  });
 }
 
 const PDF_FRACTION_FONT_SIZE = 9;
@@ -18618,7 +19921,7 @@ function formatPdfEquationEquals() {
 }
 
 function formatPdfInline(parts) {
-  return { columns: parts.filter(Boolean), columnGap: 0 };
+  return { width: 'auto', columns: parts.filter(Boolean), columnGap: 0 };
 }
 
 function formatPdfExpression(parts) {
@@ -19232,18 +20535,37 @@ function formatDecimalFractionMixedPdfContent(problem) {
   return formatPdfExpression(parts);
 }
 
+function formatPdfCrossPanelTerm(term, precedingOperator = null) {
+  if (term.kind === 'fraction') {
+    return formatPdfFraction(term.num, term.den);
+  }
+
+  if (term.kind === 'decimal') {
+    return formatPdfMixedTerm(term);
+  }
+
+  if (term.kind === 'integer') {
+    return formatPdfPlainText(formatIntegerTermText(term, precedingOperator));
+  }
+
+  if (term.kind === 'decimal-power' || term.kind === 'fraction-power') {
+    return formatPdfPlainText(formatNonIntegerPowerTermText(term));
+  }
+
+  if (term.kind === 'decimal-sqrt' || term.kind === 'fraction-sqrt') {
+    return formatPdfPlainText(formatNonIntegerSqrtTermText(term));
+  }
+
+  return formatPdfPlainText(formatCrossPanelMixedTermText(term, precedingOperator));
+}
+
 function formatCrossPanelMixedPdfContent(problem) {
   const operators = getCrossPanelMixedOperators(problem);
-  const parts = [problem.terms[0].kind === 'fraction'
-    ? formatPdfFraction(problem.terms[0].num, problem.terms[0].den)
-    : formatPdfPlainText(formatCrossPanelMixedTermText(problem.terms[0]))];
+  const parts = [formatPdfCrossPanelTerm(problem.terms[0])];
 
   operators.forEach((operator, index) => {
-    const term = problem.terms[index + 1];
     parts.push(formatPdfOperator(formatIntegerArithmeticOperatorSymbol(operator)));
-    parts.push(term.kind === 'fraction'
-      ? formatPdfFraction(term.num, term.den)
-      : formatPdfPlainText(formatCrossPanelMixedTermText(term, operator)));
+    parts.push(formatPdfCrossPanelTerm(problem.terms[index + 1], operator));
   });
 
   return formatPdfExpression(parts);
@@ -19258,13 +20580,13 @@ function formatNonIntegerAddSubtractPdfContent(problem) {
       problem.terms[1],
       getNonIntegerTermValue,
     );
-    parts.push(formatPdfOperator(formatIntegerOperatorSymbol(resolved.operator)));
+    parts.push(formatPdfOperator(formatIntegerArithmeticOperatorSymbol(resolved.operator)));
     parts.push(formatPdfNonIntegerTerm(resolved.term));
     return formatPdfExpression(parts);
   }
 
   problem.operators.forEach((operator, index) => {
-    parts.push(formatPdfOperator(formatIntegerOperatorSymbol(operator)));
+    parts.push(formatPdfOperator(formatIntegerArithmeticOperatorSymbol(operator)));
     parts.push(formatPdfNonIntegerTerm(problem.terms[index + 1]));
   });
 
@@ -19274,7 +20596,7 @@ function formatNonIntegerAddSubtractPdfContent(problem) {
 function formatNonIntegerMultiplyDividePdfContent(problem) {
   const parts = [formatPdfNonIntegerTerm(problem.terms[0])];
   problem.operators.forEach((operator, index) => {
-    parts.push(formatPdfOperator(formatIntegerOperatorSymbol(operator)));
+    parts.push(formatPdfOperator(formatIntegerArithmeticOperatorSymbol(operator)));
     parts.push(formatPdfNonIntegerTerm(problem.terms[index + 1]));
   });
 
@@ -19524,6 +20846,154 @@ function formatLinearEquationFractionPdfContent(problem) {
   return formatLinearEquationFractionUlohaPdfContent(`${problem.displayLeft} = ${problem.displayRight}`);
 }
 
+function formatPdfExpressionTextPart(text) {
+  return {
+    text: String(text).replace(/-/g, '−'),
+    fontSize: PDF_FRACTION_FONT_SIZE,
+  };
+}
+
+function formatPdfPowerExponent(exponent) {
+  return {
+    text: String(exponent),
+    sup: true,
+  };
+}
+
+function appendPdfPowerTermTextParts(parts, term, precedingOperator = null) {
+  const needsOuterParens = powerTermNeedsParensAfterOperator(term, precedingOperator);
+
+  if (needsOuterParens) {
+    parts.push(formatPdfExpressionTextPart('('));
+  }
+
+  if (term.kind === 'plain') {
+    parts.push(formatPdfExpressionTextPart(term.value));
+    if (needsOuterParens) {
+      parts.push(formatPdfExpressionTextPart(')'));
+    }
+    return;
+  }
+
+  if (term.kind === 'parenthesis-power') {
+    if (term.leadingNegative) {
+      parts.push(formatPdfExpressionTextPart('−'));
+    }
+
+    parts.push(formatPdfExpressionTextPart('('));
+    parts.push(formatPdfExpressionTextPart(term.left));
+    parts.push(formatPdfExpressionTextPart(formatIntegerArithmeticOperatorSymbol(term.innerOperator)));
+    parts.push(formatPdfExpressionTextPart(term.right));
+    parts.push(formatPdfExpressionTextPart(')'));
+    parts.push(formatPdfPowerExponent(term.exponent));
+
+    if (needsOuterParens) {
+      parts.push(formatPdfExpressionTextPart(')'));
+    }
+    return;
+  }
+
+  if (term.leadingNegative) {
+    parts.push(formatPdfExpressionTextPart('−'));
+  }
+
+  if (term.wrapped) {
+    parts.push(formatPdfExpressionTextPart('('));
+
+    if (!term.leadingNegative && term.baseSign < 0) {
+      parts.push(formatPdfExpressionTextPart('−'));
+    }
+
+    parts.push(formatPdfExpressionTextPart(term.base));
+    parts.push(formatPdfExpressionTextPart(')'));
+    parts.push(formatPdfPowerExponent(term.exponent));
+  } else {
+    if (!term.leadingNegative && term.baseSign < 0) {
+      parts.push(formatPdfExpressionTextPart('−'));
+    }
+
+    parts.push(formatPdfExpressionTextPart(term.base));
+    parts.push(formatPdfPowerExponent(term.exponent));
+  }
+
+  if (needsOuterParens) {
+    parts.push(formatPdfExpressionTextPart(')'));
+  }
+}
+
+function appendPdfCombinedPowerSqrtTermTextParts(parts, term, precedingOperator = null) {
+  if (term.kind === 'sqrt') {
+    parts.push(formatPdfExpressionTextPart('√'));
+    parts.push(formatPdfExpressionTextPart(term.radicand));
+    return;
+  }
+
+  appendPdfPowerTermTextParts(parts, term, precedingOperator);
+}
+
+function formatPowersPdfContent(problem) {
+  const parts = [];
+
+  appendPdfPowerTermTextParts(parts, problem.terms[0]);
+
+  problem.operators.forEach((operator, index) => {
+    parts.push(formatPdfExpressionTextPart(formatIntegerArithmeticOperatorSymbol(operator, true)));
+    appendPdfPowerTermTextParts(parts, problem.terms[index + 1], operator);
+  });
+
+  parts.push(formatPdfExpressionTextPart(' ='));
+
+  return { width: 'auto', text: parts };
+}
+
+function formatPowersSqrtCombinedPdfContent(problem) {
+  const parts = [];
+
+  appendPdfCombinedPowerSqrtTermTextParts(parts, problem.terms[0]);
+
+  problem.operators.forEach((operator, index) => {
+    parts.push(formatPdfExpressionTextPart(formatIntegerArithmeticOperatorSymbol(operator, true)));
+    appendPdfCombinedPowerSqrtTermTextParts(parts, problem.terms[index + 1], operator);
+  });
+
+  parts.push(formatPdfExpressionTextPart(' ='));
+
+  return { width: 'auto', text: parts };
+}
+
+function formatSqrtPdfContent(problem) {
+  const parts = [];
+
+  parts.push(formatPdfExpressionTextPart('√'));
+  parts.push(formatPdfExpressionTextPart(problem.terms[0].radicand));
+
+  problem.operators.forEach((operator, index) => {
+    parts.push(formatPdfExpressionTextPart(formatIntegerArithmeticOperatorSymbol(operator, true)));
+    parts.push(formatPdfExpressionTextPart('√'));
+    parts.push(formatPdfExpressionTextPart(problem.terms[index + 1].radicand));
+  });
+
+  parts.push(formatPdfExpressionTextPart(' ='));
+
+  return { width: 'auto', text: parts };
+}
+
+function shouldRenderWorksheetProblemAsPdfImage(problem) {
+  if (!shouldUseWorksheetPdfImageRendering()) {
+    return false;
+  }
+
+  if (problem.type === 'powers'
+    || problem.type === 'sqrt'
+    || problem.type === 'powers-sqrt-combined'
+    || problem.type === 'non-integer-powers'
+    || problem.type === 'non-integer-sqrt') {
+    return false;
+  }
+
+  return true;
+}
+
 function formatWorksheetProblemPdfContent(problem) {
   if (problem.type === 'basic-form') {
     return formatPdfExpression([formatPdfFraction(problem.givenNum, problem.givenDen)]);
@@ -19569,6 +21039,14 @@ function formatWorksheetProblemPdfContent(problem) {
     return formatNonIntegerMultiplyDividePdfContent(problem);
   }
 
+  if (problem.type === 'non-integer-mixed') {
+    return formatNonIntegerAddSubtractPdfContent(problem);
+  }
+
+  if (problem.type === 'negative-numbers-cross-mixed') {
+    return formatNegativeNumbersCrossMixedPdfContent(problem);
+  }
+
   if (isCompareProblem(problem)) {
     if (problem.variant === 'sign') {
       return formatCompareSignPdfContent(problem, '');
@@ -19591,6 +21069,18 @@ function formatWorksheetProblemPdfContent(problem) {
 
   if (problem.type === 'linear-equation-fraction') {
     return formatLinearEquationFractionPdfContent(problem);
+  }
+
+  if (problem.type === 'powers') {
+    return formatPowersPdfContent(problem);
+  }
+
+  if (problem.type === 'sqrt') {
+    return formatSqrtPdfContent(problem);
+  }
+
+  if (problem.type === 'powers-sqrt-combined') {
+    return formatPowersSqrtCombinedPdfContent(problem);
   }
 
   return { text: formatWorksheetProblemText(problem) };
@@ -19617,7 +21107,7 @@ function formatWorksheetAnswerPdfContent(problem) {
     });
   }
 
-  if (problem?.type === 'non-integer-multiply-divide') {
+  if (problem?.type === 'non-integer-multiply-divide' || problem?.type === 'non-integer-mixed' || problem?.type === 'negative-numbers-cross-mixed') {
     return formatPdfSignedFraction({
       num: problem.answerNum,
       den: problem.answerDen,
@@ -19658,9 +21148,9 @@ function formatWorksheetAnswerPdfContent(problem) {
   return { text: formatProblemCorrectAnswer(problem) };
 }
 
-function buildWorksheetPdfDefinition(worksheet) {
+function buildWorksheetPdfDefinition(worksheet, options = {}) {
   const content = [
-    { text: 'Procvičování matematiky', style: 'header' },
+    { text: options.title ?? 'Procvičování matematiky', style: 'header' },
   ];
 
   if (worksheet.modes.length > 0) {
@@ -19683,7 +21173,7 @@ function buildWorksheetPdfDefinition(worksheet) {
       content.push({
         columns: [
           { width: 22, text: `${globalNumber}.`, bold: true },
-          { width: '*', ...item.pdfContent },
+          { width: 'auto', ...item.pdfContent },
         ],
         columnGap: 6,
         margin: [0, 0, 0, 8],
@@ -19712,7 +21202,7 @@ function buildWorksheetPdfDefinition(worksheet) {
       content.push({
         columns: [
           { width: 22, text: `${globalNumber}.`, bold: true },
-          { width: '*', ...item.pdfAnswer },
+          { width: 'auto', ...item.pdfAnswer },
         ],
         columnGap: 6,
         margin: [0, 0, 0, 6],
@@ -19742,6 +21232,10 @@ async function createWorksheetPdf() {
   const originalLabel = startBtn.textContent;
   startBtn.textContent = 'Generuji PDF…';
 
+  const resolvedMode = resolveActiveExerciseMode();
+  const savedExerciseState = captureExerciseStateForWorksheetPdf();
+  prepareExerciseStateForWorksheetPdf(resolvedMode);
+
   try {
     await loadPdfMakeLibrary();
     const worksheet = await buildWorksheetData();
@@ -19751,6 +21245,7 @@ async function createWorksheetPdf() {
   } catch {
     showSetupFeedback('PDF se nepodařilo vygenerovat.');
   } finally {
+    restoreExerciseStateForWorksheetPdf(savedExerciseState);
     startBtn.textContent = originalLabel;
     updateStartButton();
   }
@@ -20341,7 +21836,7 @@ function setAnswerInputMode(mode) {
     return;
   }
 
-  if (mode === 'non-integer-add-subtract' || mode === 'non-integer-multiply-divide') {
+  if (mode === 'non-integer-add-subtract' || mode === 'non-integer-multiply-divide' || mode === 'non-integer-combined') {
     fractionAnswerInputShape = 'fraction';
     updateFractionAnswerShapeUi();
     return;
@@ -20599,6 +22094,16 @@ function showProblem(problem) {
     answerNumeratorEl.maxLength = maxInputLength;
     answerDenominatorEl.maxLength = String(FRACTION_ADD_ANSWER_MAX).length;
     problemEl.innerHTML = formatNonIntegerMultiplyDivideDisplayHtml(problem);
+  } else if (problem.type === 'non-integer-mixed') {
+    const maxInputLength = String(FRACTION_ADD_ANSWER_MAX).length;
+    answerNumeratorEl.maxLength = maxInputLength;
+    answerDenominatorEl.maxLength = maxInputLength;
+    problemEl.innerHTML = formatNonIntegerAddSubtractDisplayHtml(problem);
+  } else if (problem.type === 'negative-numbers-cross-mixed') {
+    const maxInputLength = String(FRACTION_ADD_ANSWER_MAX).length;
+    answerNumeratorEl.maxLength = maxInputLength;
+    answerDenominatorEl.maxLength = maxInputLength;
+    problemEl.innerHTML = formatNegativeNumbersCrossMixedDisplayHtml(problem);
   } else if (problem.type === 'powers') {
     problemEl.innerHTML = formatPowersDisplayHtml(problem);
   } else if (problem.type === 'sqrt') {
@@ -20973,6 +22478,20 @@ function queueRetry(problem) {
     item.answerNum = problem.answerNum;
     item.answerDen = problem.answerDen;
     item.answerNegative = problem.answerNegative;
+  } else if (problem.type === 'non-integer-mixed') {
+    item.type = 'non-integer-mixed';
+    item.terms = problem.terms.map((term) => ({ ...term }));
+    item.operators = [...problem.operators];
+    item.answerNum = problem.answerNum;
+    item.answerDen = problem.answerDen;
+    item.answerNegative = problem.answerNegative;
+  } else if (problem.type === 'negative-numbers-cross-mixed') {
+    item.type = 'negative-numbers-cross-mixed';
+    item.terms = problem.terms.map(cloneNegativeNumbersCrossTerm);
+    item.operators = [...problem.operators];
+    item.answerNum = problem.answerNum;
+    item.answerDen = problem.answerDen;
+    item.answerNegative = problem.answerNegative;
   } else if (problem.type === 'non-integer-powers') {
     item.type = 'non-integer-powers';
     item.terms = problem.terms.map((term) => ({ ...term }));
@@ -21234,6 +22753,32 @@ function pickNextProblem() {
       return {
         type: 'non-integer-multiply-divide',
         terms: dueRetry.terms.map((term) => ({ ...term })),
+        operators: [...dueRetry.operators],
+        answerNum: dueRetry.answerNum,
+        answerDen: dueRetry.answerDen,
+        answerNegative: dueRetry.answerNegative,
+        level: dueRetry.level,
+        isRetry: true,
+      };
+    }
+
+    if (dueRetry.type === 'non-integer-mixed') {
+      return {
+        type: 'non-integer-mixed',
+        terms: dueRetry.terms.map((term) => ({ ...term })),
+        operators: [...dueRetry.operators],
+        answerNum: dueRetry.answerNum,
+        answerDen: dueRetry.answerDen,
+        answerNegative: dueRetry.answerNegative,
+        level: dueRetry.level,
+        isRetry: true,
+      };
+    }
+
+    if (dueRetry.type === 'negative-numbers-cross-mixed') {
+      return {
+        type: 'negative-numbers-cross-mixed',
+        terms: dueRetry.terms.map(cloneNegativeNumbersCrossTerm),
         operators: [...dueRetry.operators],
         answerNum: dueRetry.answerNum,
         answerDen: dueRetry.answerDen,
@@ -21940,7 +23485,9 @@ formEl.addEventListener('submit', (event) => {
     return;
   }
 
-  if (currentProblem?.type === 'non-integer-multiply-divide') {
+  if (currentProblem?.type === 'non-integer-multiply-divide'
+    || currentProblem?.type === 'non-integer-mixed'
+    || currentProblem?.type === 'negative-numbers-cross-mixed') {
     if (isNumberAnswerInputShape()) {
       const userValue = parseAnswer(inputEl.value);
       if (userValue === null) {
