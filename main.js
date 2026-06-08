@@ -57,7 +57,8 @@ const setupAssignmentOptionsEl = document.getElementById('setup-assignment-optio
 const setupPdfOptionsEl = document.getElementById('setup-pdf-options');
 const pdfLevelCountsEl = document.getElementById('pdf-level-counts');
 const assignmentCountInputEl = document.getElementById('assignment-count-input');
-const assignmentLevelPickersEl = document.getElementById('assignment-level-pickers');
+const setupExerciseLevelOptionsEl = document.getElementById('setup-exercise-level-options');
+const exerciseLevelPickersEl = document.getElementById('exercise-level-pickers');
 const assignmentLinkFeedbackEl = document.getElementById('assignment-link-feedback');
 const assignmentLinkWrapEl = document.getElementById('assignment-link-wrap');
 const assignmentLinkInputEl = document.getElementById('assignment-link-input');
@@ -391,7 +392,7 @@ let lastPickedWithinPanel = null;
 let currentAnswerInputMode = null;
 let viewingSharedAnalysis = false;
 let activeAssignmentConfig = null;
-let assignmentMinDifficultyLevel = null;
+let exerciseMinDifficultyLevel = null;
 let pendingAssignmentDepotId = null;
 let awaitingAssignmentSubmission = false;
 let activeDepotId = null;
@@ -1019,6 +1020,10 @@ function updateSetupCategoryUi() {
     setupPdfOptionsEl.hidden = !pdf;
   }
 
+  if (setupExerciseLevelOptionsEl) {
+    setupExerciseLevelOptionsEl.hidden = pdf;
+  }
+
   updatePdfSetupUi();
 
   startBtn.textContent = assignment ? 'Vytvořit úkol' : pdf ? 'Vytvořit PDF' : 'Spustit';
@@ -1055,9 +1060,8 @@ function handleCreatePdfChange() {
 function updatePdfSetupUi() {
   if (isPdfSetupCategory()) {
     renderPdfLevelCountInputs();
-  }
-  if (isAssignmentSetupCategory()) {
-    renderAssignmentLevelPickers();
+  } else {
+    renderExerciseLevelPickers();
   }
   updateStartButton();
 }
@@ -1082,7 +1086,7 @@ function hideAssignmentLinkUi() {
   }
   hideAssignmentLinkQrCode();
   setAssignmentCountInputLocked(false);
-  setAssignmentLevelPickersLocked(false);
+  setExerciseLevelPickersLocked(false);
 }
 
 function hideAssignmentLinkQrCode() {
@@ -1182,12 +1186,12 @@ function setAssignmentCountInputLocked(locked) {
   assignmentCountInputEl.disabled = locked;
 }
 
-function setAssignmentLevelPickersLocked(locked) {
-  if (!assignmentLevelPickersEl) {
+function setExerciseLevelPickersLocked(locked) {
+  if (!exerciseLevelPickersEl) {
     return;
   }
 
-  assignmentLevelPickersEl.querySelectorAll('button').forEach((button) => {
+  exerciseLevelPickersEl.querySelectorAll('button').forEach((button) => {
     button.disabled = locked;
   });
 }
@@ -1715,13 +1719,15 @@ function getSetupStartBlockReason() {
     if (!Number.isInteger(count) || count < 1 || count > 200) {
       return 'Zadej počet úloh od 1 do 200.';
     }
+  }
 
+  if (!isPdfSetupCategory()) {
     const levelCount = getWorksheetSetupLevelCount();
     if (levelCount === 0) {
       return 'Vyber alespoň jeden režim procvičování.';
     }
 
-    const { startDisplayLevel, minDisplayLevel } = readAssignmentLevelSettings();
+    const { startDisplayLevel, minDisplayLevel } = readExerciseLevelSettings();
     if (startDisplayLevel < 1 || startDisplayLevel > levelCount) {
       return 'Vyber platnou počáteční úroveň.';
     }
@@ -18575,17 +18581,17 @@ function getAssignmentProblemCount() {
   return Math.trunc(value);
 }
 
-function readStoredAssignmentLevelSelection() {
+function readStoredExerciseLevelSelection() {
   const levelCount = getWorksheetSetupLevelCount();
   const fallbackStart = 1;
   const fallbackMin = 1;
 
-  if (!assignmentLevelPickersEl) {
+  if (!exerciseLevelPickersEl) {
     return { start: fallbackStart, min: fallbackMin };
   }
 
-  const start = Number(assignmentLevelPickersEl.dataset.startLevel);
-  const min = Number(assignmentLevelPickersEl.dataset.minLevel);
+  const start = Number(exerciseLevelPickersEl.dataset.startLevel);
+  const min = Number(exerciseLevelPickersEl.dataset.minLevel);
   const resolvedStart = Number.isInteger(start) && start >= 1
     ? start
     : fallbackStart;
@@ -18603,8 +18609,8 @@ function readStoredAssignmentLevelSelection() {
   return { start: clampedStart, min: clampedMin };
 }
 
-function readAssignmentLevelSettings() {
-  const { start, min } = readStoredAssignmentLevelSelection();
+function readExerciseLevelSettings() {
+  const { start, min } = readStoredExerciseLevelSelection();
 
   return {
     startDisplayLevel: start,
@@ -18612,7 +18618,7 @@ function readAssignmentLevelSettings() {
   };
 }
 
-function renderAssignmentLevelPickerGroup(kind, label, selectedLevel, maxLevel) {
+function renderExerciseLevelPickerGroup(kind, label, selectedLevel, maxLevel) {
   const buttons = Array.from({ length: maxLevel }, (_, index) => {
     const level = index + 1;
     const selected = level === selectedLevel;
@@ -18620,7 +18626,7 @@ function renderAssignmentLevelPickerGroup(kind, label, selectedLevel, maxLevel) 
     return `<button
       type="button"
       class="setup-assignment-level__btn${selected ? ' setup-assignment-level__btn--selected' : ''}"
-      data-assignment-level="${kind}"
+      data-exercise-level="${kind}"
       data-level="${level}"
       aria-pressed="${selected ? 'true' : 'false'}"
     >${level}</button>`;
@@ -18632,59 +18638,59 @@ function renderAssignmentLevelPickerGroup(kind, label, selectedLevel, maxLevel) 
   </div>`;
 }
 
-function handleAssignmentLevelButtonClick(button) {
-  if (!assignmentLevelPickersEl || button.disabled) {
+function handleExerciseLevelButtonClick(button) {
+  if (!exerciseLevelPickersEl || button.disabled) {
     return;
   }
 
-  const kind = button.dataset.assignmentLevel;
+  const kind = button.dataset.exerciseLevel;
   const level = Number(button.dataset.level);
   if (!kind || !Number.isInteger(level) || level < 1) {
     return;
   }
 
-  const current = readStoredAssignmentLevelSelection();
+  const current = readStoredExerciseLevelSelection();
   if (kind === 'start') {
-    assignmentLevelPickersEl.dataset.startLevel = String(level);
-    assignmentLevelPickersEl.dataset.minLevel = String(Math.min(current.min, level));
+    exerciseLevelPickersEl.dataset.startLevel = String(level);
+    exerciseLevelPickersEl.dataset.minLevel = String(Math.min(current.min, level));
   } else {
-    assignmentLevelPickersEl.dataset.minLevel = String(level);
-    assignmentLevelPickersEl.dataset.startLevel = String(current.start);
+    exerciseLevelPickersEl.dataset.minLevel = String(level);
+    exerciseLevelPickersEl.dataset.startLevel = String(current.start);
   }
 
-  renderAssignmentLevelPickers();
+  renderExerciseLevelPickers();
   hideAssignmentLinkUi();
   updateStartButton();
 }
 
-function renderAssignmentLevelPickers() {
-  if (!assignmentLevelPickersEl) {
+function renderExerciseLevelPickers() {
+  if (!exerciseLevelPickersEl) {
     return;
   }
 
   const levelCount = getWorksheetSetupLevelCount();
-  const { start, min } = readStoredAssignmentLevelSelection();
-  assignmentLevelPickersEl.dataset.startLevel = String(start);
-  assignmentLevelPickersEl.dataset.minLevel = String(min);
+  const { start, min } = readStoredExerciseLevelSelection();
+  exerciseLevelPickersEl.dataset.startLevel = String(start);
+  exerciseLevelPickersEl.dataset.minLevel = String(min);
 
   if (levelCount === 0) {
-    assignmentLevelPickersEl.innerHTML = '';
+    exerciseLevelPickersEl.innerHTML = '';
     return;
   }
 
-  assignmentLevelPickersEl.innerHTML = `<div class="setup-assignment-options__levels">
-    ${renderAssignmentLevelPickerGroup('start', 'Počáteční úroveň', start, levelCount)}
-    ${renderAssignmentLevelPickerGroup('min', 'Minimální úroveň', min, start)}
+  exerciseLevelPickersEl.innerHTML = `<div class="setup-assignment-options__levels">
+    ${renderExerciseLevelPickerGroup('start', 'Počáteční úroveň', start, levelCount)}
+    ${renderExerciseLevelPickerGroup('min', 'Minimální úroveň', min, start)}
   </div>`;
 
-  assignmentLevelPickersEl.querySelectorAll('button').forEach((button) => {
+  exerciseLevelPickersEl.querySelectorAll('button').forEach((button) => {
     button.addEventListener('click', () => {
-      handleAssignmentLevelButtonClick(button);
+      handleExerciseLevelButtonClick(button);
     });
   });
 }
 
-function displayLevelToAssignmentInternalLevel(displayLevel) {
+function displayLevelToExerciseInternalLevel(displayLevel) {
   const slotIndex = displayLevel - 1;
   const levels = getWorksheetInternalLevelsForPdfSlot(slotIndex);
   if (levels.length === 0) {
@@ -18694,7 +18700,7 @@ function displayLevelToAssignmentInternalLevel(displayLevel) {
   return levels[0];
 }
 
-function normalizeAssignmentLevelSettings(config) {
+function normalizeExerciseLevelSettings(config) {
   const levelCount = getWorksheetPdfLevelSlotCount();
   const fallbackStart = 1;
   const fallbackMin = 1;
@@ -18710,21 +18716,30 @@ function normalizeAssignmentLevelSettings(config) {
   return { startDisplayLevel, minDisplayLevel };
 }
 
-function applyAssignmentLevelSettings() {
+function applyExerciseLevelSettings(levelSettings) {
+  const { startDisplayLevel, minDisplayLevel } = normalizeExerciseLevelSettings(levelSettings);
+  difficultyLevel = displayLevelToExerciseInternalLevel(startDisplayLevel);
+  exerciseMinDifficultyLevel = displayLevelToExerciseInternalLevel(minDisplayLevel);
+}
+
+function applyExerciseLevelSettingsFromSetup() {
+  applyExerciseLevelSettings(readExerciseLevelSettings());
+}
+
+function applyExerciseLevelSettingsFromAssignment() {
   if (!isAssignmentExercise() || !activeAssignmentConfig) {
-    assignmentMinDifficultyLevel = null;
+    exerciseMinDifficultyLevel = null;
     return;
   }
 
-  const { startDisplayLevel, minDisplayLevel } = normalizeAssignmentLevelSettings(activeAssignmentConfig);
-  activeAssignmentConfig.startDisplayLevel = startDisplayLevel;
-  activeAssignmentConfig.minDisplayLevel = minDisplayLevel;
-  difficultyLevel = displayLevelToAssignmentInternalLevel(startDisplayLevel);
-  assignmentMinDifficultyLevel = displayLevelToAssignmentInternalLevel(minDisplayLevel);
+  const normalized = normalizeExerciseLevelSettings(activeAssignmentConfig);
+  activeAssignmentConfig.startDisplayLevel = normalized.startDisplayLevel;
+  activeAssignmentConfig.minDisplayLevel = normalized.minDisplayLevel;
+  applyExerciseLevelSettings(normalized);
 }
 
 function buildAssignmentSharePayload() {
-  const { startDisplayLevel, minDisplayLevel } = readAssignmentLevelSettings();
+  const { startDisplayLevel, minDisplayLevel } = readExerciseLevelSettings();
 
   return {
     t: 'assignment',
@@ -18911,7 +18926,7 @@ async function createAssignmentLink() {
     }
     assignmentLinkFeedbackEl.hidden = false;
     setAssignmentCountInputLocked(true);
-    setAssignmentLevelPickersLocked(true);
+    setExerciseLevelPickersLocked(true);
   } catch (error) {
     if (error.message === 'missing-config') {
       assignmentLinkFeedbackEl.textContent = getSupabaseConfigHelpMessage();
@@ -23578,7 +23593,7 @@ function clearActiveAssignment() {
 
 function resetProgress() {
   difficultyLevel = 0;
-  assignmentMinDifficultyLevel = null;
+  exerciseMinDifficultyLevel = null;
   correctStreak = 0;
   retryQueue = [];
   currentProblem = null;
@@ -23629,8 +23644,8 @@ function handleCorrectAnswer() {
 function handleWrongAnswer() {
   correctStreak = 0;
 
-  const minLevel = isAssignmentExercise() && assignmentMinDifficultyLevel !== null
-    ? assignmentMinDifficultyLevel
+  const minLevel = exerciseMinDifficultyLevel !== null
+    ? exerciseMinDifficultyLevel
     : 0;
 
   if (difficultyLevel > minLevel) {
@@ -23718,7 +23733,9 @@ function showExerciseScreen({ fromAssignment = false } = {}) {
     ? buildExerciseModePool()
     : [resolvedMode];
   if (fromAssignment) {
-    applyAssignmentLevelSettings();
+    applyExerciseLevelSettingsFromAssignment();
+  } else {
+    applyExerciseLevelSettingsFromSetup();
   }
   if (activeExerciseMode === 'multi-mode') {
     initMultiModeProgress();

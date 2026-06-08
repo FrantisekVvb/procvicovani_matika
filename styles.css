@@ -217,16 +217,13 @@ body {
   max-width: 120px;
 }
 
-.setup-assignment-options__row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px 20px;
-  align-items: flex-start;
-}
-
-.setup-assignment-options__levels-wrap {
-  flex: 1 1 220px;
-  min-width: 0;
+.setup-exercise-level-options {
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  background: #f5f5f5;
+  padding: 12px 14px;
+  margin-bottom: 24px;
+  text-align: left;
 }
 
 .setup-assignment-options__levels {
