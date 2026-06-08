@@ -217,6 +217,68 @@ body {
   max-width: 120px;
 }
 
+.setup-assignment-options__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 20px;
+  align-items: flex-start;
+}
+
+.setup-assignment-options__levels-wrap {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.setup-assignment-options__levels {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.setup-assignment-level {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.setup-assignment-level__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.setup-assignment-level__btn {
+  min-width: 2.25rem;
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.875rem;
+  line-height: 1.2;
+  background: #fff;
+  color: inherit;
+  cursor: pointer;
+}
+
+.setup-assignment-level__btn:hover:not(:disabled) {
+  border-color: #999;
+  background: #fafafa;
+}
+
+.setup-assignment-level__btn--selected {
+  border-color: #0969da;
+  background: #ddf4ff;
+  color: #0550ae;
+  font-weight: 600;
+}
+
+.setup-assignment-level__btn:disabled {
+  color: #888;
+  background: #ececec;
+  border-color: #ddd;
+  cursor: not-allowed;
+}
+
 .setup-pdf-options__intro {
   font-size: 0.875rem;
   line-height: 1.35;

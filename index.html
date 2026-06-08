@@ -271,19 +271,22 @@
       </label>
 
       <div class="setup-assignment-options" id="setup-assignment-options" hidden>
-        <label class="setup-assignment-options__field setup-assignment-options__field--count">
-          <span class="setup-assignment-options__label">Počet úloh</span>
-          <input
-            class="setup-assignment-options__input setup-assignment-options__input--count"
-            id="assignment-count-input"
-            type="number"
-            inputmode="numeric"
-            min="1"
-            max="200"
-            value="10"
-            required
-          >
-        </label>
+        <div class="setup-assignment-options__row">
+          <label class="setup-assignment-options__field setup-assignment-options__field--count">
+            <span class="setup-assignment-options__label">Počet úloh</span>
+            <input
+              class="setup-assignment-options__input setup-assignment-options__input--count"
+              id="assignment-count-input"
+              type="number"
+              inputmode="numeric"
+              min="1"
+              max="200"
+              value="10"
+              required
+            >
+          </label>
+          <div class="setup-assignment-options__levels-wrap" id="assignment-level-pickers"></div>
+        </div>
         <p class="setup-feedback setup-assignment-options__feedback" id="assignment-link-feedback" hidden aria-live="polite"></p>
         <div class="analysis__link-wrap setup-assignment-options__link-wrap" id="assignment-link-wrap" hidden>
           <label class="analysis__link-label" for="assignment-link-input">Odkaz na úkol</label>
