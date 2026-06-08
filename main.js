@@ -128,6 +128,8 @@ const LINEAR_EQUATION_INFINITE_SOLUTION_LABEL = 'libovolné číslo';
 const POWER_MAX_LEVEL = 4;
 const POWER_SQUARE_BASE_MAX = 15;
 const POWER_HIGH_EXP_BASE_MAX = 5;
+const POWER_LARGE_BASE_THRESHOLD = 2;
+const POWER_LARGE_BASE_MAX_EXPONENT = 3;
 const POWER_ANSWER_MIN = -1000;
 const POWER_ANSWER_MAX = 1000;
 const POWER_PAREN_OPERAND_MAX = 9;
@@ -1641,16 +1643,12 @@ function buildMultiModeIndividualIntegerModes() {
 function buildExerciseModePool() {
   const pool = [];
 
-  if (hasPowersSqrtCombinedSelection()) {
-    pool.push('powers-sqrt-combined');
-  } else {
-    if (hasPowersMode()) {
-      pool.push('powers');
-    }
+  if (hasPowersMode()) {
+    pool.push('powers');
+  }
 
-    if (hasSqrtMode()) {
-      pool.push('sqrt');
-    }
+  if (hasSqrtMode()) {
+    pool.push('sqrt');
   }
 
   if (hasNonIntegerPowersMode()) {
@@ -8256,6 +8254,18 @@ function formatCompareOrderListText(problem, order) {
     .join('; ');
 }
 
+function formatCompareOrderPdfRenderHtml(problem, options = {}) {
+  const order = options.order ?? problem.displayOrder ?? shuffleIndices(problem.operands.length);
+  const items = order.map((index) => (
+    `<span class="pdf-compare-order__item">${formatCompareOperandHtml(problem, problem.operands[index])}</span>`
+  )).join('<span class="pdf-compare-order__sep" aria-hidden="true">;</span>');
+  const label = options.omitLabel
+    ? ''
+    : '<span class="pdf-compare-order__label">Uspořádej:</span>';
+
+  return `<span class="problem-expression problem-expression--compare-order">${label}<span class="pdf-compare-order__list">${items}</span></span>`;
+}
+
 function formatCompareProblemText(problem) {
   if (problem.variant === 'sign') {
     return formatCompareSignText(problem, '?');
@@ -10970,14 +10980,56 @@ function hasMultiModeCrossPanelCombination() {
   return false;
 }
 
+function modeSupportsMultiModeDifficultyLevel(mode, level) {
+  return level <= getMaxDifficultyLevelForMode(mode);
+}
+
+function hasAnyMultiModeIndividualModeAtLevel(level) {
+  return multiModeIndividualQueue.some((mode) => modeSupportsMultiModeDifficultyLevel(mode, level));
+}
+
+function initMultiModeFocusedModeIndexAtCurrentLevel() {
+  multiModeFocusedModeIndex = 0;
+
+  while (multiModeFocusedModeIndex < multiModeIndividualQueue.length
+    && !modeSupportsMultiModeDifficultyLevel(
+      multiModeIndividualQueue[multiModeFocusedModeIndex],
+      difficultyLevel,
+    )) {
+    multiModeFocusedModeIndex += 1;
+  }
+}
+
+function advanceMultiModeIndividualProgress() {
+  let nextIndex = multiModeFocusedModeIndex + 1;
+
+  while (nextIndex < multiModeIndividualQueue.length
+    && !modeSupportsMultiModeDifficultyLevel(multiModeIndividualQueue[nextIndex], difficultyLevel)) {
+    nextIndex += 1;
+  }
+
+  if (nextIndex < multiModeIndividualQueue.length) {
+    multiModeFocusedModeIndex = nextIndex;
+    return;
+  }
+
+  difficultyLevel += 1;
+  initMultiModeFocusedModeIndexAtCurrentLevel();
+
+  if (!hasAnyMultiModeIndividualModeAtLevel(difficultyLevel)) {
+    difficultyLevel = getMultiModeIndividualMaxDifficulty();
+    advanceMultiModePhaseAfterIndividualComplete();
+  }
+}
+
 function initMultiModeProgress() {
   multiModePhase = MULTI_MODE_PHASE.INDIVIDUAL;
   multiModeIndividualQueue = buildMultiModeIndividualQueue();
   multiModeWithinPanelQueue = buildMultiModeWithinPanelQueue();
-  multiModeFocusedModeIndex = 0;
   multiModeCombinationUseCrossPanel = true;
   shuffledWithinPanelDeck = [];
   lastPickedWithinPanel = null;
+  initMultiModeFocusedModeIndexAtCurrentLevel();
 }
 
 function getMultiModeIndividualMaxDifficulty() {
@@ -11026,8 +11078,8 @@ function createRandomCrossPanelPowerTerm() {
   if (hasPowersMode()) {
     options.push(() => createPositiveSquareTerm(randomWhole(1, POWER_SQUARE_BASE_MAX)));
     options.push(() => {
-      const exponent = Math.random() < 0.5 ? 3 : 4;
-      return createHighExponentTerm(randomWhole(1, POWER_HIGH_EXP_BASE_MAX), exponent, true);
+      const base = randomWhole(1, POWER_HIGH_EXP_BASE_MAX);
+      return createHighExponentTerm(base, pickRandomHighPowerExponent(base), true);
     });
     options.push(() => createWrappedNegativeSquareTerm(randomWhole(1, POWER_SQUARE_BASE_MAX)));
     options.push(() => createUnaryMinusSquareTerm(randomWhole(1, POWER_SQUARE_BASE_MAX)));
@@ -14269,6 +14321,26 @@ function integerPow(base, exponent) {
   return base ** exponent;
 }
 
+function isLargePowerBase(base) {
+  return Math.abs(base) > POWER_LARGE_BASE_THRESHOLD;
+}
+
+function clampPowerExponentForBase(base, exponent) {
+  if (isLargePowerBase(base)) {
+    return Math.min(exponent, POWER_LARGE_BASE_MAX_EXPONENT);
+  }
+
+  return exponent;
+}
+
+function pickRandomHighPowerExponent(base) {
+  if (isLargePowerBase(base)) {
+    return POWER_LARGE_BASE_MAX_EXPONENT;
+  }
+
+  return Math.random() < 0.5 ? 3 : 4;
+}
+
 function createPowerTerm(base, exponent, {
   baseSign = 1,
   wrapped = false,
@@ -14277,7 +14349,7 @@ function createPowerTerm(base, exponent, {
   return {
     kind: 'power',
     base,
-    exponent,
+    exponent: clampPowerExponentForBase(base, exponent),
     baseSign,
     wrapped,
     leadingNegative,
@@ -14657,9 +14729,8 @@ function generatePowersTerms(displayLevel, operandCount, requirePower = false) {
         if (displayLevel <= 2) {
           terms.push(createPositiveSquareTerm(randomWhole(1, POWER_SQUARE_BASE_MAX)));
         } else if (displayLevel === 3) {
-          const exponent = Math.random() < 0.5 ? 3 : 4;
           const base = randomWhole(1, POWER_HIGH_EXP_BASE_MAX);
-          terms.push(createHighExponentTerm(base, exponent, true));
+          terms.push(createHighExponentTerm(base, pickRandomHighPowerExponent(base), true));
         } else if (displayLevel >= 5 && Math.random() < 0.45) {
           terms.push(createRandomParenthesisPowerTerm());
         } else {
@@ -14704,9 +14775,8 @@ function createPowersLevel2Problem(displayLevel) {
 }
 
 function createPowersLevel3Problem(displayLevel) {
-  const exponent = Math.random() < 0.5 ? 3 : 4;
   const base = randomWhole(1, POWER_HIGH_EXP_BASE_MAX);
-  const term = createHighExponentTerm(base, exponent, true);
+  const term = createHighExponentTerm(base, pickRandomHighPowerExponent(base), true);
 
   return buildPowersProblem([term], [], displayLevel);
 }
@@ -16099,9 +16169,8 @@ function createRandomCombinedPowerTerm(displayLevel) {
   }
 
   if (displayLevel === 3) {
-    const exponent = Math.random() < 0.5 ? 3 : 4;
     const base = randomWhole(1, POWER_HIGH_EXP_BASE_MAX);
-    return createHighExponentTerm(base, exponent, true);
+    return createHighExponentTerm(base, pickRandomHighPowerExponent(base), true);
   }
 
   if (displayLevel >= 5 && Math.random() < 0.45) {
@@ -18047,21 +18116,40 @@ function parseAnalysisSharePayload(data) {
         throw new Error('Neplatná analýza.');
       }
 
-      const uloha = String(row[0]);
-      const modes = Array.isArray(parsed.m) ? parsed.m.map((mode) => String(mode)) : [];
-
       return {
-        uloha,
+        uloha: String(row[0]),
         uroven: Number(row[1]),
         odpoved: String(row[2]),
         spravne: String(row[3]),
         vysledek: row[4] ? 'správně' : 'špatně',
-        ulohaHtml: typeof row[5] === 'string' && row[5] !== ''
-          ? row[5]
-          : reconstructAnalysisProblemHtml(uloha, modes),
+        ulohaHtmlRaw: typeof row[5] === 'string' && row[5] !== '' ? row[5] : null,
       };
     }),
   };
+}
+
+function canFormatAnalysisProblemText(uloha) {
+  const text = String(uloha).trim();
+  return /[√^]|\d+\s*\/\s*\d+|\bx\b/.test(text);
+}
+
+function resolveAnalysisRowHtml(row, modes = sessionSelectedModes) {
+  if (row._resolvedHtml !== undefined) {
+    return row._resolvedHtml;
+  }
+
+  if (row.ulohaHtml) {
+    row._resolvedHtml = row.ulohaHtml;
+    return row._resolvedHtml;
+  }
+
+  if (row.ulohaHtmlRaw) {
+    row._resolvedHtml = row.ulohaHtmlRaw;
+    return row._resolvedHtml;
+  }
+
+  row._resolvedHtml = reconstructAnalysisProblemHtml(row.uloha, modes) || '';
+  return row._resolvedHtml;
 }
 
 const ANALYSIS_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -18842,11 +18930,19 @@ async function loadAnalysisFromSupabase(id) {
     throw new Error('missing-config');
   }
 
-  const { data, error } = await supabase
-    .from('analyses')
-    .select('payload')
-    .eq('id', id)
-    .single();
+  let data;
+  let error;
+
+  if (window.__analysisPrefetch) {
+    ({ data, error } = await window.__analysisPrefetch);
+    window.__analysisPrefetch = null;
+  } else {
+    ({ data, error } = await supabase
+      .from('analyses')
+      .select('payload')
+      .eq('id', id)
+      .single());
+  }
 
   if (error || !data?.payload) {
     throw new Error('load-failed');
@@ -19156,6 +19252,10 @@ function getProblemPdfRenderHtml(problem) {
     return formatCompoundFractionPdfRenderHtml(problem);
   }
 
+  if (isCompareProblem(problem) && problem.variant === 'order') {
+    return formatCompareOrderPdfRenderHtml(problem);
+  }
+
   return formatProblemDisplayHtml(problem);
 }
 
@@ -19169,7 +19269,10 @@ function getProblemAnswerPdfRenderHtml(problem) {
       return formatCompareSignHtml(problem, problem.answerSign);
     }
 
-    return formatPlainPdfRenderHtml(formatCompareOrderListText(problem, problem.correctOrder));
+    return formatCompareOrderPdfRenderHtml(problem, {
+      order: problem.correctOrder,
+      omitLabel: true,
+    });
   }
 
   if (problem?.type === 'non-integer-add-subtract' && getNonIntegerAnswerKind(problem) !== 'decimal') {
@@ -19734,8 +19837,11 @@ async function buildWorksheetData() {
   }
 
   const usePdfImages = shouldUseWorksheetPdfImageRendering();
+  const needsCompareOrderPdfImages = pendingSections.some(({ problems }) => (
+    problems.some((problem) => shouldRenderWorksheetProblemAsPdfImage(problem))
+  ));
 
-  if (usePdfImages) {
+  if (usePdfImages || needsCompareOrderPdfImages) {
     await loadHtml2CanvasLibrary();
   }
 
@@ -20047,14 +20153,23 @@ function formatPdfNonIntegerTerm(term) {
 
 function formatPdfCompareOperand(problem, operand) {
   if (isIntegerCompareProblem(problem)) {
-    return formatPdfPlainText(formatIntegerAnswer(operand.value));
+    return formatPdfAlignedWithFractionBar(formatIntegerAnswer(operand.value));
   }
 
   if (isNonIntegerCompareProblem(problem) || isFractionCompareProblem(problem)) {
+    if (operand.kind === 'decimal') {
+      const value = getNonIntegerTermValue(operand);
+      const text = operand.wrapped && value < 0
+        ? `(${formatDecimal(value, 1)})`
+        : formatDecimal(value, 1);
+
+      return formatPdfAlignedWithFractionBar(text);
+    }
+
     return formatPdfNonIntegerTerm(operand);
   }
 
-  return formatPdfPlainText(formatDecimal(operand.value, operand.decimals));
+  return formatPdfAlignedWithFractionBar(formatDecimal(operand.value, operand.decimals));
 }
 
 function formatPdfCompoundInlineText(text, margin = [0, 0, 0, 0]) {
@@ -20613,20 +20728,34 @@ function formatCompareSignPdfContent(problem, sign = '') {
 
 function formatCompareOrderPdfContent(problem, options = {}) {
   const order = options.order ?? problem.displayOrder ?? shuffleIndices(problem.operands.length);
-  const parts = [];
-
-  if (!options.omitLabel) {
-    parts.push(formatPdfPlainText('Uspořádej: ', [0, 3, 0, 0]));
-  }
+  const cells = [];
 
   order.forEach((index, itemIndex) => {
     if (itemIndex > 0) {
-      parts.push(formatPdfPlainText('; ', [2, 3, 2, 0]));
+      cells.push(formatPdfAlignedWithFractionBar(';', { left: 5, right: 5 }));
     }
-    parts.push(formatPdfCompareOperand(problem, problem.operands[index]));
+
+    cells.push(formatPdfCompareOperand(problem, problem.operands[index]));
   });
 
-  return formatPdfInline(parts);
+  const listContent = {
+    width: 'auto',
+    columns: cells,
+    columnGap: 2,
+  };
+
+  if (options.omitLabel) {
+    return listContent;
+  }
+
+  return {
+    width: 'auto',
+    columns: [
+      formatPdfAlignedWithFractionBar('Uspořádej:', { right: 8 }),
+      listContent,
+    ],
+    columnGap: 0,
+  };
 }
 
 function formatFractionZlomekPdfContent(problem) {
@@ -20979,6 +21108,10 @@ function formatSqrtPdfContent(problem) {
 }
 
 function shouldRenderWorksheetProblemAsPdfImage(problem) {
+  if (isCompareProblem(problem) && problem.variant === 'order') {
+    return true;
+  }
+
   if (!shouldUseWorksheetPdfImageRendering()) {
     return false;
   }
@@ -21321,12 +21454,20 @@ function buildAnalysisDocument() {
 }
 
 function hasFormattedAnalysisProblems() {
-  return sessionResults.some((row) => row.ulohaHtml);
+  return sessionResults.some((row) => (
+    row.ulohaHtmlRaw
+    || row.ulohaHtml
+    || canFormatAnalysisProblemText(row.uloha)
+  ));
 }
 
 function formatAnalysisProblemCell(row) {
-  if (analysisProblemDisplayMode === 'formatted' && row.ulohaHtml) {
-    return `<div class="analysis__problem analysis__problem--formatted" aria-label="${escapeHtml(row.uloha)}">${row.ulohaHtml}</div>`;
+  if (analysisProblemDisplayMode === 'formatted') {
+    const html = resolveAnalysisRowHtml(row);
+
+    if (html) {
+      return `<div class="analysis__problem analysis__problem--formatted" aria-label="${escapeHtml(row.uloha)}">${html}</div>`;
+    }
   }
 
   return escapeHtml(row.uloha);
@@ -21364,10 +21505,8 @@ function setAnalysisProblemDisplayMode(mode) {
   renderAnalysisTableRows();
 }
 
-function renderAnalysisTableRows() {
-  const doc = buildAnalysisDocument();
-
-  analysisTableBodyEl.innerHTML = doc.rows.map((row) => `
+function renderAnalysisTableRowHtml(row) {
+  return `
     <tr class="${row.vysledek === 'špatně' ? 'row--wrong' : ''}">
       <td class="num">${row.number}</td>
       <td>${formatAnalysisProblemCell(row)}</td>
@@ -21376,7 +21515,34 @@ function renderAnalysisTableRows() {
       <td>${escapeHtml(row.spravne)}</td>
       <td>${escapeHtml(row.vysledek)}</td>
     </tr>
-  `).join('');
+  `;
+}
+
+function renderAnalysisTableRows() {
+  const doc = buildAnalysisDocument();
+  const rows = doc.rows;
+  const chunkSize = 25;
+
+  analysisTableBodyEl.innerHTML = '';
+
+  if (rows.length === 0) {
+    return;
+  }
+
+  let index = 0;
+
+  const renderChunk = () => {
+    const end = Math.min(index + chunkSize, rows.length);
+    const html = rows.slice(index, end).map((row) => renderAnalysisTableRowHtml(row)).join('');
+    analysisTableBodyEl.insertAdjacentHTML('beforeend', html);
+    index = end;
+
+    if (index < rows.length) {
+      requestAnimationFrame(renderChunk);
+    }
+  };
+
+  renderChunk();
 }
 
 function buildAnalysisSummaryText(doc) {
@@ -23181,22 +23347,12 @@ function handleCorrectAnswer() {
   if (activeExerciseMode === 'multi-mode'
     && activeExerciseModePool.length > 1
     && multiModePhase === MULTI_MODE_PHASE.INDIVIDUAL) {
-    const focusMode = multiModeIndividualQueue[multiModeFocusedModeIndex];
-    const modeMax = getMaxDifficultyLevelForMode(focusMode);
-
-    if (correctStreak >= CORRECT_STREAK_TO_LEVEL_UP && difficultyLevel >= modeMax) {
-      multiModeFocusedModeIndex += 1;
-
-      if (multiModeFocusedModeIndex >= multiModeIndividualQueue.length) {
-        difficultyLevel = getMultiModeIndividualMaxDifficulty();
-        advanceMultiModePhaseAfterIndividualComplete();
-      } else {
-        difficultyLevel = 0;
-      }
-
+    if (correctStreak >= CORRECT_STREAK_TO_LEVEL_UP) {
       correctStreak = 0;
-      return;
+      advanceMultiModeIndividualProgress();
     }
+
+    return;
   }
 
   if (correctStreak >= CORRECT_STREAK_TO_LEVEL_UP && difficultyLevel < getMaxDifficultyLevel()) {
@@ -23210,6 +23366,10 @@ function handleWrongAnswer() {
 
   if (difficultyLevel > 0) {
     difficultyLevel -= 1;
+
+    if (activeExerciseMode === 'multi-mode' && multiModePhase === MULTI_MODE_PHASE.INDIVIDUAL) {
+      initMultiModeFocusedModeIndexAtCurrentLevel();
+    }
   }
 
   queueRetry(currentProblem);
@@ -23297,6 +23457,22 @@ function showExerciseScreen({ fromAssignment = false } = {}) {
   updateTitle();
   updateExerciseStatsUi();
   newProblem();
+}
+
+function showAnalysisLoadingScreen() {
+  hideAllScreens();
+  analysisScreenEl.hidden = false;
+  appEl.classList.add('app--wide');
+  analysisSummaryEl.innerHTML = '<p class="analysis__loading">Načítám analýzu…</p>';
+  analysisLevelsEl.innerHTML = '';
+  analysisTableBodyEl.innerHTML = '';
+  analysisProblemViewEl.hidden = true;
+  analysisDownloadBtn.disabled = true;
+  if (analysisDownloadPdfBtn) {
+    analysisDownloadPdfBtn.disabled = true;
+  }
+  analysisLinkBtn.disabled = true;
+  hideAnalysisLinkUi();
 }
 
 function showAnalysisScreen({ pendingAssignmentSubmission = false } = {}) {
@@ -24177,6 +24353,25 @@ decimalCompareInequalityButtons.forEach((button) => {
 });
 
 async function navigateFromAppHash() {
+  const analysisId = getAnalysisIdFromUrl();
+  if (analysisId) {
+    showAnalysisLoadingScreen();
+    const analysisLoaded = await loadAnalysisFromUrl();
+    if (analysisLoaded) {
+      if (activeDepotId) {
+        analysisReturnDepotId = activeDepotId;
+      }
+      showAnalysisScreen();
+      return;
+    }
+
+    showSetupScreen({ preserveAnalysisHash: true });
+    showSetupFeedback(
+      'Analýzu se nepodařilo načíst. Spusť aplikaci přes lokální server (např. npx serve) a otevři http://localhost, ne soubor file://.',
+    );
+    return;
+  }
+
   const assignmentLoaded = await loadAssignmentFromUrl();
   if (assignmentLoaded) {
     return;
@@ -24184,15 +24379,6 @@ async function navigateFromAppHash() {
 
   const depotLoaded = await loadDepotFromUrl();
   if (depotLoaded) {
-    return;
-  }
-
-  const analysisLoaded = await loadAnalysisFromUrl();
-  if (analysisLoaded) {
-    if (activeDepotId) {
-      analysisReturnDepotId = activeDepotId;
-    }
-    showAnalysisScreen();
     return;
   }
 
@@ -24205,14 +24391,6 @@ async function navigateFromAppHash() {
   if (getDepotIdFromUrl()) {
     showSetupScreen({ preserveDepotHash: true });
     showSetupFeedback('Odkaz na depozitář je neplatný nebo vypršel.');
-    return;
-  }
-
-  if (getAnalysisIdFromUrl()) {
-    showSetupScreen({ preserveAnalysisHash: true });
-    showSetupFeedback(
-      'Analýzu se nepodařilo načíst. Spusť aplikaci přes lokální server (např. npx serve) a otevři http://localhost, ne soubor file://.',
-    );
     return;
   }
 

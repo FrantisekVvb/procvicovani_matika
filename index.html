@@ -7,6 +7,22 @@
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
+  <script>
+    (function () {
+      const match = location.hash.match(/^#a=([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
+      const config = window.SUPABASE_CONFIG;
+      if (!match || !config?.url || !config?.anonKey || !window.supabase) {
+        return;
+      }
+
+      window.__analysisPrefetch = window.supabase
+        .createClient(config.url, config.anonKey)
+        .from('analyses')
+        .select('payload')
+        .eq('id', match[1])
+        .single();
+    }());
+  </script>
   <script src="main.js" defer></script>
 </head>
 <body>
