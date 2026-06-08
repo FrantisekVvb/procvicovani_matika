@@ -19318,14 +19318,10 @@ function canUseAnalysisLinkButton() {
   return !viewingSharedAnalysis && sessionResults.length > 0;
 }
 
-function canSubmitAssignment() {
-  return canUseAnalysisLinkButton() && getAnalysisName() !== '';
-}
-
 function updateAnalysisLinkButton() {
   if (pendingAssignmentDepotId) {
     analysisLinkBtn.textContent = 'Odevzdat úkol';
-    analysisLinkBtn.disabled = !canSubmitAssignment();
+    analysisLinkBtn.disabled = !canUseAnalysisLinkButton();
     return;
   }
 
