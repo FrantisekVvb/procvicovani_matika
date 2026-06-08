@@ -17834,6 +17834,67 @@ function formatAnalysisPlainTermTextToHtml(text) {
   return `<span class="problem-expression__term">${escapeHtml(trimmed)}</span>`;
 }
 
+function normalizeAnalysisPowerTermText(text) {
+  return String(text).trim().replace(/−/g, '-');
+}
+
+function formatAnalysisPowerTermTextToHtml(text) {
+  const trimmed = normalizeAnalysisPowerTermText(text);
+
+  if (!trimmed) {
+    return null;
+  }
+
+  const sqrtMatch = trimmed.match(/^√(\d+)$/);
+  if (sqrtMatch) {
+    return formatSqrtTermHtml({ kind: 'sqrt', radicand: Number(sqrtMatch[1]) });
+  }
+
+  const wrappedPowerMatch = trimmed.match(/^\((-?\d+)\)\^(\d+)$/);
+  if (wrappedPowerMatch) {
+    const baseValue = Number(wrappedPowerMatch[1]);
+    const base = Math.abs(baseValue);
+    const isNegative = baseValue < 0;
+
+    return formatPowerTermHtml(
+      createPowerTerm(base, Number(wrappedPowerMatch[2]), {
+        baseSign: isNegative ? -1 : 1,
+        wrapped: isNegative,
+      }),
+    );
+  }
+
+  const parenthesisPowerMatch = trimmed.match(/^\((\d+)\s*([+\-])\s*(\d+)\)\^(\d+)$/);
+  if (parenthesisPowerMatch) {
+    return formatPowerTermHtml(createParenthesisPowerTerm(
+      Number(parenthesisPowerMatch[1]),
+      Number(parenthesisPowerMatch[3]),
+      parenthesisPowerMatch[2] === '+' ? 'add' : 'subtract',
+      Number(parenthesisPowerMatch[4]),
+    ));
+  }
+
+  const negativeBasePowerMatch = trimmed.match(/^-(\d+)\^(\d+)$/);
+  if (negativeBasePowerMatch) {
+    return formatPowerTermHtml(createPowerTerm(
+      Number(negativeBasePowerMatch[1]),
+      Number(negativeBasePowerMatch[2]),
+      { baseSign: -1, wrapped: false },
+    ));
+  }
+
+  const positivePowerMatch = trimmed.match(/^(\d+)\^(\d+)$/);
+  if (positivePowerMatch) {
+    return formatPowerTermHtml(createPowerTerm(
+      Number(positivePowerMatch[1]),
+      Number(positivePowerMatch[2]),
+      { baseSign: 1, wrapped: false },
+    ));
+  }
+
+  return null;
+}
+
 function formatNestedCompoundPartHtmlFromRenderedParts(numeratorHtml, denominatorHtml) {
   return `<span class="fraction compound-fraction compound-fraction--nested"><span class="fraction__num">${numeratorHtml}</span><span class="fraction__bar" aria-hidden="true"></span><span class="fraction__den">${denominatorHtml}</span></span>`;
 }
@@ -17882,6 +17943,15 @@ function formatAnalysisCompoundPartTextToHtml(partText) {
   }
 
   if (/^-?\d+,\d+$/.test(trimmed)) {
+    return formatAnalysisPlainTermTextToHtml(trimmed);
+  }
+
+  const powerTermHtml = formatAnalysisPowerTermTextToHtml(trimmed);
+  if (powerTermHtml) {
+    return powerTermHtml;
+  }
+
+  if (/[√^]/.test(trimmed)) {
     return formatAnalysisPlainTermTextToHtml(trimmed);
   }
 
@@ -18095,6 +18165,8 @@ function buildAnalysisSharePayload() {
 
       if (row.ulohaHtml) {
         entry.push(row.ulohaHtml);
+      } else if (row.ulohaHtmlRaw) {
+        entry.push(row.ulohaHtmlRaw);
       }
 
       return entry;
@@ -21461,16 +21533,16 @@ function hasFormattedAnalysisProblems() {
   ));
 }
 
-function formatAnalysisProblemCell(row) {
+function formatAnalysisProblemCell(sessionRow) {
   if (analysisProblemDisplayMode === 'formatted') {
-    const html = resolveAnalysisRowHtml(row);
+    const html = resolveAnalysisRowHtml(sessionRow);
 
     if (html) {
-      return `<div class="analysis__problem analysis__problem--formatted" aria-label="${escapeHtml(row.uloha)}">${html}</div>`;
+      return `<div class="analysis__problem analysis__problem--formatted" aria-label="${escapeHtml(sessionRow.uloha)}">${html}</div>`;
     }
   }
 
-  return escapeHtml(row.uloha);
+  return escapeHtml(sessionRow.uloha);
 }
 
 function updateAnalysisProblemViewControls() {
@@ -21505,15 +21577,15 @@ function setAnalysisProblemDisplayMode(mode) {
   renderAnalysisTableRows();
 }
 
-function renderAnalysisTableRowHtml(row) {
+function renderAnalysisTableRowHtml(docRow, sessionRow) {
   return `
-    <tr class="${row.vysledek === 'špatně' ? 'row--wrong' : ''}">
-      <td class="num">${row.number}</td>
-      <td>${formatAnalysisProblemCell(row)}</td>
-      <td class="num">${row.uroven}</td>
-      <td>${escapeHtml(row.odpoved)}</td>
-      <td>${escapeHtml(row.spravne)}</td>
-      <td>${escapeHtml(row.vysledek)}</td>
+    <tr class="${docRow.vysledek === 'špatně' ? 'row--wrong' : ''}">
+      <td class="num">${docRow.number}</td>
+      <td>${formatAnalysisProblemCell(sessionRow)}</td>
+      <td class="num">${docRow.uroven}</td>
+      <td>${escapeHtml(docRow.odpoved)}</td>
+      <td>${escapeHtml(docRow.spravne)}</td>
+      <td>${escapeHtml(docRow.vysledek)}</td>
     </tr>
   `;
 }
@@ -21533,7 +21605,9 @@ function renderAnalysisTableRows() {
 
   const renderChunk = () => {
     const end = Math.min(index + chunkSize, rows.length);
-    const html = rows.slice(index, end).map((row) => renderAnalysisTableRowHtml(row)).join('');
+    const html = rows.slice(index, end).map((docRow, offset) => (
+      renderAnalysisTableRowHtml(docRow, sessionResults[index + offset])
+    )).join('');
     analysisTableBodyEl.insertAdjacentHTML('beforeend', html);
     index = end;
 
