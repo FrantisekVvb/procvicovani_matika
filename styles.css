@@ -1715,6 +1715,30 @@ body {
   font: inherit;
 }
 
+.analysis__link-open-btn {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  color: #222;
+  font: inherit;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+
+.analysis__link-open-btn:hover {
+  background: #ececec;
+}
+
+.analysis__link-open-btn:focus {
+  outline: none;
+  border-color: #333;
+}
+
 .analysis__link-copy {
   flex-shrink: 0;
   display: inline-flex;

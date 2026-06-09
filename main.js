@@ -71,9 +71,9 @@ const assignmentLinkQrLightboxEl = document.getElementById('assignment-link-qr-l
 const assignmentLinkQrLightboxCanvasEl = document.getElementById('assignment-link-qr-lightbox-canvas');
 const assignmentLinkQrLightboxCloseBtn = document.getElementById('assignment-link-qr-lightbox-close-btn');
 const assignmentDepotLinkWrapEl = document.getElementById('assignment-depot-link-wrap');
-const assignmentDepotLinkInputEl = document.getElementById('assignment-depot-link-input');
-const assignmentDepotLinkCopyBtn = document.getElementById('assignment-depot-link-copy-btn');
+const assignmentDepotOpenBtn = document.getElementById('assignment-depot-open-btn');
 const assignmentDepotLinkDownloadBtn = document.getElementById('assignment-depot-link-download-btn');
+let assignmentDepotShareUrl = '';
 const depotScreenEl = document.getElementById('depot-screen');
 const depotTableWrapEl = document.getElementById('depot-table-wrap');
 const depotEmptyEl = document.getElementById('depot-empty');
@@ -1081,9 +1081,7 @@ function hideAssignmentLinkUi() {
   if (assignmentDepotLinkWrapEl) {
     assignmentDepotLinkWrapEl.hidden = true;
   }
-  if (assignmentDepotLinkInputEl) {
-    assignmentDepotLinkInputEl.value = '';
-  }
+  assignmentDepotShareUrl = '';
   hideAssignmentLinkQrCode();
   setAssignmentCountInputLocked(false);
   setExerciseLevelPickersLocked(false);
@@ -18910,8 +18908,8 @@ async function createAssignmentLink() {
     assignmentLinkInputEl.value = url;
     assignmentLinkWrapEl.hidden = false;
 
-    if (assignmentDepotLinkInputEl && assignmentDepotLinkWrapEl) {
-      assignmentDepotLinkInputEl.value = buildDepotShareUrl(depotId);
+    if (assignmentDepotLinkWrapEl) {
+      assignmentDepotShareUrl = buildDepotShareUrl(depotId);
       assignmentDepotLinkWrapEl.hidden = false;
     }
 
@@ -21676,7 +21674,7 @@ function buildDepotLinkHtmlFile(depotUrl) {
 }
 
 function downloadDepotLinkFile() {
-  const depotUrl = assignmentDepotLinkInputEl?.value.trim();
+  const depotUrl = assignmentDepotShareUrl.trim();
   if (!depotUrl) {
     return;
   }
@@ -24527,19 +24525,13 @@ document.addEventListener('keydown', (event) => {
   }
 });
 
-assignmentDepotLinkCopyBtn?.addEventListener('click', async () => {
-  const url = assignmentDepotLinkInputEl?.value.trim();
+assignmentDepotOpenBtn?.addEventListener('click', () => {
+  const url = assignmentDepotShareUrl.trim();
   if (!url) {
     return;
   }
 
-  try {
-    await navigator.clipboard.writeText(url);
-    assignmentLinkFeedbackEl.textContent = 'Odkaz na depozitář zkopírován do schránky.';
-    assignmentLinkFeedbackEl.hidden = false;
-  } catch {
-    assignmentDepotLinkInputEl.select();
-  }
+  window.open(url, '_blank', 'noopener,noreferrer');
 });
 
 assignmentDepotLinkDownloadBtn?.addEventListener('click', () => {
